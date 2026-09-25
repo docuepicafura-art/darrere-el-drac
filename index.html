@@ -1,0 +1,404 @@
+<!doctype html>
+<html lang="ca">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Darrere el drac</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎥</text></svg>">
+<meta name="description" content="Un documental de David González i Joan Clusella">
+<style>
+:root{--bg:#f6f4ef;--card:#fff;--tx:#1f1d1a;--mut:#6d675d;--ac:#b4471f;--bd:#e2ddd2;--ok:#2e9e5b;--warn:#c47b1f;--err:#c0392b}
+@media (prefers-color-scheme:dark){:root{--bg:#1b1a18;--card:#262421;--tx:#f0ece4;--mut:#a39c8f;--ac:#e47a4f;--bd:#3a3733;--ok:#3fbf75;--warn:#e0a63c;--err:#e26a5c}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
+header{padding:20px 20px 8px;display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+h1{margin:0;font:700 26px/1.2 Georgia,serif}
+.byline{color:var(--mut);font-size:13px;font-style:italic;margin-top:2px}
+.sub{color:var(--ok);font-size:14px;min-height:20px}
+nav{display:flex;gap:8px;overflow-x:auto;padding:12px 20px;border-bottom:1px solid var(--bd)}
+nav button{flex:none;border:1px solid var(--bd);background:var(--card);color:var(--tx);padding:8px 14px;border-radius:999px;cursor:pointer;font:inherit;font-size:14px}
+nav button.on{background:var(--ac);border-color:var(--ac);color:#fff}
+main{max-width:880px;margin:0 auto;padding:20px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:18px;margin-bottom:16px}
+h2{margin:0 0 10px;font:700 20px Georgia,serif}
+h3{margin:0 0 8px;font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--mut)}
+.notes{white-space:pre-wrap}
+.task{display:flex;gap:10px;align-items:center;padding:6px 0;border-bottom:1px solid var(--bd)}
+.task:last-child{border:0}
+.task.done span{text-decoration:line-through;color:var(--mut)}
+input[type=checkbox]{width:18px;height:18px;accent-color:var(--ac)}
+input[type=text],input[type=email],input[type=password],input[type=number],textarea{width:100%;font:inherit;color:var(--tx);background:var(--bg);border:1px solid var(--bd);border-radius:8px;padding:8px}
+textarea{min-height:120px;resize:vertical}
+select,input[type=date]{font:inherit;color:var(--tx);background:var(--bg);border:1px solid var(--bd);border-radius:8px;padding:6px}
+.btn{border:1px solid var(--bd);background:var(--card);color:var(--tx);padding:7px 12px;border-radius:8px;cursor:pointer;font:inherit;font-size:14px}
+.btn.p{background:var(--ac);border-color:var(--ac);color:#fff}
+.btn.d{color:var(--err)}
+.btn.s{padding:3px 8px;font-size:13px}
+.row{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center}
+.x{margin-left:auto;background:none;border:0;color:var(--mut);cursor:pointer;font-size:18px}
+.cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
+.wd{font-size:12px;color:var(--mut);text-align:center}
+.cell{min-height:78px;background:var(--card);border:1px solid var(--bd);border-radius:8px;padding:4px;overflow:hidden}
+.cell.e{background:none;border:0}
+.dn{font-size:12px;color:var(--mut)}
+.chip{font-size:11px;line-height:1.3;padding:2px 6px;border-radius:5px;margin-top:3px;color:#fff;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-block;max-width:100%}
+.cell .chip{display:block}
+.chip.done{opacity:.5;text-decoration:line-through}
+.k0{background:#b4471f}.k1{background:#2f6f8f}.k2{background:#7a5aa6}.k3{background:#3d8b5f}.k4{background:#7d776b}
+.tag{font-size:12px;color:#fff;padding:1px 8px;border-radius:999px;margin-left:auto;white-space:nowrap}
+.pp{font-size:12px;color:var(--mut);white-space:nowrap}
+.badge{font-size:12px;color:var(--mut)}
+#login{max-width:340px;margin:12vh auto;padding:20px}
+#login h1{font-size:24px}
+#login input{margin-bottom:10px}
+#err{color:var(--err);font-size:14px;min-height:20px}
+.bud-list{width:100%;font-size:14px}
+.bud-head{display:grid;grid-template-columns:28px 1fr 130px 110px 110px 100px 32px;gap:8px;padding:6px 0;border-bottom:2px solid var(--bd);font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--mut);font-weight:600;align-items:center}
+.bud-row{display:grid;grid-template-columns:28px 1fr 130px 110px 110px 100px 32px;gap:8px;padding:6px 0;border-bottom:1px solid var(--bd);align-items:center}
+.bud-row:hover{background:rgba(180,71,31,.05)}
+.bud-row .bc-caret{text-align:center}
+.bud-row .bc-num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.bud-row .bc-num.strong{font-weight:600}
+.bud-row .bc-estat{white-space:nowrap}
+.bud-row .bc-x{text-align:center}
+.caret{background:none;border:0;color:var(--mut);cursor:pointer;font-size:14px;padding:0 6px;transition:transform .15s;display:inline-block}
+.caret.open{transform:rotate(90deg)}
+.cat-pill{display:inline-block;font-size:11px;padding:2px 8px;border-radius:999px;background:var(--bg);border:1px solid var(--bd);color:var(--mut);white-space:nowrap}
+.st-pill{display:inline-block;font-size:11px;padding:2px 8px;border-radius:999px;color:#fff;white-space:nowrap}
+.st-pendent{background:#a39c8f}
+.st-aprovat{background:#2f6f8f}
+.st-pagat{background:#2e9e5b}
+.exp-box{padding:10px 10px 12px 40px;background:var(--bg);border-bottom:1px solid var(--bd)}
+.exp-item{display:flex;gap:10px;align-items:center;padding:4px 0;border-bottom:1px dashed var(--bd)}
+.exp-item:last-of-type{border:0}
+.exp-date{color:var(--mut);font-variant-numeric:tabular-nums;min-width:70px}
+.exp-name{flex:1}
+.exp-amt{font-variant-numeric:tabular-nums;font-weight:600;min-width:80px;text-align:right}
+.exp-add{margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.exp-add input{padding:5px 8px;font-size:13px}
+.exp-add input.d{max-width:140px}
+.exp-add input.a{max-width:110px}
+.exp-add input.t{flex:1;min-width:140px}
+.summary{display:grid;grid-template-columns:1fr auto;gap:6px 16px;font-variant-numeric:tabular-nums}
+.summary .lbl{color:var(--mut)}
+.summary .val{font-weight:600;text-align:right;white-space:nowrap}
+.summary .big{font-size:18px;font-weight:700}
+.summary .pos{color:var(--err)}
+.summary .neg{color:var(--ok)}
+@media (max-width:640px){
+  .bud-head,.bud-row{grid-template-columns:24px 1fr 90px 32px}
+  .bud-head .hide-s,.bud-row .hide-s{display:none}
+  main{padding:12px}
+}
+</style>
+</head>
+<body>
+<div id="login" hidden>
+  <h1>Darrere el drac</h1>
+  <div class="byline">Un documental de David González i Joan Clusella</div>
+  <p class="badge" style="margin-top:14px">Entra amb el teu correu i contrasenya.</p>
+  <input type="email" id="em" placeholder="Correu">
+  <input type="password" id="pw" placeholder="Contrasenya">
+  <button class="btn p" id="go">Entrar</button>
+  <div id="err"></div>
+</div>
+<div id="ui" hidden>
+  <header>
+    <div>
+      <h1>Darrere el drac</h1>
+      <div class="byline">Un documental de David González i Joan Clusella</div>
+      <div class="sub" id="who"></div>
+    </div>
+    <button class="btn" id="out">Sortir</button>
+  </header>
+  <nav id="nav"></nav>
+  <main id="app"></main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script>
+// =============================================
+// === POSA AQUÍ LES TEVES DADES DE SUPABASE ===
+const SUPABASE_URL = 'https://edmppcurmxlbjeiigacw.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_RIXMNmjl2gvoJjnPVFgi8Q_fkMXYe3x';
+// =============================================
+
+const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const $ = s => document.querySelector(s);
+const el = (t, p = {}, k = []) => { const e = document.createElement(t); for (const a in p) { if (a === 'class') e.className = p[a]; else if (a.startsWith('on')) e.addEventListener(a.slice(2), p[a]); else e[a] = p[a]; } [].concat(k).forEach(c => e.append(c)); return e; };
+const KINDS = ['Rodatge', 'Producció', 'Entrevista', 'Postproducció', 'Altres'];
+const ki = k => { const i = KINDS.indexOf(k.k); return i < 0 ? 4 : i; };
+const CATS = ['Personal intern', 'Personal extern', 'Fixer extern', 'Empresa externa', 'Contractació interna', 'Altres'];
+const STATS = [['pendent', 'Pendent'], ['aprovat', 'Aprovat'], ['pagat', 'Pagat']];
+const stClass = s => 'st-' + (s || 'pendent');
+const stLabel = s => ({ pendent: 'Pendent', aprovat: 'Aprovat', pagat: 'Pagat' }[s] || 'Pendent');
+const fmt = d => d.split('-').reverse().slice(0, 2).join('/');
+const iso = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+const eur = n => (Number(n) || 0).toLocaleString('ca-ES', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) + ' €';
+const realOf = p => (p.exp || []).reduce((a, e) => a + (Number(e.a) || 0), 0);
+const isBudgetSec = s => /pressupost/i.test(s.name);
+
+const PARTIDES_INICIALS = [
+  {c:"Direcció",cat:"Personal intern",p:0,st:"pendent",exp:[]},
+  {c:"Guió",cat:"Personal intern",p:4000,st:"pendent",exp:[]},
+  {c:"Direcció de fotografia",cat:"Personal intern",p:0,st:"pendent",exp:[]},
+  {c:"Operador càmera / il·luminació / so",cat:"Personal intern",p:5500,st:"pendent",exp:[]},
+  {c:"Producció",cat:"Fixer extern",p:1500,st:"pendent",exp:[]},
+  {c:"Romanent",cat:"Altres",p:1000,st:"pendent",exp:[]},
+  {c:"Muntatge i etalonatge",cat:"Personal intern",p:0,st:"pendent",exp:[]},
+  {c:"Postproducció i grafisme",cat:"Personal intern",p:0,st:"pendent",exp:[]},
+  {c:"Postproducció so",cat:"Personal extern",p:1500,st:"pendent",exp:[]},
+  {c:"Composició BSO",cat:"Personal extern",p:3250,st:"pendent",exp:[]},
+  {c:"Drets imatges arxiu",cat:"Altres",p:7000,st:"pendent",exp:[]},
+  {c:"Rodatge en localitzacions",cat:"Altres",p:6000,st:"pendent",exp:[]},
+  {c:"Material tècnic",cat:"Altres",p:5000,st:"pendent",exp:[]},
+  {c:"Subtitulació",cat:"Empresa externa",p:3000,st:"pendent",exp:[]},
+  {c:"Veus (veu + màgia)",cat:"Personal extern",p:750,st:"pendent",exp:[]},
+  {c:"Veus (veu animacions)",cat:"Personal extern",p:250,st:"pendent",exp:[]},
+  {c:"Il·lustracions",cat:"Personal extern",p:4500,st:"pendent",exp:[]},
+  {c:"Animació",cat:"Empresa externa",p:3250,st:"pendent",exp:[]},
+  {c:"Distribució i comunicació (interna)",cat:"Contractació interna",p:10200,st:"pendent",exp:[]},
+  {c:"Distribució i comunicació (empreses)",cat:"Empresa externa",p:4500,st:"pendent",exp:[]},
+  {c:"Dietes i desplaçaments",cat:"Altres",p:2500,st:"pendent",exp:[]}
+];
+
+let secs = [], people = ['Joan', 'David'], cur = 'cal', editing = false, me = '', peers = {}, pch = null;
+let openBud = {}, cal = (() => { const n = new Date(); return { y: n.getFullYear(), m: n.getMonth() }; })();
+const timers = {};
+
+function save(s) { clearTimeout(timers[s.id]); timers[s.id] = setTimeout(() => db.from('sections').upsert({ id: s.id, pos: s.pos, name: s.name, notes: s.notes, tasks: s.tasks || [], budget: s.budget || [] }), 500); }
+function savePeople() { db.from('settings').upsert({ id: 1, people }); }
+function retag(o, n) { secs.forEach(s => { let ch = false; (s.tasks || []).forEach(k => { if (k.p === o) { k.p = n; ch = true; } }); if (ch) save(s); }); }
+
+const nm = e => e.split('@')[0];
+const others = id => Object.entries(peers).filter(([k, v]) => k !== me && v.some(x => x.sec === id)).map(([k]) => nm(k));
+function goto(id) { cur = id; render(); if (pch) pch.track({ sec: id }); }
+function paintNav() {
+  const n = $('#nav'); n.innerHTML = '';
+  n.append(el('button', { class: cur === 'cal' ? 'on' : '', textContent: '📅 Calendari', onclick: () => goto('cal') }));
+  secs.forEach(s => n.append(el('button', { class: s.id === cur ? 'on' : '', textContent: s.name + (others(s.id).length ? ' 🟢' : ''), onclick: () => goto(s.id) })));
+  if (editing) n.append(el('button', { textContent: '+ Secció', onclick: addSec }));
+  const o = cur === 'cal' ? [] : others(cur);
+  $('#who').textContent = o.length ? '🟢 ' + o.join(', ') + (o.length > 1 ? ' són' : ' és') + ' en aquesta secció ara' : '';
+}
+
+function addSec() { const n = { id: 's' + Date.now().toString(36), pos: (secs.length ? Math.max(...secs.map(x => x.pos)) : 0) + 1, name: 'Nova secció', notes: '', tasks: [], budget: [] }; secs.push(n); save(n); goto(n.id); }
+function move(d) { const i = secs.findIndex(x => x.id === cur), j = i + d; if (j < 0 || j >= secs.length) return; const a = secs[i], b = secs[j]; [a.pos, b.pos] = [b.pos, a.pos]; secs.sort((x, y) => x.pos - y.pos); save(a); save(b); render(); }
+const sel = k => el('select', { onchange: e => { k.k = e.target.value; save(cur_()); } }, KINDS.map(n => el('option', { value: n, textContent: n, selected: (k.k || 'Altres') === n })));
+const psel = k => el('select', { onchange: e => { k.p = e.target.value; save(cur_()); } }, [el('option', { value: '', textContent: 'Sense assignar' })].concat(people.map(n => el('option', { value: n, textContent: n, selected: k.p === n }))));
+const cur_ = () => secs.find(x => x.id === cur);
+
+function render() {
+  paintNav();
+  const app = $('#app'); app.innerHTML = '';
+  if (cur === 'cal') return renderCal();
+  const s = cur_();
+  if (!s) { app.textContent = 'Encara no hi ha seccions.'; return; }
+
+  app.append(el('div', { class: 'row', style: 'margin:0 0 14px' }, el('button', { class: 'btn', textContent: editing ? "Acabar d'editar" : 'Editar', onclick: () => { editing = !editing; render(); } })));
+
+  const c = el('div', { class: 'card' });
+  if (editing) {
+    c.append(el('h3', { textContent: 'Nom de la secció' }), el('input', { type: 'text', value: s.name, oninput: e => { s.name = e.target.value; save(s); } }));
+    c.append(el('h3', { style: 'margin-top:14px', textContent: 'Notes' }), el('textarea', { value: s.notes, oninput: e => { s.notes = e.target.value; save(s); } }));
+  } else {
+    c.append(el('h2', { textContent: s.name }));
+    if (s.notes) c.append(el('div', { class: 'notes', textContent: s.notes }));
+  }
+  app.append(c);
+
+  if (isBudgetSec(s) && (!s.budget || s.budget.length === 0)) {
+    s.budget = JSON.parse(JSON.stringify(PARTIDES_INICIALS));
+    save(s);
+  }
+
+  if (isBudgetSec(s)) app.append(renderBudget(s));
+  else app.append(renderTasks(s));
+
+  if (editing) {
+    const pc = el('div', { class: 'card' }, el('h3', { textContent: "Persones de l'equip" }));
+    people.forEach((n, i) => pc.append(el('div', { class: 'task' }, [
+      el('input', { type: 'text', value: n, onchange: e => { const v = e.target.value.trim(); if (!v) return; retag(people[i], v); people[i] = v; savePeople(); render(); } }),
+      el('button', { class: 'x', textContent: '×', onclick: () => { retag(people[i], ''); people.splice(i, 1); savePeople(); render(); } })])));
+    pc.append(el('div', { class: 'row' }, el('button', { class: 'btn', textContent: '+ Persona', onclick: () => { people.push('Nova persona'); savePeople(); render(); } })));
+    app.append(pc);
+    app.append(el('div', { class: 'row' }, [
+      el('button', { class: 'btn', textContent: '← Moure', onclick: () => move(-1) }),
+      el('button', { class: 'btn', textContent: 'Moure →', onclick: () => move(1) }),
+      el('button', { class: 'btn d', textContent: 'Eliminar secció', onclick: () => { if (confirm('Eliminar aquesta secció?')) { secs = secs.filter(x => x.id !== s.id); db.from('sections').delete().eq('id', s.id); goto(secs[0] ? secs[0].id : 'cal'); } } })]));
+  }
+}
+
+function renderTasks(s) {
+  const t = el('div', { class: 'card' }, el('h3', { textContent: 'Tasques' }));
+  (s.tasks || []).forEach((k, i) => {
+    const row = el('div', { class: 'task' + (k.done ? ' done' : '') });
+    row.append(el('input', { type: 'checkbox', checked: k.done, onchange: e => { k.done = e.target.checked; save(s); render(); } }));
+    if (editing) { row.style.flexWrap = 'wrap'; row.append(el('input', { type: 'text', value: k.t, style: 'flex:1;min-width:140px', oninput: e => { k.t = e.target.value; save(s); } }), sel(k), psel(k), el('input', { type: 'date', value: k.d || '', oninput: e => { k.d = e.target.value; save(s); } }), el('button', { class: 'x', textContent: '×', onclick: () => { s.tasks.splice(i, 1); save(s); render(); } })); }
+    else row.append(el('span', { textContent: k.t }), k.d ? el('span', { class: 'tag k' + ki(k), textContent: (k.k || 'Altres') + ' · ' + fmt(k.d) }) : '', k.p ? el('span', { class: 'pp', textContent: '👤 ' + k.p }) : '');
+    t.append(row);
+  });
+  if (!(s.tasks || []).length) t.append(el('div', { class: 'badge', textContent: 'Cap tasca.' }));
+  if (editing) t.append(el('div', { class: 'row' }, el('button', { class: 'btn', textContent: '+ Tasca', onclick: () => { s.tasks = s.tasks || []; s.tasks.push({ t: '', done: false, k: 'Altres', d: '' }); save(s); render(); } })));
+  return t;
+}
+
+function renderBudget(s) {
+  s.budget = s.budget || [];
+  const wrap = el('div', { class: 'card' });
+
+  wrap.append(el('div', { class: 'row', style: 'justify-content:space-between;margin:0 0 8px;align-items:center' }, [
+    el('h3', { textContent: 'Full de pressupost', style: 'margin:0' }),
+    el('div', { class: 'row', style: 'margin:0' }, [
+      editing ? el('button', { class: 'btn s', textContent: '📥 Recarregar partides', onclick: () => {
+        if (!confirm('Això sobreescriurà el pressupost actual amb les 21 partides inicials. Continuar?')) return;
+        s.budget = JSON.parse(JSON.stringify(PARTIDES_INICIALS));
+        save(s); render();
+      } }) : '',
+      editing ? el('button', { class: 'btn', textContent: '+ Nova partida', onclick: () => { s.budget.push({ c: '', cat: 'Altres', p: 0, st: 'pendent', exp: [] }); save(s); render(); } }) : ''
+    ].filter(Boolean))
+  ].filter(Boolean)));
+
+  if (!s.budget.length) {
+    wrap.append(el('div', { class: 'badge', textContent: 'Cap partida. Prem "Editar" i després "+ Nova partida".' }));
+    return wrap;
+  }
+
+  const list = el('div', { class: 'bud-list' });
+  list.append(el('div', { class: 'bud-head' }, [
+    el('div', { class: 'bc-caret' }),
+    el('div', { textContent: 'Concepte' }),
+    el('div', { class: 'hide-s', textContent: 'Tipus' }),
+    el('div', { class: 'bc-num', textContent: 'Previst' }),
+    el('div', { class: 'bc-num', textContent: 'Real' }),
+    el('div', { class: 'hide-s', textContent: 'Estat' }),
+    el('div', { class: 'bc-x' })
+  ]));
+
+  s.budget.forEach((p, idx) => {
+    const open = !!openBud[idx];
+    const real = realOf(p);
+    const row = el('div', { class: 'bud-row' + (open ? ' open' : '') });
+    row.append(el('div', { class: 'bc-caret' }, el('button', { class: 'caret' + (open ? ' open' : ''), textContent: '▶', title: 'Veure despeses', onclick: () => { openBud[idx] = !openBud[idx]; render(); } })));
+
+    if (editing) {
+      row.append(el('div', {}, el('input', { type: 'text', value: p.c, placeholder: 'Concepte', oninput: e => { p.c = e.target.value; save(s); } })));
+      row.append(el('div', { class: 'hide-s' }, el('select', { onchange: e => { p.cat = e.target.value; save(s); } }, CATS.map(c => el('option', { value: c, textContent: c, selected: (p.cat || 'Altres') === c })))));
+      row.append(el('div', { class: 'bc-num' }, el('input', { type: 'number', value: p.p, min: 0, step: '0.01', style: 'text-align:right', oninput: e => { p.p = Number(e.target.value) || 0; save(s); } })));
+    } else {
+      row.append(el('div', { textContent: p.c || '(sense nom)' }));
+      row.append(el('div', { class: 'hide-s' }, el('span', { class: 'cat-pill', textContent: p.cat || 'Altres' })));
+      row.append(el('div', { class: 'bc-num', textContent: eur(p.p) }));
+    }
+
+    row.append(el('div', { class: 'bc-num strong', textContent: eur(real) }));
+
+    if (editing) {
+      row.append(el('div', { class: 'hide-s' }, el('select', { onchange: e => { p.st = e.target.value; save(s); } }, STATS.map(([v, l]) => el('option', { value: v, textContent: l, selected: (p.st || 'pendent') === v })))));
+    } else {
+      row.append(el('div', { class: 'hide-s' }, el('span', { class: 'st-pill ' + stClass(p.st), textContent: stLabel(p.st) })));
+    }
+
+    row.append(el('div', { class: 'bc-x' }, editing ? el('button', { class: 'x', textContent: '×', title: 'Eliminar partida', onclick: () => { if (confirm('Eliminar aquesta partida?')) { s.budget.splice(idx, 1); save(s); render(); } } }) : ''));
+    list.append(row);
+
+    if (open) {
+      const box = el('div', { class: 'exp-box' });
+      (p.exp || []).forEach((e, ei) => {
+        const item = el('div', { class: 'exp-item' });
+        if (editing) {
+          item.append(el('input', { type: 'date', class: 'd', value: e.d || '', oninput: ev => { e.d = ev.target.value; save(s); } }));
+          item.append(el('input', { type: 'text', class: 't', placeholder: 'Concepte', value: e.t || '', oninput: ev => { e.t = ev.target.value; save(s); } }));
+          item.append(el('input', { type: 'number', class: 'a', value: e.a || 0, min: 0, step: '0.01', oninput: ev => { e.a = Number(ev.target.value) || 0; save(s); } }));
+          item.append(el('button', { class: 'x', textContent: '×', onclick: () => { p.exp.splice(ei, 1); save(s); render(); } }));
+        } else {
+          item.append(el('span', { class: 'exp-date', textContent: e.d ? fmt(e.d) : '—' }));
+          item.append(el('span', { class: 'exp-name', textContent: e.t || '(sense concepte)' }));
+          item.append(el('span', { class: 'exp-amt', textContent: eur(e.a) }));
+        }
+        box.append(item);
+      });
+      if (!(p.exp || []).length) box.append(el('div', { class: 'badge', textContent: 'Cap despesa apuntada.' }));
+      if (editing) box.append(el('div', { class: 'exp-add' }, el('button', { class: 'btn s', textContent: '+ Afegir despesa', onclick: () => { p.exp = p.exp || []; p.exp.push({ d: '', t: '', a: 0 }); save(s); render(); } })));
+      list.append(box);
+    }
+  });
+
+  wrap.append(list);
+
+  const totalP = s.budget.reduce((a, p) => a + (Number(p.p) || 0), 0);
+  const totalR = s.budget.reduce((a, p) => a + realOf(p), 0);
+  const diff = totalR - totalP;
+  const pendentPag = s.budget.filter(p => (p.st || 'pendent') !== 'pagat').reduce((a, p) => a + Math.max(0, (Number(p.p) || 0) - realOf(p)), 0);
+
+  const sum = el('div', { class: 'summary', style: 'margin-top:16px;padding-top:14px;border-top:2px solid var(--bd)' });
+  sum.append(el('div', { class: 'lbl', textContent: 'Total previst' }), el('div', { class: 'val big', textContent: eur(totalP) }));
+  sum.append(el('div', { class: 'lbl', textContent: 'Total real' }), el('div', { class: 'val big', textContent: eur(totalR) }));
+  sum.append(el('div', { class: 'lbl', textContent: 'Diferència (real − previst)' }), el('div', { class: 'val big ' + (diff > 0 ? 'pos' : diff < 0 ? 'neg' : ''), textContent: (diff > 0 ? '+' : '') + eur(diff) + (diff > 0 ? ' (excés)' : diff < 0 ? ' (estalvi)' : '') }));
+  sum.append(el('div', { class: 'lbl', textContent: 'Pendent de pagar' }), el('div', { class: 'val', textContent: eur(pendentPag) }));
+  wrap.append(sum);
+
+  return wrap;
+}
+
+function renderCal() {
+  const app = $('#app'); app.innerHTML = '';
+  const by = {}; secs.forEach(s => (s.tasks || []).forEach(k => { if (k.d) (by[k.d] = by[k.d] || []).push({ k, s }); }));
+  app.append(el('div', { class: 'row', style: 'align-items:center;justify-content:space-between;margin:0 0 12px' }, [
+    el('button', { class: 'btn', textContent: '←', onclick: () => { cal.m--; if (cal.m < 0) { cal.m = 11; cal.y--; } render(); } }),
+    el('strong', { textContent: new Date(cal.y, cal.m, 1).toLocaleDateString('ca', { month: 'long', year: 'numeric' }) }),
+    el('button', { class: 'btn', textContent: '→', onclick: () => { cal.m++; if (cal.m > 11) { cal.m = 0; cal.y++; } render(); } })]));
+  const g = el('div', { class: 'cal' });
+  ['Dl', 'Dt', 'Dc', 'Dj', 'Dv', 'Ds', 'Dg'].forEach(d => g.append(el('div', { class: 'wd', textContent: d })));
+  const off = (new Date(cal.y, cal.m, 1).getDay() + 6) % 7, dim = new Date(cal.y, cal.m + 1, 0).getDate();
+  for (let i = 0; i < off; i++) g.append(el('div', { class: 'cell e' }));
+  for (let d = 1; d <= dim; d++) {
+    const key = cal.y + '-' + String(cal.m + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+    const c = el('div', { class: 'cell' }, el('div', { class: 'dn', textContent: d }));
+    (by[key] || []).forEach(({ k, s }) => c.append(el('div', { class: 'chip k' + ki(k) + (k.done ? ' done' : ''), textContent: k.t || '(sense títol)', title: s.name + ' · ' + (k.k || 'Altres') + (k.p ? ' · ' + k.p : ''), onclick: () => goto(s.id) })));
+    g.append(c);
+  }
+  app.append(g);
+  app.append(el('div', { class: 'row' }, KINDS.map((n, i) => el('span', { class: 'chip k' + i, textContent: n }))));
+  const t0 = new Date(), today = iso(t0), wk = iso(new Date(t0.getFullYear(), t0.getMonth(), t0.getDate() + 6));
+  const up = []; secs.forEach(s => (s.tasks || []).forEach(k => { if (k.d && !k.done && k.d >= today) up.push({ k, s }); }));
+  up.sort((a, b) => a.k.d < b.k.d ? -1 : a.k.d > b.k.d ? 1 : 0);
+  [['Aquesta setmana', up.filter(x => x.k.d <= wk)], ['Més endavant', up.filter(x => x.k.d > wk).slice(0, 10)]].forEach(([h, l]) => {
+    const c = el('div', { class: 'card', style: 'margin-top:16px' }, el('h3', { textContent: h }));
+    if (!l.length) c.append(el('div', { class: 'badge', textContent: 'Res pendent.' }));
+    l.forEach(({ k, s }) => c.append(el('div', { class: 'task', style: 'cursor:pointer', onclick: () => goto(s.id) }, [el('span', { class: 'pp', textContent: fmt(k.d) }), el('span', { textContent: k.t || '(sense títol)' }), el('span', { class: 'tag k' + ki(k), textContent: k.k || 'Altres' }), k.p ? el('span', { class: 'pp', textContent: '👤 ' + k.p }) : ''])));
+    app.append(c);
+  });
+}
+
+const busy = () => { const a = document.activeElement; return a && $('#app').contains(a) && /INPUT|TEXTAREA|SELECT/.test(a.tagName); };
+async function start(user) {
+  me = user.email;
+  $('#login').hidden = true; $('#ui').hidden = false;
+  const a = await db.from('sections').select('*').order('pos'); secs = a.data || [];
+  const b = await db.from('settings').select('people').eq('id', 1).maybeSingle(); if (b.data) people = b.data.people;
+  cur = 'cal'; render();
+  db.channel('canvis')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'sections' }, p => {
+      if (p.eventType === 'DELETE') secs = secs.filter(x => x.id !== p.old.id);
+      else { if (p.new.id === cur && busy()) return; const i = secs.findIndex(x => x.id === p.new.id); if (i < 0) secs.push(p.new); else Object.assign(secs[i], p.new); }
+      secs.sort((x, y) => x.pos - y.pos); if (!busy()) render(); else paintNav();
+    })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'settings' }, p => { if (p.new && p.new.people) { people = p.new.people; if (!busy()) render(); } })
+    .subscribe();
+  pch = db.channel('presencia', { config: { presence: { key: me } } });
+  pch.on('presence', { event: 'sync' }, () => { peers = pch.presenceState(); paintNav(); })
+     .subscribe(st => { if (st === 'SUBSCRIBED') pch.track({ sec: cur }); });
+}
+$('#go').onclick = async () => {
+  const r = await db.auth.signInWithPassword({ email: $('#em').value.trim(), password: $('#pw').value });
+  if (r.error) $('#err').textContent = 'Correu o contrasenya incorrectes.'; else start(r.data.user);
+};
+$('#out').onclick = async () => { await db.auth.signOut(); location.reload(); };
+(async () => {
+  const { data } = await db.auth.getSession();
+  if (data.session) start(data.session.user); else $('#login').hidden = false;
+})();
+</script>
+</body>
+</html>
