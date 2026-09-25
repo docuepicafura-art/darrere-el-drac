@@ -53,6 +53,7 @@ input[type=time]{padding:6px;width:auto}
 #login h1{font-size:24px}
 #login input{margin-bottom:10px}
 #err{color:var(--err);font-size:14px;min-height:20px}
+
 .agenda-item{display:grid;grid-template-columns:120px 1fr auto;gap:12px;align-items:center;padding:10px 0;border-bottom:1px solid var(--bd);cursor:pointer}
 .agenda-item:last-child{border-bottom:0}
 .agenda-item:hover{background:rgba(180,71,31,.05)}
@@ -62,6 +63,7 @@ input[type=time]{padding:6px;width:auto}
 .agenda-who{font-size:12px;color:var(--mut);white-space:nowrap}
 .agenda-empty{color:var(--mut);font-size:13px;padding:6px 0}
 .agenda-chip{font-size:11px;padding:2px 8px;border-radius:999px;color:#fff;white-space:nowrap}
+
 .bud-list{width:100%;font-size:14px}
 .bud-head{display:grid;grid-template-columns:28px 1fr 130px 110px 110px 100px 32px;gap:8px;padding:6px 0;border-bottom:2px solid var(--bd);font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--mut);font-weight:600;align-items:center}
 .bud-row{display:grid;grid-template-columns:28px 1fr 130px 110px 110px 100px 32px;gap:8px;padding:6px 0;border-bottom:1px solid var(--bd);align-items:center}
@@ -95,11 +97,25 @@ input[type=time]{padding:6px;width:auto}
 .summary .big{font-size:18px;font-weight:700}
 .summary .pos{color:var(--err)}
 .summary .neg{color:var(--ok)}
+
+/* Adjunts */
+.files-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-top:12px}
+.file-card{background:var(--bg);border:1px solid var(--bd);border-radius:8px;padding:10px;display:flex;flex-direction:column;gap:8px;position:relative}
+.file-thumb{width:100%;height:120px;object-fit:cover;border-radius:6px;background:var(--card)}
+.file-icon{width:100%;height:120px;display:flex;align-items:center;justify-content:center;font-size:48px;background:var(--card);border-radius:6px}
+.file-name{font-size:12px;word-break:break-word;line-height:1.3;max-height:2.6em;overflow:hidden;text-overflow:ellipsis}
+.file-size{font-size:11px;color:var(--mut)}
+.file-actions{display:flex;gap:6px;margin-top:auto}
+.file-actions .btn{flex:1;padding:4px 6px;font-size:12px;text-align:center}
+.file-actions .btn.d{flex:0 0 auto}
+audio{width:100%;height:32px;margin-top:4px}
+
 @media (max-width:640px){
   .bud-head,.bud-row{grid-template-columns:24px 1fr 90px 32px}
   .bud-head .hide-s,.bud-row .hide-s{display:none}
   .agenda-item{grid-template-columns:100px 1fr;gap:8px}
   .agenda-who{display:none}
+  .files-grid{grid-template-columns:repeat(auto-fill,minmax(130px,1fr))}
   main{padding:12px}
 }
 </style>
@@ -151,6 +167,7 @@ const isBudgetSec = s => /pressupost/i.test(s.name);
 const isOverviewSec = s => /visi[oó]\s*general/i.test(s.name);
 const dias = ['diumenge','dilluns','dimarts','dimecres','dijous','divendres','dissabte'];
 const diaLabel = d => { const dt = new Date(d + 'T00:00:00'); return dias[dt.getDay()]; };
+const humanSize = b => { if (!b) return '0 B'; const u = ['B','KB','MB','GB']; const i = Math.floor(Math.log(b) / Math.log(1024)); return (b / Math.pow(1024, i)).toFixed(1) + ' ' + u[i]; };
 const PARTIDES_INICIALS = [
   {c:"Direcció",cat:"Personal intern",p:0,st:"pendent",exp:[]},
   {c:"Guió",cat:"Personal intern",p:4000,st:"pendent",exp:[]},
@@ -184,14 +201,8 @@ function save(s) {
   clearTimeout(timers[s.id]);
   timers[s.id] = setTimeout(async () => {
     const payload = { id: s.id, pos: s.pos, name: s.name, notes: s.notes || '', tasks: s.tasks || [], budget: s.budget || [] };
-    console.log('ENVIANT A SUPABASE:', JSON.stringify(payload).substring(0, 300));
     const r = await db.from('sections').upsert(payload);
-    if (r.error) {
-      console.error('❌ ERROR GUARDANT:', r.error);
-      alert('Error guardant: ' + r.error.message);
-    } else {
-      console.log('✅ Guardat ok:', s.name, 'budget length:', (s.budget || []).length);
-    }
+    if (r.error) { console.error('Error guardant:', r.error); alert('Error: ' + r.error.message); }
   }, 500);
 }
 function savePeople() { db.from('settings').upsert({ id: 1, people }); }
@@ -241,6 +252,11 @@ function render() {
     app.append(renderBudget(s));
   } else {
     app.append(renderTasks(s));
+  }
+
+  // Fitxers adjunts a totes les seccions excepte Visió general
+  if (!isOverviewSec(s)) {
+    app.append(renderFiles(s));
   }
 
   if (editing) {
@@ -310,6 +326,22 @@ function renderOverview() {
     c3.append(el('div', { class: 'agenda-empty', textContent: 'Encara no hi ha pressupost.' }));
   }
   wrap.append(c3);
+
+  // Recollida ràpida de fitxers adjunts
+  const fitxers = [];
+  secs.forEach(sec => (sec.files || []).forEach(f => fitxers.push({ ...f, secName: sec.name, secId: sec.id })));
+  if (fitxers.length) {
+    const c4 = el('div', { class: 'card' }, el('h3', { textContent: '📎 Últims fitxers pujats' }));
+    fitxers.slice(-6).reverse().forEach(f => {
+      c4.append(el('div', { class: 'agenda-item', onclick: () => goto(f.secId) }, [
+        el('div', { class: 'agenda-when', textContent: '📄' }),
+        el('div', {}, [el('div', { class: 'agenda-title', textContent: f.name }), el('div', { class: 'agenda-who', textContent: f.secName })]),
+        el('div', { class: 'agenda-chip', textContent: humanSize(f.size) })
+      ]));
+    });
+    wrap.append(c4);
+  }
+
   return wrap;
 }
 function renderTasks(s) {
@@ -335,6 +367,122 @@ function renderTasks(s) {
   if (!(s.tasks || []).length) t.append(el('div', { class: 'badge', textContent: 'Cap tasca.' }));
   if (editing) t.append(el('div', { class: 'row' }, el('button', { class: 'btn', textContent: '+ Tasca', onclick: () => { s.tasks = s.tasks || []; s.tasks.push({ t: '', done: false, k: 'Altres', d: '', h: '' }); save(s); render(); } })));
   return t;
+}
+
+// ==================== FITXERS ADJUNTS ====================
+function fileKind(mime, name) {
+  if (!mime && name) mime = name.split('.').pop().toLowerCase();
+  if (typeof mime === 'string') {
+    if (mime.startsWith('image/')) return 'image';
+    if (mime.startsWith('audio/')) return 'audio';
+    if (mime.startsWith('video/')) return 'video';
+    if (mime === 'application/pdf' || mime === 'pdf') return 'pdf';
+    if (mime.includes('word') || mime === 'doc' || mime === 'docx') return 'doc';
+    if (mime.includes('sheet') || mime.includes('excel') || mime === 'xls' || mime === 'xlsx') return 'sheet';
+  }
+  return 'file';
+}
+
+function fileIcon(kind) {
+  return { image: '🖼️', audio: '🎵', video: '🎬', pdf: '📄', doc: '📝', sheet: '📊', file: '📎' }[kind] || '📎';
+}
+
+function renderFiles(s) {
+  s.files = s.files || [];
+  const card = el('div', { class: 'card' });
+  card.append(el('div', { class: 'row', style: 'justify-content:space-between;margin:0 0 10px;align-items:center' }, [
+    el('h3', { textContent: '📎 Fitxers adjunts', style: 'margin:0' }),
+    el('div', { class: 'row', style: 'margin:0' }, [
+      el('button', { class: 'btn p', textContent: '+ Pujar fitxer', onclick: () => pujaFitxer(s) })
+    ])
+  ]));
+
+  if (!s.files.length) {
+    card.append(el('div', { class: 'badge', textContent: 'Cap fitxer pujat encara.' }));
+    return card;
+  }
+
+  const grid = el('div', { class: 'files-grid' });
+
+  s.files.forEach((f, i) => {
+    const kind = fileKind(f.mime, f.name);
+    const fileCard = el('div', { class: 'file-card' });
+
+    // Previsualització
+    if (kind === 'image') {
+      fileCard.append(el('img', { class: 'file-thumb', src: f.url, alt: f.name, loading: 'lazy' }));
+    } else {
+      fileCard.append(el('div', { class: 'file-icon', textContent: fileIcon(kind) }));
+    }
+
+    // Nom i mida
+    fileCard.append(el('div', { class: 'file-name', textContent: f.name, title: f.name }));
+    fileCard.append(el('div', { class: 'file-size', textContent: humanSize(f.size) }));
+
+    // Reproductor d'àudio
+    if (kind === 'audio') {
+      const audio = el('audio', { controls: true, preload: 'metadata' });
+      audio.src = f.url;
+      fileCard.append(audio);
+    }
+
+    // Botons
+    const actions = el('div', { class: 'file-actions' });
+    const a = el('a', { href: f.url, target: '_blank', style: 'flex:1' });
+    a.append(el('button', { class: 'btn', textContent: 'Obrir', style: 'width:100%' }));
+    actions.append(a);
+    actions.append(el('button', { class: 'btn d', textContent: '🗑️', title: 'Esborrar', onclick: () => esborraFitxer(s, i, f) }));
+    fileCard.append(actions);
+
+    grid.append(fileCard);
+  });
+
+  card.append(grid);
+  return card;
+}
+
+async function pujaFitxer(s) {
+  const input = el('input', { type: 'file', style: 'display:none' });
+  input.addEventListener('change', async () => {
+    const file = input.files[0];
+    if (!file) return;
+    if (file.size > 50 * 1024 * 1024) { alert('El fitxer és massa gran (màxim 50 MB).'); return; }
+
+    // Nom del fitxer dins el bucket: <sector>/<timestamp>-<nom>
+    const secName = s.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'general';
+    const timestamp = Date.now();
+    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const path = secName + '/' + timestamp + '-' + safeName;
+
+    const bar = el('div', { class: 'card', style: 'text-align:center' }, el('div', { textContent: '⏳ Pujant...', style: 'font-weight:600' }));
+    $('#app').prepend(bar);
+
+    const { data, error } = await db.storage.from('adjunts').upload(path, file, { cacheControl: '3600', upsert: false });
+
+    bar.remove();
+
+    if (error) { console.error('Error pujant:', error); alert('Error pujant el fitxer: ' + error.message); return; }
+
+    const { data: urlData } = db.storage.from('adjunts').getPublicUrl(path);
+    const url = urlData.publicUrl;
+
+    s.files = s.files || [];
+    s.files.push({ name: file.name, size: file.size, mime: file.type, path: path, url: url, uploaded: new Date().toISOString() });
+    save(s);
+    render();
+  });
+  input.click();
+}
+
+async function esborraFitxer(s, idx, f) {
+  if (!confirm('Esborrar "' + f.name + '"? Aquesta acció no es pot desfer.')) return;
+  if (f.path) {
+    const r = await db.storage.from('adjunts').remove([f.path]);
+    if (r.error) console.warn('No s\'ha pogut esborrar del Storage:', r.error.message);
+  }
+  s.files.splice(idx, 1);
+  save(s);
+  render();
 }
 
 function renderBudget(s) {
@@ -434,7 +582,6 @@ function renderBudget(s) {
 
   return wrap;
 }
-
 function renderCal() {
   const app = $('#app'); app.innerHTML = '';
   const by = {}; secs.forEach(s => (s.tasks || []).forEach(k => { if (k.d) (by[k.d] = by[k.d] || []).push({ k, s }); }));
@@ -470,7 +617,7 @@ async function start(user) {
   me = user.email;
   $('#login').hidden = true; $('#ui').hidden = false;
   const a = await db.from('sections').select('*').order('pos');
-  if (a.error) { console.error('Error carregant:', a.error); alert('Error carregant dades. Mira la consola.'); return; }
+  if (a.error) { console.error('Error carregant:', a.error); alert('Error carregant dades.'); return; }
   secs = a.data || [];
   const b = await db.from('settings').select('people').eq('id', 1).maybeSingle();
   if (b.data) people = b.data.people;
