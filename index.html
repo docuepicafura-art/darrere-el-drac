@@ -184,9 +184,14 @@ function save(s) {
   clearTimeout(timers[s.id]);
   timers[s.id] = setTimeout(async () => {
     const payload = { id: s.id, pos: s.pos, name: s.name, notes: s.notes || '', tasks: s.tasks || [], budget: s.budget || [] };
+    console.log('ENVIANT A SUPABASE:', JSON.stringify(payload).substring(0, 300));
     const r = await db.from('sections').upsert(payload);
-    if (r.error) console.error('Error guardant:', r.error);
-    else console.log('Guardat ok:', s.name);
+    if (r.error) {
+      console.error('❌ ERROR GUARDANT:', r.error);
+      alert('Error guardant: ' + r.error.message);
+    } else {
+      console.log('✅ Guardat ok:', s.name, 'budget length:', (s.budget || []).length);
+    }
   }, 500);
 }
 function savePeople() { db.from('settings').upsert({ id: 1, people }); }
