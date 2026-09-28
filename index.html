@@ -39,8 +39,11 @@ input[type=time]{padding:6px;width:auto}
 .x{margin-left:auto;background:none;border:0;color:var(--mut);cursor:pointer;font-size:18px}
 .cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
 .wd{font-size:12px;color:var(--mut);text-align:center}
-.cell{min-height:78px;background:var(--card);border:1px solid var(--bd);border-radius:8px;padding:4px;overflow:hidden}
+.cell{min-height:78px;background:var(--card);border:1px solid var(--bd);border-radius:8px;padding:4px;overflow:hidden;position:relative}
 .cell.e{background:none;border:0}
+.cell.blocked{background:rgba(192,57,43,.12);border-color:var(--err)}
+.cell .lock{position:absolute;top:2px;right:4px;font-size:14px;cursor:pointer;opacity:.6}
+.cell .lock:hover{opacity:1}
 .dn{font-size:12px;color:var(--mut)}
 .chip{font-size:11px;line-height:1.3;padding:2px 6px;border-radius:5px;margin-top:3px;color:#fff;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-block;max-width:100%}
 .cell .chip{display:block}
@@ -98,6 +101,13 @@ input[type=time]{padding:6px;width:auto}
 .summary .pos{color:var(--err)}
 .summary .neg{color:var(--ok)}
 
+/* Indicador d'espai */
+.storage-indicator{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--mut)}
+.storage-bar{width:120px;height:6px;background:var(--bd);border-radius:3px;overflow:hidden}
+.storage-bar-fill{height:100%;background:var(--ok);transition:width .3s,background .3s}
+.storage-bar-fill.warn{background:var(--warn)}
+.storage-bar-fill.danger{background:var(--err)}
+
 /* Adjunts */
 .files-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-top:12px}
 .file-card{background:var(--bg);border:1px solid var(--bd);border-radius:8px;padding:10px;display:flex;flex-direction:column;gap:8px;position:relative}
@@ -137,7 +147,14 @@ audio{width:100%;height:32px;margin-top:4px}
       <div class="byline">Un documental de David González i Joan Clusella</div>
       <div class="sub" id="who"></div>
     </div>
-    <button class="btn" id="out">Sortir</button>
+    <div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end">
+      <button class="btn" id="out">Sortir</button>
+      <div class="storage-indicator" id="storage-ind">
+        <span>💾</span>
+        <div class="storage-bar"><div class="storage-bar-fill" id="storage-fill" style="width:0%"></div></div>
+        <span id="storage-text">—</span>
+      </div>
+    </div>
   </header>
   <nav id="nav"></nav>
   <main id="app"></main>
@@ -168,6 +185,7 @@ const isOverviewSec = s => /visi[oó]\s*general/i.test(s.name);
 const dias = ['diumenge','dilluns','dimarts','dimecres','dijous','divendres','dissabte'];
 const diaLabel = d => { const dt = new Date(d + 'T00:00:00'); return dias[dt.getDay()]; };
 const humanSize = b => { if (!b) return '0 B'; const u = ['B','KB','MB','GB']; const i = Math.floor(Math.log(b) / Math.log(1024)); return (b / Math.pow(1024, i)).toFixed(1) + ' ' + u[i]; };
+let blockedDays = {};
 const PARTIDES_INICIALS = [
   {c:"Direcció",cat:"Personal intern",p:0,st:"pendent",exp:[]},
   {c:"Guió",cat:"Personal intern",p:4000,st:"pendent",exp:[]},
@@ -200,7 +218,7 @@ function save(s) {
   if (!s || !s.id) return;
   clearTimeout(timers[s.id]);
   timers[s.id] = setTimeout(async () => {
-    const payload = { id: s.id, pos: s.pos, name: s.name, notes: s.notes || '', tasks: s.tasks || [], budget: s.budget || [] };
+    const payload = { id: s.id, pos: s.pos, name: s.name, notes: s.notes || '', tasks: s.tasks || [], budget: s.budget || [], files: s.files || [] };
     const r = await db.from('sections').upsert(payload);
     if (r.error) { console.error('Error guardant:', r.error); alert('Error: ' + r.error.message); }
   }, 500);
@@ -220,11 +238,33 @@ function paintNav() {
   $('#who').textContent = o.length ? '🟢 ' + o.join(', ') + (o.length > 1 ? ' són' : ' és') + ' en aquesta secció ara' : '';
 }
 
-function addSec() { const n = { id: 's' + Date.now().toString(36), pos: (secs.length ? Math.max(...secs.map(x => x.pos)) : 0) + 1, name: 'Nova secció', notes: '', tasks: [], budget: [] }; secs.push(n); save(n); goto(n.id); }
+function addSec() { const n = { id: 's' + Date.now().toString(36), pos: (secs.length ? Math.max(...secs.map(x => x.pos)) : 0) + 1, name: 'Nova secció', notes: '', tasks: [], budget: [], files: [] }; secs.push(n); save(n); goto(n.id); }
 function move(d) { const i = secs.findIndex(x => x.id === cur), j = i + d; if (j < 0 || j >= secs.length) return; const a = secs[i], b = secs[j]; [a.pos, b.pos] = [b.pos, a.pos]; secs.sort((x, y) => x.pos - y.pos); save(a); save(b); render(); }
 const sel = k => el('select', { onchange: e => { k.k = e.target.value; save(cur_()); } }, KINDS.map(n => el('option', { value: n, textContent: n, selected: (k.k || 'Altres') === n })));
 const psel = k => el('select', { onchange: e => { k.p = e.target.value; save(cur_()); } }, [el('option', { value: '', textContent: 'Sense assignar' })].concat(people.map(n => el('option', { value: n, textContent: n, selected: k.p === n }))));
 const cur_ = () => secs.find(x => x.id === cur);
+
+// ---- Bloquejos ----
+async function carregaBlocks() {
+  const { data, error } = await db.from('blocks').select('day');
+  if (error) { console.warn('No s\'han pogut carregar els bloquejos:', error.message); return; }
+  blockedDays = {};
+  (data || []).forEach(b => { blockedDays[b.day] = true; });
+}
+async function toggleBlock(day) {
+  if (blockedDays[day]) {
+    if (!confirm('Desbloquejar el dia ' + fmt(day) + '?')) return;
+    const r = await db.from('blocks').delete().eq('day', day);
+    if (r.error) { alert('Error: ' + r.error.message); return; }
+    delete blockedDays[day];
+  } else {
+    if (!confirm('Bloquejar el dia ' + fmt(day) + '? No es podran afegir tasques.')) return;
+    const r = await db.from('blocks').insert({ day: day, created_by: me });
+    if (r.error) { alert('Error: ' + r.error.message); return; }
+    blockedDays[day] = true;
+  }
+  render();
+}
 
 function render() {
   paintNav();
@@ -254,7 +294,6 @@ function render() {
     app.append(renderTasks(s));
   }
 
-  // Fitxers adjunts a totes les seccions excepte Visió general
   if (!isOverviewSec(s)) {
     app.append(renderFiles(s));
   }
@@ -271,6 +310,31 @@ function render() {
       el('button', { class: 'btn', textContent: 'Moure →', onclick: () => move(1) }),
       el('button', { class: 'btn d', textContent: 'Eliminar secció', onclick: () => { if (confirm('Eliminar aquesta secció?')) { secs = secs.filter(x => x.id !== s.id); db.from('sections').delete().eq('id', s.id); goto(secs[0] ? secs[0].id : 'cal'); } } })]));
   }
+}
+
+async function refreshStorage() {
+  try {
+    const { data, error } = await db.storage.from('adjunts').list('', { limit: 1000 });
+    if (error) { console.warn('No s\'ha pogut calcular l\'espai:', error); return; }
+    let total = 0;
+    for (const item of data) {
+      if (item.id === null) {
+        const sub = await db.storage.from('adjunts').list(item.name, { limit: 1000 });
+        if (sub.data) sub.data.forEach(f => { total += (f.metadata && f.metadata.size) || 0; });
+      } else {
+        total += (item.metadata && item.metadata.size) || 0;
+      }
+    }
+    const maxBytes = 1024 * 1024 * 1024;
+    const pct = Math.min(100, (total / maxBytes) * 100);
+    const fill = $('#storage-fill');
+    const text = $('#storage-text');
+    if (fill && text) {
+      fill.style.width = pct.toFixed(1) + '%';
+      fill.className = 'storage-bar-fill' + (pct > 90 ? ' danger' : pct > 70 ? ' warn' : '');
+      text.textContent = humanSize(total) + ' / 1 GB';
+    }
+  } catch (e) { console.warn('Error calcular espai:', e); }
 }
 
 function renderOverview() {
@@ -327,7 +391,6 @@ function renderOverview() {
   }
   wrap.append(c3);
 
-  // Recollida ràpida de fitxers adjunts
   const fitxers = [];
   secs.forEach(sec => (sec.files || []).forEach(f => fitxers.push({ ...f, secName: sec.name, secId: sec.id })));
   if (fitxers.length) {
@@ -408,25 +471,21 @@ function renderFiles(s) {
     const kind = fileKind(f.mime, f.name);
     const fileCard = el('div', { class: 'file-card' });
 
-    // Previsualització
     if (kind === 'image') {
       fileCard.append(el('img', { class: 'file-thumb', src: f.url, alt: f.name, loading: 'lazy' }));
     } else {
       fileCard.append(el('div', { class: 'file-icon', textContent: fileIcon(kind) }));
     }
 
-    // Nom i mida
     fileCard.append(el('div', { class: 'file-name', textContent: f.name, title: f.name }));
     fileCard.append(el('div', { class: 'file-size', textContent: humanSize(f.size) }));
 
-    // Reproductor d'àudio
     if (kind === 'audio') {
       const audio = el('audio', { controls: true, preload: 'metadata' });
       audio.src = f.url;
       fileCard.append(audio);
     }
 
-    // Botons
     const actions = el('div', { class: 'file-actions' });
     const a = el('a', { href: f.url, target: '_blank', style: 'flex:1' });
     a.append(el('button', { class: 'btn', textContent: 'Obrir', style: 'width:100%' }));
@@ -446,9 +505,8 @@ async function pujaFitxer(s) {
   input.addEventListener('change', async () => {
     const file = input.files[0];
     if (!file) return;
-    if (file.size > 50 * 1024 * 1024) { alert('El fitxer és massa gran (màxim 50 MB).'); return; }
+    if (file.size > 100 * 1024 * 1024) { alert('El fitxer és massa gran (màxim 100 MB).'); return; }
 
-    // Nom del fitxer dins el bucket: <sector>/<timestamp>-<nom>
     const secName = s.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'general';
     const timestamp = Date.now();
     const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
@@ -470,6 +528,7 @@ async function pujaFitxer(s) {
     s.files.push({ name: file.name, size: file.size, mime: file.type, path: path, url: url, uploaded: new Date().toISOString() });
     save(s);
     render();
+    refreshStorage();
   });
   input.click();
 }
@@ -483,6 +542,7 @@ async function esborraFitxer(s, idx, f) {
   s.files.splice(idx, 1);
   save(s);
   render();
+  refreshStorage();
 }
 
 function renderBudget(s) {
@@ -589,13 +649,17 @@ function renderCal() {
     el('button', { class: 'btn', textContent: '←', onclick: () => { cal.m--; if (cal.m < 0) { cal.m = 11; cal.y--; } render(); } }),
     el('strong', { textContent: new Date(cal.y, cal.m, 1).toLocaleDateString('ca', { month: 'long', year: 'numeric' }) }),
     el('button', { class: 'btn', textContent: '→', onclick: () => { cal.m++; if (cal.m > 11) { cal.m = 0; cal.y++; } render(); } })]));
+  app.append(el('div', { class: 'badge', style: 'margin:0 0 8px', textContent: '💡 Clica el 🔓 d\'un dia per bloquejar-lo o desbloquejar-lo.' }));
   const g = el('div', { class: 'cal' });
   ['Dl', 'Dt', 'Dc', 'Dj', 'Dv', 'Ds', 'Dg'].forEach(d => g.append(el('div', { class: 'wd', textContent: d })));
   const off = (new Date(cal.y, cal.m, 1).getDay() + 6) % 7, dim = new Date(cal.y, cal.m + 1, 0).getDate();
   for (let i = 0; i < off; i++) g.append(el('div', { class: 'cell e' }));
   for (let d = 1; d <= dim; d++) {
     const key = cal.y + '-' + String(cal.m + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
-    const c = el('div', { class: 'cell' }, el('div', { class: 'dn', textContent: d }));
+    const isBlocked = !!blockedDays[key];
+    const c = el('div', { class: 'cell' + (isBlocked ? ' blocked' : '') });
+    c.append(el('div', { class: 'dn', textContent: d }));
+    c.append(el('span', { class: 'lock', title: isBlocked ? 'Desbloquejar' : 'Bloquejar', textContent: isBlocked ? '🔒' : '🔓', onclick: () => toggleBlock(key) }));
     (by[key] || []).forEach(({ k, s }) => c.append(el('div', { class: 'chip k' + ki(k) + (k.done ? ' done' : ''), textContent: (k.h ? k.h + ' ' : '') + (k.t || '(sense títol)'), title: s.name + ' · ' + (k.k || 'Altres') + (k.p ? ' · ' + k.p : ''), onclick: () => goto(s.id) })));
     g.append(c);
   }
@@ -621,7 +685,9 @@ async function start(user) {
   secs = a.data || [];
   const b = await db.from('settings').select('people').eq('id', 1).maybeSingle();
   if (b.data) people = b.data.people;
+  await carregaBlocks();
   cur = 'cal'; render();
+  refreshStorage();
   db.channel('canvis')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'sections' }, p => {
       if (p.eventType === 'DELETE') secs = secs.filter(x => x.id !== p.old.id);
@@ -629,6 +695,7 @@ async function start(user) {
       secs.sort((x, y) => x.pos - y.pos); if (!busy()) render(); else paintNav();
     })
     .on('postgres_changes', { event: '*', schema: 'public', table: 'settings' }, p => { if (p.new && p.new.people) { people = p.new.people; if (!busy()) render(); } })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'blocks' }, async () => { await carregaBlocks(); if (cur === 'cal' && !busy()) render(); })
     .subscribe();
   pch = db.channel('presencia', { config: { presence: { key: me } } });
   pch.on('presence', { event: 'sync' }, () => { peers = pch.presenceState(); paintNav(); })
