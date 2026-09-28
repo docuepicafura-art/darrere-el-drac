@@ -324,25 +324,12 @@ function render() {
 
 async function refreshStorage() {
   try {
-    // Llistar tots els fitxers de cada carpeta coneguda
-    const folders = ['gui', 'preproduccio', 'entrevistes', 'rodatge', 'postproduccio', 'pressupost'];
+    const folders = ['gui', 'preproduccio', 'entrevistes', 'rodatge', 'postproduccio', 'pressupost', 'produccio', 'altres'];
     let total = 0;
 
-    // Primera passada: mira les carpetes que existeixen
-    const root = await db.storage.from('adjunts').list('', { limit: 1000 });
-    if (root.error) { console.warn('Error llistant arrel:', root.error); return; }
-
-    const foldersToScan = new Set();
-    for (const item of root.data || []) {
-      if (item.id === null) foldersToScan.add(item.name);
-    }
-    // Afegeix també les carpetes conegudes per si de cas
-    folders.forEach(f => foldersToScan.add(f));
-
-    // Segona passada: suma les mides de tots els fitxers
-    for (const folder of foldersToScan) {
+    for (const folder of folders) {
       const sub = await db.storage.from('adjunts').list(folder, { limit: 1000 });
-      if (sub.error) { console.warn('Error llistant ' + folder + ':', sub.error); continue; }
+      if (sub.error) continue;
       for (const f of sub.data || []) {
         total += (f.metadata && f.metadata.size) || 0;
       }
@@ -357,7 +344,7 @@ async function refreshStorage() {
       fill.className = 'storage-bar-fill' + (pct > 90 ? ' danger' : pct > 70 ? ' warn' : '');
       text.textContent = humanSize(total) + ' / 1 GB';
     }
-  } catch (e) { console.warn('Error calcular espai:', e); }
+  } catch (e) { /* silenci */ }
 }
 function renderOverview() {
   const wrap = el('div');
