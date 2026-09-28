@@ -56,17 +56,15 @@ input[type=time]{padding:6px;width:auto}
 #login h1{font-size:24px}
 #login input{margin-bottom:10px}
 #err{color:var(--err);font-size:14px;min-height:20px}
-
 .agenda-item{display:grid;grid-template-columns:120px 1fr auto;gap:12px;align-items:center;padding:10px 0;border-bottom:1px solid var(--bd);cursor:pointer}
 .agenda-item:last-child{border-bottom:0}
 .agenda-item:hover{background:rgba(180,71,31,.05)}
-.agenda-when{font-variant-numeric:tabular-nums;font-weight:600;color:var(--tx);white-space:nowrap}
+.agenda-when{font-variant-numeric:tabular-nums;font-weight:600;white-space:nowrap}
 .agenda-when .hr{color:var(--ac);font-weight:700}
 .agenda-title{font-size:14px}
 .agenda-who{font-size:12px;color:var(--mut);white-space:nowrap}
 .agenda-empty{color:var(--mut);font-size:13px;padding:6px 0}
 .agenda-chip{font-size:11px;padding:2px 8px;border-radius:999px;color:#fff;white-space:nowrap}
-
 .bud-list{width:100%;font-size:14px}
 .bud-head{display:grid;grid-template-columns:28px 1fr 130px 110px 110px 100px 32px;gap:8px;padding:6px 0;border-bottom:2px solid var(--bd);font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--mut);font-weight:600;align-items:center}
 .bud-row{display:grid;grid-template-columns:28px 1fr 130px 110px 110px 100px 32px;gap:8px;padding:6px 0;border-bottom:1px solid var(--bd);align-items:center}
@@ -100,17 +98,8 @@ input[type=time]{padding:6px;width:auto}
 .summary .big{font-size:18px;font-weight:700}
 .summary .pos{color:var(--err)}
 .summary .neg{color:var(--ok)}
-
-/* Indicador d'espai */
-.storage-indicator{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--mut)}
-.storage-bar{width:120px;height:6px;background:var(--bd);border-radius:3px;overflow:hidden}
-.storage-bar-fill{height:100%;background:var(--ok);transition:width .3s,background .3s}
-.storage-bar-fill.warn{background:var(--warn)}
-.storage-bar-fill.danger{background:var(--err)}
-
-/* Adjunts */
 .files-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-top:12px}
-.file-card{background:var(--bg);border:1px solid var(--bd);border-radius:8px;padding:10px;display:flex;flex-direction:column;gap:8px;position:relative}
+.file-card{background:var(--bg);border:1px solid var(--bd);border-radius:8px;padding:10px;display:flex;flex-direction:column;gap:8px}
 .file-thumb{width:100%;height:120px;object-fit:cover;border-radius:6px;background:var(--card)}
 .file-icon{width:100%;height:120px;display:flex;align-items:center;justify-content:center;font-size:48px;background:var(--card);border-radius:6px}
 .file-name{font-size:12px;word-break:break-word;line-height:1.3;max-height:2.6em;overflow:hidden;text-overflow:ellipsis}
@@ -119,7 +108,8 @@ input[type=time]{padding:6px;width:auto}
 .file-actions .btn{flex:1;padding:4px 6px;font-size:12px;text-align:center}
 .file-actions .btn.d{flex:0 0 auto}
 audio{width:100%;height:32px;margin-top:4px}
-
+.editor-area{width:100%;min-height:400px;font:15px/1.7 Georgia,serif;padding:16px;background:var(--bg);border:1px solid var(--bd);border-radius:8px;resize:vertical;color:var(--tx)}
+.editor-save{font-size:12px;color:var(--ok);min-height:16px;text-align:right;margin-top:6px}
 @media (max-width:640px){
   .bud-head,.bud-row{grid-template-columns:24px 1fr 90px 32px}
   .bud-head .hide-s,.bud-row .hide-s{display:none}
@@ -128,13 +118,6 @@ audio{width:100%;height:32px;margin-top:4px}
   .files-grid{grid-template-columns:repeat(auto-fill,minmax(130px,1fr))}
   main{padding:12px}
 }
-/* Editor de guió */
-.editor-wrap{display:flex;flex-direction:column;gap:8px;margin-top:8px}
-.editor-toolbar{display:flex;gap:6px;flex-wrap:wrap;align-items:center;padding:6px 0;border-bottom:1px solid var(--bd);margin-bottom:8px}
-.editor-toolbar .info{font-size:12px;color:var(--mut);margin-left:auto}
-.editor-area{width:100%;min-height:400px;font:15px/1.7 Georgia,serif;padding:16px;background:var(--bg);border:1px solid var(--bd);border-radius:8px;resize:vertical;color:var(--tx)}
-.editor-area:focus{outline:2px solid var(--ac);outline-offset:-2px}
-.editor-save{font-size:12px;color:var(--ok);min-height:16px;text-align:right}
 </style>
 </head>
 <body>
@@ -154,14 +137,7 @@ audio{width:100%;height:32px;margin-top:4px}
       <div class="byline">Un documental de David González i Joan Clusella</div>
       <div class="sub" id="who"></div>
     </div>
-    <div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end">
-      <button class="btn" id="out">Sortir</button>
-      <div class="storage-indicator" id="storage-ind">
-        <span>💾</span>
-        <div class="storage-bar"><div class="storage-bar-fill" id="storage-fill" style="width:0%"></div></div>
-        <span id="storage-text">—</span>
-      </div>
-    </div>
+    <button class="btn" id="out">Sortir</button>
   </header>
   <nav id="nav"></nav>
   <main id="app"></main>
@@ -170,7 +146,7 @@ audio{width:100%;height:32px;margin-top:4px}
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script>
 // =============================================
-const SUPABASE_URL = 'https://edmppcurmxlbjeiigacw.supabase.co'; 
+const SUPABASE_URL = 'https://edmppcurmxlbjeiigacw.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_RIXMNmjl2gvoJjnPVFgi8Q_fkMXYe3x';
 // =============================================
 
@@ -189,11 +165,11 @@ const eur = n => (Number(n) || 0).toLocaleString('ca-ES', { minimumFractionDigit
 const realOf = p => (p.exp || []).reduce((a, e) => a + (Number(e.a) || 0), 0);
 const isBudgetSec = s => /pressupost/i.test(s.name);
 const isOverviewSec = s => /visi[oó]\s*general/i.test(s.name);
-const isGuioSec = s => /^gui[oó]$/i.test(s.name);
 const dias = ['diumenge','dilluns','dimarts','dimecres','dijous','divendres','dissabte'];
 const diaLabel = d => { const dt = new Date(d + 'T00:00:00'); return dias[dt.getDay()]; };
 const humanSize = b => { if (!b) return '0 B'; const u = ['B','KB','MB','GB']; const i = Math.floor(Math.log(b) / Math.log(1024)); return (b / Math.pow(1024, i)).toFixed(1) + ' ' + u[i]; };
 let blockedDays = {};
+
 const PARTIDES_INICIALS = [
   {c:"Direcció",cat:"Personal intern",p:0,st:"pendent",exp:[]},
   {c:"Guió",cat:"Personal intern",p:4000,st:"pendent",exp:[]},
@@ -226,9 +202,9 @@ function save(s) {
   if (!s || !s.id) return;
   clearTimeout(timers[s.id]);
   timers[s.id] = setTimeout(async () => {
-    const payload = { id: s.id, pos: s.pos, name: s.name, notes: s.notes || '', tasks: s.tasks || [], budget: s.budget || [], files: s.files || [] };
+    const payload = { id: s.id, pos: s.pos, name: s.name, notes: s.notes || '', tasks: s.tasks || [], budget: s.budget || [], files: s.files || [], text: s.text || '' };
     const r = await db.from('sections').upsert(payload);
-    if (r.error) { console.error('Error guardant:', r.error); alert('Error: ' + r.error.message); }
+    if (r.error) console.error('Error guardant:', r.error);
   }, 500);
 }
 function savePeople() { db.from('settings').upsert({ id: 1, people }); }
@@ -246,13 +222,12 @@ function paintNav() {
   $('#who').textContent = o.length ? '🟢 ' + o.join(', ') + (o.length > 1 ? ' són' : ' és') + ' en aquesta secció ara' : '';
 }
 
-function addSec() { const n = { id: 's' + Date.now().toString(36), pos: (secs.length ? Math.max(...secs.map(x => x.pos)) : 0) + 1, name: 'Nova secció', notes: '', tasks: [], budget: [], files: [] }; secs.push(n); save(n); goto(n.id); }
+function addSec() { const n = { id: 's' + Date.now().toString(36), pos: (secs.length ? Math.max(...secs.map(x => x.pos)) : 0) + 1, name: 'Nova secció', notes: '', tasks: [], budget: [], files: [], text: '' }; secs.push(n); save(n); goto(n.id); }
 function move(d) { const i = secs.findIndex(x => x.id === cur), j = i + d; if (j < 0 || j >= secs.length) return; const a = secs[i], b = secs[j]; [a.pos, b.pos] = [b.pos, a.pos]; secs.sort((x, y) => x.pos - y.pos); save(a); save(b); render(); }
 const sel = k => el('select', { onchange: e => { k.k = e.target.value; save(cur_()); } }, KINDS.map(n => el('option', { value: n, textContent: n, selected: (k.k || 'Altres') === n })));
 const psel = k => el('select', { onchange: e => { k.p = e.target.value; save(cur_()); } }, [el('option', { value: '', textContent: 'Sense assignar' })].concat(people.map(n => el('option', { value: n, textContent: n, selected: k.p === n }))));
 const cur_ = () => secs.find(x => x.id === cur);
 
-// ---- Bloquejos ----
 async function carregaBlocks() {
   const { data, error } = await db.from('blocks').select('day');
   if (error) { console.warn('No s\'han pogut carregar els bloquejos:', error.message); return; }
@@ -273,7 +248,6 @@ async function toggleBlock(day) {
   }
   render();
 }
-
 function render() {
   paintNav();
   const app = $('#app'); app.innerHTML = '';
@@ -293,12 +267,12 @@ function render() {
   }
   app.append(c);
 
-    if (isOverviewSec(s)) {
+  if (isOverviewSec(s)) {
     app.append(renderOverview());
   } else if (isBudgetSec(s)) {
     if (!s.budget || s.budget.length === 0) { s.budget = JSON.parse(JSON.stringify(PARTIDES_INICIALS)); save(s); }
     app.append(renderBudget(s));
-  } else if (isGuioSec(s)) {
+  } else if (/^gui[oó]$/i.test(s.name)) {
     app.append(renderEditor(s));
   } else {
     app.append(renderTasks(s));
@@ -322,30 +296,163 @@ function render() {
   }
 }
 
-async function refreshStorage() {
-  try {
-    const folders = ['gui', 'preproduccio', 'entrevistes', 'rodatge', 'postproduccio', 'pressupost', 'produccio', 'altres'];
-    let total = 0;
-
-    for (const folder of folders) {
-      const sub = await db.storage.from('adjunts').list(folder, { limit: 1000 });
-      if (sub.error) continue;
-      for (const f of sub.data || []) {
-        total += (f.metadata && f.metadata.size) || 0;
-      }
+// ---- Editor de text ----
+function renderEditor(s) {
+  const card = el('div', { class: 'card' });
+  card.append(el('h3', { textContent: '📝 Text (editable)' }));
+  const ta = el('textarea', {
+    class: 'editor-area',
+    value: s.text || '',
+    placeholder: 'Escriu aquí el guió, les notes o el text que vulguis...\n\nEs guarda automàticament.',
+    oninput: e => {
+      s.text = e.target.value;
+      saveText(s);
+      const msg = $('#editor-save-msg');
+      if (msg) msg.textContent = '⏳ Desant...';
     }
-
-    const maxBytes = 1024 * 1024 * 1024;
-    const pct = Math.min(100, (total / maxBytes) * 100);
-    const fill = $('#storage-fill');
-    const text = $('#storage-text');
-    if (fill && text) {
-      fill.style.width = pct.toFixed(1) + '%';
-      fill.className = 'storage-bar-fill' + (pct > 90 ? ' danger' : pct > 70 ? ' warn' : '');
-      text.textContent = humanSize(total) + ' / 1 GB';
-    }
-  } catch (e) { /* silenci */ }
+  });
+  card.append(ta);
+  card.append(el('div', { class: 'editor-save', id: 'editor-save-msg', textContent: '' }));
+  return card;
 }
+
+function saveText(s) {
+  clearTimeout(timers['text-' + s.id]);
+  const msg = $('#editor-save-msg');
+  timers['text-' + s.id] = setTimeout(async () => {
+    const payload = { id: s.id, pos: s.pos, name: s.name, notes: s.notes || '', tasks: s.tasks || [], budget: s.budget || [], files: s.files || [], text: s.text || '' };
+    const r = await db.from('sections').upsert(payload);
+    if (r.error) {
+      if (msg) msg.textContent = '❌ Error guardant';
+      console.error('Error guardant text:', r.error);
+    } else {
+      if (msg) msg.textContent = '✅ Guardat a les ' + new Date().toLocaleTimeString('ca-ES', { hour: '2-digit', minute: '2-digit' });
+    }
+  }, 800);
+}
+
+// ---- Tasques ----
+function renderTasks(s) {
+  const t = el('div', { class: 'card' }, el('h3', { textContent: 'Tasques' }));
+  (s.tasks || []).forEach((k, i) => {
+    const row = el('div', { class: 'task' + (k.done ? ' done' : '') });
+    row.append(el('input', { type: 'checkbox', checked: k.done, onchange: e => { k.done = e.target.checked; save(s); render(); } }));
+    if (editing) {
+      row.style.flexWrap = 'wrap';
+      row.append(el('input', { type: 'text', value: k.t, style: 'flex:1;min-width:140px', oninput: e => { k.t = e.target.value; save(s); } }));
+      row.append(sel(k));
+      row.append(psel(k));
+      row.append(el('input', { type: 'date', value: k.d || '', oninput: e => {
+        if (e.target.value && blockedDays[e.target.value]) {
+          alert('🔒 Aquest dia està bloquejat. No es poden assignar tasques.');
+          e.target.value = '';
+          k.d = '';
+          return;
+        }
+        k.d = e.target.value; save(s);
+      } }));
+      row.append(el('input', { type: 'time', value: k.h || '', oninput: e => { k.h = e.target.value; save(s); } }));
+      row.append(el('button', { class: 'x', textContent: '×', onclick: () => { s.tasks.splice(i, 1); save(s); render(); } }));
+    } else {
+      row.append(el('span', { textContent: k.t }));
+      if (k.d) row.append(el('span', { class: 'tag k' + ki(k), textContent: (k.k || 'Altres') + ' · ' + fmt(k.d) + (k.h ? ' · ' + k.h : '') }));
+      if (k.p) row.append(el('span', { class: 'pp', textContent: '👤 ' + k.p }));
+    }
+    t.append(row);
+  });
+  if (!(s.tasks || []).length) t.append(el('div', { class: 'badge', textContent: 'Cap tasca.' }));
+  if (editing) t.append(el('div', { class: 'row' }, el('button', { class: 'btn', textContent: '+ Tasca', onclick: () => { s.tasks = s.tasks || []; s.tasks.push({ t: '', done: false, k: 'Altres', d: '', h: '' }); save(s); render(); } })));
+  return t;
+}
+
+// ---- Fitxers adjunts ----
+function fileKind(mime, name) {
+  if (!mime && name) mime = name.split('.').pop().toLowerCase();
+  if (typeof mime === 'string') {
+    if (mime.startsWith('image/')) return 'image';
+    if (mime.startsWith('audio/')) return 'audio';
+    if (mime.startsWith('video/')) return 'video';
+    if (mime === 'application/pdf' || mime === 'pdf') return 'pdf';
+    if (mime.includes('word') || mime === 'doc' || mime === 'docx') return 'doc';
+  }
+  return 'file';
+}
+function fileIcon(kind) {
+  return { image: '🖼️', audio: '🎵', video: '🎬', pdf: '📄', doc: '📝', file: '📎' }[kind] || '📎';
+}
+function renderFiles(s) {
+  s.files = s.files || [];
+  const card = el('div', { class: 'card' });
+  card.append(el('div', { class: 'row', style: 'justify-content:space-between;margin:0 0 10px;align-items:center' }, [
+    el('h3', { textContent: '📎 Fitxers adjunts', style: 'margin:0' }),
+    el('button', { class: 'btn p', textContent: '+ Pujar fitxer', onclick: () => pujaFitxer(s) })
+  ]));
+  if (!s.files.length) {
+    card.append(el('div', { class: 'badge', textContent: 'Cap fitxer pujat encara.' }));
+    return card;
+  }
+  const grid = el('div', { class: 'files-grid' });
+  s.files.forEach((f, i) => {
+    const kind = fileKind(f.mime, f.name);
+    const fileCard = el('div', { class: 'file-card' });
+    if (kind === 'image') {
+      fileCard.append(el('img', { class: 'file-thumb', src: f.url, alt: f.name, loading: 'lazy' }));
+    } else {
+      fileCard.append(el('div', { class: 'file-icon', textContent: fileIcon(kind) }));
+    }
+    fileCard.append(el('div', { class: 'file-name', textContent: f.name, title: f.name }));
+    fileCard.append(el('div', { class: 'file-size', textContent: humanSize(f.size) }));
+    if (kind === 'audio') {
+      const audio = el('audio', { controls: true, preload: 'metadata' });
+      audio.src = f.url;
+      fileCard.append(audio);
+    }
+    const actions = el('div', { class: 'file-actions' });
+    const a = el('a', { href: f.url, target: '_blank', style: 'flex:1' });
+    a.append(el('button', { class: 'btn', textContent: 'Obrir', style: 'width:100%' }));
+    actions.append(a);
+    actions.append(el('button', { class: 'btn d', textContent: '🗑️', title: 'Esborrar', onclick: () => esborraFitxer(s, i, f) }));
+    fileCard.append(actions);
+    grid.append(fileCard);
+  });
+  card.append(grid);
+  return card;
+}
+async function pujaFitxer(s) {
+  const input = el('input', { type: 'file', style: 'display:none' });
+  input.addEventListener('change', async () => {
+    const file = input.files[0];
+    if (!file) return;
+    if (file.size > 50 * 1024 * 1024) { alert('El fitxer és massa gran (màxim 50 MB).'); return; }
+    const secName = s.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'general';
+    const timestamp = Date.now();
+    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const path = secName + '/' + timestamp + '-' + safeName;
+    const bar = el('div', { class: 'card', style: 'text-align:center' }, el('div', { textContent: '⏳ Pujant...', style: 'font-weight:600' }));
+    $('#app').prepend(bar);
+    const { data, error } = await db.storage.from('adjunts').upload(path, file, { cacheControl: '3600', upsert: false });
+    bar.remove();
+    if (error) { console.error('Error pujant:', error); alert('Error pujant el fitxer: ' + error.message); return; }
+    const { data: urlData } = db.storage.from('adjunts').getPublicUrl(path);
+    s.files = s.files || [];
+    s.files.push({ name: file.name, size: file.size, mime: file.type, path: path, url: urlData.publicUrl, uploaded: new Date().toISOString() });
+    save(s);
+    render();
+  });
+  input.click();
+}
+async function esborraFitxer(s, idx, f) {
+  if (!confirm('Esborrar "' + f.name + '"? Aquesta acció no es pot desfer.')) return;
+  if (f.path) {
+    const r = await db.storage.from('adjunts').remove([f.path]);
+    if (r.error) console.warn('No s\'ha pogut esborrar del Storage:', r.error.message);
+  }
+  s.files.splice(idx, 1);
+  save(s);
+  render();
+}
+
+// ---- Visió general ----
 function renderOverview() {
   const wrap = el('div');
   const today = iso(new Date());
@@ -416,201 +523,9 @@ function renderOverview() {
 
   return wrap;
 }
-function renderEditor(s) {
-  s.text = s.text || '';
-  const card = el('div', { class: 'card' });
-
-  // Toolbar
-  const tb = el('div', { class: 'editor-toolbar' });
-  tb.append(el('h3', { textContent: '📝 Editor de guió', style: 'margin:0' }));
-  tb.append(el('span', { class: 'info', textContent: 'Es guarda automàticament mentre escrius.' }));
-  card.append(tb);
-
-  // Textarea
-  const ta = el('textarea', {
-    class: 'editor-area',
-    value: s.text,
-    placeholder: 'Escriu aquí el guió del documental...\n\nPots escriure lliurement: escenes, diàlegs, notes, estructures...',
-    oninput: e => {
-      s.text = e.target.value;
-      saveText(s);
-      const msg = $('#editor-save-msg');
-      if (msg) { msg.textContent = '⏳ Desant...'; }
-    }
-  });
-  card.append(ta);
-
-  // Missatge de guardat
-  card.append(el('div', { class: 'editor-save', id: 'editor-save-msg', textContent: '' }));
-
-  return card;
-}
-
-function saveText(s) {
-  clearTimeout(timers['text-' + s.id]);
-  const msg = $('#editor-save-msg');
-  timers['text-' + s.id] = setTimeout(async () => {
-    const payload = { id: s.id, pos: s.pos, name: s.name, notes: s.notes || '', tasks: s.tasks || [], budget: s.budget || [], files: s.files || [], text: s.text || '' };
-    const r = await db.from('sections').upsert(payload);
-    if (r.error) {
-      console.error('Error guardant text:', r.error);
-      if (msg) msg.textContent = '❌ Error guardant';
-    } else {
-      if (msg) msg.textContent = '✅ Guardat a les ' + new Date().toLocaleTimeString('ca-ES', { hour: '2-digit', minute: '2-digit' });
-    }
-  }, 800);
-}
-function renderTasks(s) {
-  const t = el('div', { class: 'card' }, el('h3', { textContent: 'Tasques' }));
-  (s.tasks || []).forEach((k, i) => {
-    const row = el('div', { class: 'task' + (k.done ? ' done' : '') });
-    row.append(el('input', { type: 'checkbox', checked: k.done, onchange: e => { k.done = e.target.checked; save(s); render(); } }));
-    if (editing) {
-      row.style.flexWrap = 'wrap';
-      row.append(el('input', { type: 'text', value: k.t, style: 'flex:1;min-width:140px', oninput: e => { k.t = e.target.value; save(s); } }));
-      row.append(sel(k));
-      row.append(psel(k));
-    row.append(el('input', { type: 'date', value: k.d || '', oninput: e => {
-  if (e.target.value && blockedDays[e.target.value]) {
-    alert('🔒 Aquest dia està bloquejat. No es poden assignar tasques.');
-    e.target.value = '';
-    k.d = '';
-    return;
-  }
-  k.d = e.target.value;
-  save(s);
-} }));
-      row.append(el('input', { type: 'time', value: k.h || '', oninput: e => { k.h = e.target.value; save(s); } }));
-      row.append(el('button', { class: 'x', textContent: '×', onclick: () => { s.tasks.splice(i, 1); save(s); render(); } }));
-    } else {
-      row.append(el('span', { textContent: k.t }));
-      if (k.d) row.append(el('span', { class: 'tag k' + ki(k), textContent: (k.k || 'Altres') + ' · ' + fmt(k.d) + (k.h ? ' · ' + k.h : '') }));
-      if (k.p) row.append(el('span', { class: 'pp', textContent: '👤 ' + k.p }));
-    }
-    t.append(row);
-  });
-  if (!(s.tasks || []).length) t.append(el('div', { class: 'badge', textContent: 'Cap tasca.' }));
-  if (editing) t.append(el('div', { class: 'row' }, el('button', { class: 'btn', textContent: '+ Tasca', onclick: () => { s.tasks = s.tasks || []; s.tasks.push({ t: '', done: false, k: 'Altres', d: '', h: '' }); save(s); render(); } })));
-  return t;
-}
-
-// ==================== FITXERS ADJUNTS ====================
-function fileKind(mime, name) {
-  if (!mime && name) mime = name.split('.').pop().toLowerCase();
-  if (typeof mime === 'string') {
-    if (mime.startsWith('image/')) return 'image';
-    if (mime.startsWith('audio/')) return 'audio';
-    if (mime.startsWith('video/')) return 'video';
-    if (mime === 'application/pdf' || mime === 'pdf') return 'pdf';
-    if (mime.includes('word') || mime === 'doc' || mime === 'docx') return 'doc';
-    if (mime.includes('sheet') || mime.includes('excel') || mime === 'xls' || mime === 'xlsx') return 'sheet';
-  }
-  return 'file';
-}
-
-function fileIcon(kind) {
-  return { image: '🖼️', audio: '🎵', video: '🎬', pdf: '📄', doc: '📝', sheet: '📊', file: '📎' }[kind] || '📎';
-}
-
-function renderFiles(s) {
-  s.files = s.files || [];
-  const card = el('div', { class: 'card' });
-  card.append(el('div', { class: 'row', style: 'justify-content:space-between;margin:0 0 10px;align-items:center' }, [
-    el('h3', { textContent: '📎 Fitxers adjunts', style: 'margin:0' }),
-    el('div', { class: 'row', style: 'margin:0' }, [
-      el('button', { class: 'btn p', textContent: '+ Pujar fitxer', onclick: () => pujaFitxer(s) })
-    ])
-  ]));
-
-  if (!s.files.length) {
-    card.append(el('div', { class: 'badge', textContent: 'Cap fitxer pujat encara.' }));
-    return card;
-  }
-
-  const grid = el('div', { class: 'files-grid' });
-
-  s.files.forEach((f, i) => {
-    const kind = fileKind(f.mime, f.name);
-    const fileCard = el('div', { class: 'file-card' });
-
-    if (kind === 'image') {
-      fileCard.append(el('img', { class: 'file-thumb', src: f.url, alt: f.name, loading: 'lazy' }));
-    } else {
-      fileCard.append(el('div', { class: 'file-icon', textContent: fileIcon(kind) }));
-    }
-
-    fileCard.append(el('div', { class: 'file-name', textContent: f.name, title: f.name }));
-    fileCard.append(el('div', { class: 'file-size', textContent: humanSize(f.size) }));
-
-    if (kind === 'audio') {
-      const audio = el('audio', { controls: true, preload: 'metadata' });
-      audio.src = f.url;
-      fileCard.append(audio);
-    }
-
-    const actions = el('div', { class: 'file-actions' });
-    const a = el('a', { href: f.url, target: '_blank', style: 'flex:1' });
-    a.append(el('button', { class: 'btn', textContent: 'Obrir', style: 'width:100%' }));
-    actions.append(a);
-    actions.append(el('button', { class: 'btn d', textContent: '🗑️', title: 'Esborrar', onclick: () => esborraFitxer(s, i, f) }));
-    fileCard.append(actions);
-
-    grid.append(fileCard);
-  });
-
-  card.append(grid);
-  return card;
-}
-
-async function pujaFitxer(s) {
-  const input = el('input', { type: 'file', style: 'display:none' });
-  input.addEventListener('change', async () => {
-    const file = input.files[0];
-    if (!file) return;
-    if (file.size > 100 * 1024 * 1024) { alert('El fitxer és massa gran (màxim 100 MB).'); return; }
-
-    const secName = s.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'general';
-    const timestamp = Date.now();
-    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-    const path = secName + '/' + timestamp + '-' + safeName;
-
-    const bar = el('div', { class: 'card', style: 'text-align:center' }, el('div', { textContent: '⏳ Pujant...', style: 'font-weight:600' }));
-    $('#app').prepend(bar);
-
-    const { data, error } = await db.storage.from('adjunts').upload(path, file, { cacheControl: '3600', upsert: false });
-
-    bar.remove();
-
-    if (error) { console.error('Error pujant:', error); alert('Error pujant el fitxer: ' + error.message); return; }
-
-    const { data: urlData } = db.storage.from('adjunts').getPublicUrl(path);
-    const url = urlData.publicUrl;
-
-    s.files = s.files || [];
-    s.files.push({ name: file.name, size: file.size, mime: file.type, path: path, url: url, uploaded: new Date().toISOString() });
-    save(s);
-    render();
-    refreshStorage();
-  });
-  input.click();
-}
-
-async function esborraFitxer(s, idx, f) {
-  if (!confirm('Esborrar "' + f.name + '"? Aquesta acció no es pot desfer.')) return;
-  if (f.path) {
-    const r = await db.storage.from('adjunts').remove([f.path]);
-    if (r.error) console.warn('No s\'ha pogut esborrar del Storage:', r.error.message);
-  }
-  s.files.splice(idx, 1);
-  save(s);
-  render();
-  refreshStorage();
-}
-
 function renderBudget(s) {
   s.budget = s.budget || [];
   const wrap = el('div', { class: 'card' });
-
   wrap.append(el('div', { class: 'row', style: 'justify-content:space-between;margin:0 0 8px;align-items:center' }, [
     el('h3', { textContent: 'Full de pressupost', style: 'margin:0' }),
     el('div', { class: 'row', style: 'margin:0' }, [
@@ -704,6 +619,7 @@ function renderBudget(s) {
 
   return wrap;
 }
+
 function renderCal() {
   const app = $('#app'); app.innerHTML = '';
   const by = {}; secs.forEach(s => (s.tasks || []).forEach(k => { if (k.d) (by[k.d] = by[k.d] || []).push({ k, s }); }));
@@ -749,7 +665,6 @@ async function start(user) {
   if (b.data) people = b.data.people;
   await carregaBlocks();
   cur = 'cal'; render();
-  refreshStorage();
   db.channel('canvis')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'sections' }, p => {
       if (p.eventType === 'DELETE') secs = secs.filter(x => x.id !== p.old.id);
