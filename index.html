@@ -420,10 +420,13 @@ function renderDocEditor() {
   return card;
 }
 
-function saveEditorContent(d) {
-  const ed = document.querySelector('.rich-editor');
-  if (ed) d.content = ed.innerHTML;
-  saveDoc(d);
+function descarregaPDF(d) {
+  const win = window.open('', '_blank');
+  const title = d.title || 'Document';
+  const content = d.content || '<p>(buit)</p>';
+  const html = '<!doctype html><html lang="ca"><head><meta charset="utf-8"><title>' + title.replace(/</g,'&lt;') + '</title><style>body{font:14pt/1.6 Georgia,serif;max-width:800px;margin:40px auto;padding:0 20px;color:#1f1d1a}h1{font-size:22pt;margin:0 0 6px}h2{font-size:16pt;margin:20px 0 8px}h3{font-size:13pt;margin:16px 0 6px}p{margin:8px 0}ul,ol{margin:8px 0 8px 28px}blockquote{border-left:3px solid #ccc;padding-left:14px;margin:12px 0;color:#555}a{color:#b4471f;text-decoration:none}.footer{margin-top:40px;padding-top:14px;border-top:1px solid #ddd;font-size:10pt;color:#888;font-style:italic}@media print{body{margin:20mm}}</style></head><body><h1>' + title.replace(/</g,'&lt;') + '</h1><div>' + content + '</div><div class="footer">Un documental de David González i Joan Clusella</div><script>window.onload=function(){setTimeout(function(){window.print();},300);};<\/script></body></html>';
+  win.document.write(html);
+  win.document.close();
 }
 
 // ---- Accions de documents ----
