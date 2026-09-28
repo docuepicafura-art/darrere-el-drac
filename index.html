@@ -407,10 +407,8 @@ function renderFiles(s) {
       audio.src = f.url;
       fileCard.append(audio);
     }
-    const actions = el('div', { class: 'file-actions' });
-    const a = el('a', { href: f.url, target: '_blank', style: 'flex:1' });
-    a.append(el('button', { class: 'btn', textContent: 'Obrir', style: 'width:100%' }));
-    actions.append(a);
+      const actions = el('div', { class: 'file-actions' });
+    actions.append(el('button', { class: 'btn', textContent: 'Obrir', style: 'flex:1', onclick: () => obreFitxer(f) }));
     actions.append(el('button', { class: 'btn d', textContent: '🗑️', title: 'Esborrar', onclick: () => esborraFitxer(s, i, f) }));
     fileCard.append(actions);
     grid.append(fileCard);
@@ -523,6 +521,14 @@ function renderOverview() {
 
   return wrap;
 }
+async function obreFitxer(f) {
+  if (!f.path) { window.open(f.url, '_blank'); return; }
+  // Genera una URL signada vàlida durant 1 hora
+  const { data, error } = await db.storage.from('adjunts').createSignedUrl(f.path, 3600);
+  if (error) { alert('No s\'ha pogut obrir el fitxer: ' + error.message); return; }
+  window.open(data.signedUrl, '_blank');
+}
+
 function renderBudget(s) {
   s.budget = s.budget || [];
   const wrap = el('div', { class: 'card' });
