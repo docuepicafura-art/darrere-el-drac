@@ -169,6 +169,10 @@ const dias = ['diumenge','dilluns','dimarts','dimecres','dijous','divendres','di
 const diaLabel = d => { const dt = new Date(d + 'T00:00:00'); return dias[dt.getDay()]; };
 const humanSize = b => { if (!b) return '0 B'; const u = ['B','KB','MB','GB']; const i = Math.floor(Math.log(b) / Math.log(1024)); return (b / Math.pow(1024, i)).toFixed(1) + ' ' + u[i]; };
 let blockedDays = {};
+let docs = []; // Llista de documents
+let currentDoc = null; // Document que s'està editant
+let currentFolder = 'Guió'; // Carpeta seleccionada a la vista
+const FOLDERS = ['Guió', 'Notes', 'Entrevistes', 'Producció', 'Altres'];
 
 const PARTIDES_INICIALS = [
   {c:"Direcció",cat:"Personal intern",p:0,st:"pendent",exp:[]},
@@ -234,6 +238,11 @@ async function carregaBlocks() {
   blockedDays = {};
   (data || []).forEach(b => { blockedDays[b.day] = true; });
 }
+async function carregaDocs() {
+  const { data, error } = await db.from('documents').select('*').order('updated_at', { ascending: false });
+  if (error) { console.warn('No s\'han pogut carregar els documents:', error.message); return; }
+  docs = data || [];
+}
 async function toggleBlock(day) {
   if (blockedDays[day]) {
     if (!confirm('Desbloquejar el dia ' + fmt(day) + '?')) return;
@@ -273,7 +282,7 @@ function render() {
     if (!s.budget || s.budget.length === 0) { s.budget = JSON.parse(JSON.stringify(PARTIDES_INICIALS)); save(s); }
     app.append(renderBudget(s));
   } else if (/^gui[oó]$/i.test(s.name)) {
-    app.append(renderEditor(s));
+    app.append(renderDocsUI());
   } else {
     app.append(renderTasks(s));
   }
@@ -297,23 +306,158 @@ function render() {
 }
 
 // ---- Editor de text ----
-function renderEditor(s) {
+// ---- Llista de documents + Editor ----
+function renderDocsUI() {
+  if (currentDoc) return renderDocEditor();
+  return renderDocsList();
+}
+
+function renderDocsList() {
   const card = el('div', { class: 'card' });
-  card.append(el('h3', { textContent: '📝 Text (editable)' }));
+  card.append(el('div', { class: 'row', style: 'justify-content:space-between;margin:0 0 12px;align-items:center' }, [
+    el('h3', { textContent: '📚 Documents', style: 'margin:0' }),
+    el('button', { class: 'btn p', textContent: '+ Nou document', onclick: () => nouDocument() })
+  ]));
+
+  if (!docs.length) {
+    card.append(el('div', { class: 'badge', textContent: 'Cap document encara. Prem "+ Nou document" per començar.' }));
+    return card;
+  }
+
+  // Agrupar per carpetes
+  const grouped = {};
+  FOLDERS.forEach(f => grouped[f] = []);
+  docs.forEach(d => {
+    const folder = FOLDERS.includes(d.folder) ? d.folder : 'Altres';
+    if (!grouped[folder]) grouped[folder] = [];
+    grouped[folder].push(d);
+  });
+
+  // Mostrar cada carpeta
+  Object.keys(grouped).forEach(folder => {
+    const list = grouped[folder];
+    if (!list.length) return;
+    const folderCard = el('div', { style: 'margin-bottom:16px' });
+    folderCard.append(el('div', { style: 'font-weight:700;font-size:14px;margin-bottom:6px;color:var(--ac)', textContent: '📁 ' + folder }));
+    list.forEach(d => {
+      const row = el('div', { class: 'task', style: 'cursor:pointer;padding:8px 6px;border-radius:6px' });
+      row.addEventListener('mouseenter', () => row.style.background = 'rgba(180,71,31,.05)');
+      row.addEventListener('mouseleave', () => row.style.background = 'transparent');
+      row.append(el('span', { textContent: '📄', style: 'font-size:18px' }));
+      row.append(el('div', { style: 'flex:1', onclick: () => obreDocument(d) }, [
+        el('div', { style: 'font-weight:600', textContent: d.title || 'Sense títol' }),
+        el('div', { class: 'badge', textContent: 'Actualitzat ' + dataRelativa(d.updated_at) })
+      ]));
+      row.append(el('button', { class: 'btn d', textContent: '🗑️', title: 'Esborrar', onclick: (e) => { e.stopPropagation(); esborraDocument(d); } }));
+      folderCard.append(row);
+    });
+    card.append(folderCard);
+  });
+
+  return card;
+}
+
+function renderDocEditor() {
+  const d = currentDoc;
+  const card = el('div', { class: 'card' });
+
+  // Barra superior
+  const bar = el('div', { class: 'row', style: 'justify-content:space-between;margin:0 0 12px;align-items:center' });
+  bar.append(el('button', { class: 'btn', textContent: '← Tornar', onclick: () => { currentDoc = null; render(); } }));
+  bar.append(el('span', { class: 'badge', textContent: '📁 ' + d.folder }));
+  card.append(bar);
+
+  // Títol editable
+  const titleInput = el('input', {
+    type: 'text',
+    value: d.title || 'Sense títol',
+    placeholder: 'Títol del document',
+    style: 'font-size:20px;font-weight:700;font-family:Georgia,serif;margin-bottom:10px',
+    oninput: e => {
+      d.title = e.target.value;
+      saveDoc(d);
+    }
+  });
+  card.append(titleInput);
+
+  // Cos editable
   const ta = el('textarea', {
     class: 'editor-area',
-    value: s.text || '',
-    placeholder: 'Escriu aquí el guió, les notes o el text que vulguis...\n\nEs guarda automàticament.',
+    value: d.content || '',
+    placeholder: 'Escriu aquí el contingut...\n\nEs guarda automàticament.',
     oninput: e => {
-      s.text = e.target.value;
-      saveText(s);
+      d.content = e.target.value;
+      saveDoc(d);
       const msg = $('#editor-save-msg');
       if (msg) msg.textContent = '⏳ Desant...';
     }
   });
   card.append(ta);
   card.append(el('div', { class: 'editor-save', id: 'editor-save-msg', textContent: '' }));
+
   return card;
+}
+
+// ---- Accions de documents ----
+async function nouDocument() {
+  const title = prompt('Nom del nou document:', 'Nou document');
+  if (!title) return;
+  const folder = prompt('Carpeta (Guió, Notes, Entrevistes, Producció, Altres):', 'Guió') || 'Guió';
+  const folderOk = FOLDERS.includes(folder) ? folder : 'Altres';
+  const nou = { folder: folderOk, title: title.trim(), content: '' };
+  const r = await db.from('documents').insert(nou).select().single();
+  if (r.error) { alert('Error creant el document: ' + r.error.message); return; }
+  docs.unshift(r.data);
+  currentDoc = r.data;
+  render();
+}
+
+function obreDocument(d) {
+  currentDoc = d;
+  render();
+}
+
+async function esborraDocument(d) {
+  if (!confirm('Esborrar "' + (d.title || 'Sense títol') + '"? Aquesta acció no es pot desfer.')) return;
+  const r = await db.from('documents').delete().eq('id', d.id);
+  if (r.error) { alert('Error esborrant: ' + r.error.message); return; }
+  docs = docs.filter(x => x.id !== d.id);
+  if (currentDoc && currentDoc.id === d.id) currentDoc = null;
+  render();
+}
+
+function saveDoc(d) {
+  if (!d || !d.id) return;
+  clearTimeout(timers['doc-' + d.id]);
+  const msg = $('#editor-save-msg');
+  timers['doc-' + d.id] = setTimeout(async () => {
+    const payload = { title: d.title || 'Sense títol', content: d.content || '', folder: d.folder || 'Altres', updated_at: new Date().toISOString() };
+    const r = await db.from('documents').update(payload).eq('id', d.id);
+    if (r.error) {
+      if (msg) msg.textContent = '❌ Error guardant';
+      console.error('Error guardant doc:', r.error);
+    } else {
+      if (msg) msg.textContent = '✅ Guardat a les ' + new Date().toLocaleTimeString('ca-ES', { hour: '2-digit', minute: '2-digit' });
+      d.updated_at = payload.updated_at;
+    }
+  }, 800);
+}
+
+// ---- Utilitat: data relativa ----
+function dataRelativa(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  const now = new Date();
+  const diffMs = now - d;
+  const diffMin = Math.floor(diffMs / 60000);
+  const diffH = Math.floor(diffMin / 60);
+  const diffD = Math.floor(diffH / 24);
+  if (diffMin < 1) return 'ara mateix';
+  if (diffMin < 60) return 'fa ' + diffMin + ' min';
+  if (diffH < 24) return 'fa ' + diffH + ' h';
+  if (diffD === 1) return 'ahir';
+  if (diffD < 7) return 'fa ' + diffD + ' dies';
+  return d.toLocaleDateString('ca-ES');
 }
 
 function saveText(s) {
@@ -670,6 +814,7 @@ async function start(user) {
   const b = await db.from('settings').select('people').eq('id', 1).maybeSingle();
   if (b.data) people = b.data.people;
   await carregaBlocks();
+  await carregaDocs();
   cur = 'cal'; render();
   db.channel('canvis')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'sections' }, p => {
