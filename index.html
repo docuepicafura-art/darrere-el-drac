@@ -128,6 +128,13 @@ audio{width:100%;height:32px;margin-top:4px}
   .files-grid{grid-template-columns:repeat(auto-fill,minmax(130px,1fr))}
   main{padding:12px}
 }
+/* Editor de guió */
+.editor-wrap{display:flex;flex-direction:column;gap:8px;margin-top:8px}
+.editor-toolbar{display:flex;gap:6px;flex-wrap:wrap;align-items:center;padding:6px 0;border-bottom:1px solid var(--bd);margin-bottom:8px}
+.editor-toolbar .info{font-size:12px;color:var(--mut);margin-left:auto}
+.editor-area{width:100%;min-height:400px;font:15px/1.7 Georgia,serif;padding:16px;background:var(--bg);border:1px solid var(--bd);border-radius:8px;resize:vertical;color:var(--tx)}
+.editor-area:focus{outline:2px solid var(--ac);outline-offset:-2px}
+.editor-save{font-size:12px;color:var(--ok);min-height:16px;text-align:right}
 </style>
 </head>
 <body>
@@ -182,6 +189,7 @@ const eur = n => (Number(n) || 0).toLocaleString('ca-ES', { minimumFractionDigit
 const realOf = p => (p.exp || []).reduce((a, e) => a + (Number(e.a) || 0), 0);
 const isBudgetSec = s => /pressupost/i.test(s.name);
 const isOverviewSec = s => /visi[oó]\s*general/i.test(s.name);
+const isGuioSec = s => /^gui[oó]$/i.test(s.name);
 const dias = ['diumenge','dilluns','dimarts','dimecres','dijous','divendres','dissabte'];
 const diaLabel = d => { const dt = new Date(d + 'T00:00:00'); return dias[dt.getDay()]; };
 const humanSize = b => { if (!b) return '0 B'; const u = ['B','KB','MB','GB']; const i = Math.floor(Math.log(b) / Math.log(1024)); return (b / Math.pow(1024, i)).toFixed(1) + ' ' + u[i]; };
@@ -285,11 +293,13 @@ function render() {
   }
   app.append(c);
 
-  if (isOverviewSec(s)) {
+    if (isOverviewSec(s)) {
     app.append(renderOverview());
   } else if (isBudgetSec(s)) {
     if (!s.budget || s.budget.length === 0) { s.budget = JSON.parse(JSON.stringify(PARTIDES_INICIALS)); save(s); }
     app.append(renderBudget(s));
+  } else if (isGuioSec(s)) {
+    app.append(renderEditor(s));
   } else {
     app.append(renderTasks(s));
   }
@@ -406,6 +416,50 @@ function renderOverview() {
   }
 
   return wrap;
+}
+function renderEditor(s) {
+  s.text = s.text || '';
+  const card = el('div', { class: 'card' });
+
+  // Toolbar
+  const tb = el('div', { class: 'editor-toolbar' });
+  tb.append(el('h3', { textContent: '📝 Editor de guió', style: 'margin:0' }));
+  tb.append(el('span', { class: 'info', textContent: 'Es guarda automàticament mentre escrius.' }));
+  card.append(tb);
+
+  // Textarea
+  const ta = el('textarea', {
+    class: 'editor-area',
+    value: s.text,
+    placeholder: 'Escriu aquí el guió del documental...\n\nPots escriure lliurement: escenes, diàlegs, notes, estructures...',
+    oninput: e => {
+      s.text = e.target.value;
+      saveText(s);
+      const msg = $('#editor-save-msg');
+      if (msg) { msg.textContent = '⏳ Desant...'; }
+    }
+  });
+  card.append(ta);
+
+  // Missatge de guardat
+  card.append(el('div', { class: 'editor-save', id: 'editor-save-msg', textContent: '' }));
+
+  return card;
+}
+
+function saveText(s) {
+  clearTimeout(timers['text-' + s.id]);
+  const msg = $('#editor-save-msg');
+  timers['text-' + s.id] = setTimeout(async () => {
+    const payload = { id: s.id, pos: s.pos, name: s.name, notes: s.notes || '', tasks: s.tasks || [], budget: s.budget || [], files: s.files || [], text: s.text || '' };
+    const r = await db.from('sections').upsert(payload);
+    if (r.error) {
+      console.error('Error guardant text:', r.error);
+      if (msg) msg.textContent = '❌ Error guardant';
+    } else {
+      if (msg) msg.textContent = '✅ Guardat a les ' + new Date().toLocaleTimeString('ca-ES', { hour: '2-digit', minute: '2-digit' });
+    }
+  }, 800);
 }
 function renderTasks(s) {
   const t = el('div', { class: 'card' }, el('h3', { textContent: 'Tasques' }));
