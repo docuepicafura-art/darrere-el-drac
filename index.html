@@ -417,7 +417,16 @@ function renderTasks(s) {
       row.append(el('input', { type: 'text', value: k.t, style: 'flex:1;min-width:140px', oninput: e => { k.t = e.target.value; save(s); } }));
       row.append(sel(k));
       row.append(psel(k));
-      row.append(el('input', { type: 'date', value: k.d || '', oninput: e => { k.d = e.target.value; save(s); } }));
+    row.append(el('input', { type: 'date', value: k.d || '', oninput: e => {
+  if (e.target.value && blockedDays[e.target.value]) {
+    alert('🔒 Aquest dia està bloquejat. No es poden assignar tasques.');
+    e.target.value = '';
+    k.d = '';
+    return;
+  }
+  k.d = e.target.value;
+  save(s);
+} }));
       row.append(el('input', { type: 'time', value: k.h || '', oninput: e => { k.h = e.target.value; save(s); } }));
       row.append(el('button', { class: 'x', textContent: '×', onclick: () => { s.tasks.splice(i, 1); save(s); render(); } }));
     } else {
