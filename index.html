@@ -108,16 +108,6 @@ input[type=time]{padding:6px;width:auto}
 .file-actions .btn{flex:1;padding:4px 6px;font-size:12px;text-align:center}
 .file-actions .btn.d{flex:0 0 auto}
 audio{width:100%;height:32px;margin-top:4px}
-.editor-area{width:100%;min-height:400px;font:15px/1.7 Georgia,serif;padding:16px;background:var(--bg);border:1px solid var(--bd);border-radius:8px;resize:vertical;color:var(--tx)}
-.editor-save{font-size:12px;color:var(--ok);min-height:16px;text-align:right;margin-top:6px}
-@media (max-width:640px){
-  .bud-head,.bud-row{grid-template-columns:24px 1fr 90px 32px}
-  .bud-head .hide-s,.bud-row .hide-s{display:none}
-  .agenda-item{grid-template-columns:100px 1fr;gap:8px}
-  .agenda-who{display:none}
-  .files-grid{grid-template-columns:repeat(auto-fill,minmax(130px,1fr))}
-  main{padding:12px}
-}
 .rich-editor{width:100%;min-height:400px;font:15px/1.7 Georgia,serif;padding:16px;background:var(--bg);border:1px solid var(--bd);border-radius:8px;color:var(--tx);outline:none}
 .rich-editor:focus{outline:2px solid var(--ac);outline-offset:-2px}
 .rich-toolbar{display:flex;gap:4px;flex-wrap:wrap;padding:8px;background:var(--bg);border:1px solid var(--bd);border-radius:8px;margin-bottom:8px}
@@ -127,6 +117,15 @@ audio{width:100%;height:32px;margin-top:4px}
 .rich-editor p{margin:6px 0}
 .rich-editor ul,.rich-editor ol{margin:6px 0 6px 24px}
 .rich-editor blockquote{border-left:3px solid var(--bd);padding-left:12px;margin:8px 0;color:var(--mut)}
+.editor-save{font-size:12px;color:var(--ok);min-height:16px;text-align:right;margin-top:6px}
+@media (max-width:640px){
+  .bud-head,.bud-row{grid-template-columns:24px 1fr 90px 32px}
+  .bud-head .hide-s,.bud-row .hide-s{display:none}
+  .agenda-item{grid-template-columns:100px 1fr;gap:8px}
+  .agenda-who{display:none}
+  .files-grid{grid-template-columns:repeat(auto-fill,minmax(130px,1fr))}
+  main{padding:12px}
+}
 </style>
 </head>
 <body>
@@ -178,9 +177,8 @@ const dias = ['diumenge','dilluns','dimarts','dimecres','dijous','divendres','di
 const diaLabel = d => { const dt = new Date(d + 'T00:00:00'); return dias[dt.getDay()]; };
 const humanSize = b => { if (!b) return '0 B'; const u = ['B','KB','MB','GB']; const i = Math.floor(Math.log(b) / Math.log(1024)); return (b / Math.pow(1024, i)).toFixed(1) + ' ' + u[i]; };
 let blockedDays = {};
-let docs = []; // Llista de documents
-let currentDoc = null; // Document que s'està editant
-let currentFolder = 'Guió'; // Carpeta seleccionada a la vista
+let docs = [];
+let currentDoc = null;
 const FOLDERS = ['Guió', 'Notes', 'Entrevistes', 'Producció', 'Altres'];
 
 const PARTIDES_INICIALS = [
@@ -247,11 +245,13 @@ async function carregaBlocks() {
   blockedDays = {};
   (data || []).forEach(b => { blockedDays[b.day] = true; });
 }
+
 async function carregaDocs() {
   const { data, error } = await db.from('documents').select('*').order('updated_at', { ascending: false });
   if (error) { console.warn('No s\'han pogut carregar els documents:', error.message); return; }
   docs = data || [];
 }
+
 async function toggleBlock(day) {
   if (blockedDays[day]) {
     if (!confirm('Desbloquejar el dia ' + fmt(day) + '?')) return;
@@ -314,8 +314,7 @@ function render() {
   }
 }
 
-// ---- Editor de text ----
-// ---- Llista de documents + Editor ----
+// ==================== DOCUMENTS ====================
 function renderDocsUI() {
   if (currentDoc) return renderDocEditor();
   return renderDocsList();
@@ -333,7 +332,6 @@ function renderDocsList() {
     return card;
   }
 
-  // Agrupar per carpetes
   const grouped = {};
   FOLDERS.forEach(f => grouped[f] = []);
   docs.forEach(d => {
@@ -342,21 +340,20 @@ function renderDocsList() {
     grouped[folder].push(d);
   });
 
-  // Mostrar cada carpeta
   Object.keys(grouped).forEach(folder => {
     const list = grouped[folder];
     if (!list.length) return;
     const folderCard = el('div', { style: 'margin-bottom:16px' });
     folderCard.append(el('div', { style: 'font-weight:700;font-size:14px;margin-bottom:6px;color:var(--ac)', textContent: '📁 ' + folder }));
     list.forEach(d => {
-      const row = el('div', { class: 'task', style: 'cursor:pointer;padding:8px 6px;border-radius:6px' });
-      row.addEventListener('mouseenter', () => row.style.background = 'rgba(180,71,31,.05)');
-      row.addEventListener('mouseleave', () => row.style.background = 'transparent');
+      const row = el('div', { class: 'task', style: 'padding:8px 6px' });
       row.append(el('span', { textContent: '📄', style: 'font-size:18px' }));
-      row.append(el('div', { style: 'flex:1', onclick: () => obreDocument(d) }, [
+      const info = el('div', { style: 'flex:1;cursor:pointer', onclick: () => obreDocument(d) }, [
         el('div', { style: 'font-weight:600', textContent: d.title || 'Sense títol' }),
         el('div', { class: 'badge', textContent: 'Actualitzat ' + dataRelativa(d.updated_at) })
-      ]));
+      ]);
+      row.append(info);
+      row.append(el('button', { class: 'btn s', textContent: '📄', title: 'Descarregar PDF', onclick: (e) => { e.stopPropagation(); descarregaPDF(d); } }));
       row.append(el('button', { class: 'btn d', textContent: '🗑️', title: 'Esborrar', onclick: (e) => { e.stopPropagation(); esborraDocument(d); } }));
       folderCard.append(row);
     });
@@ -370,21 +367,18 @@ function renderDocEditor() {
   const d = currentDoc;
   const card = el('div', { class: 'card' });
 
-  // Barra superior
   const bar = el('div', { class: 'row', style: 'justify-content:space-between;margin:0 0 12px;align-items:center' });
   bar.append(el('button', { class: 'btn', textContent: '← Tornar', onclick: () => { currentDoc = null; render(); } }));
   bar.append(el('span', { class: 'badge', textContent: '📁 ' + d.folder }));
   bar.append(el('button', { class: 'btn p', textContent: '📄 Descarregar PDF', onclick: () => descarregaPDF(d) }));
   card.append(bar);
 
-  // Títol editable
   card.append(el('input', {
     type: 'text', value: d.title || 'Sense títol', placeholder: 'Títol del document',
     style: 'font-size:20px;font-weight:700;font-family:Georgia,serif;margin-bottom:10px',
     oninput: e => { d.title = e.target.value; saveDoc(d); }
   }));
 
-  // Barra d'eines
   const tb = el('div', { class: 'rich-toolbar' });
   const btns = [
     ['B', 'bold', 'Negreta'],
@@ -410,7 +404,6 @@ function renderDocEditor() {
   });
   card.append(tb);
 
-  // Cos editable
   const ed = el('div', { class: 'rich-editor', contentEditable: 'true' });
   ed.innerHTML = d.content || '';
   ed.addEventListener('input', () => { d.content = ed.innerHTML; saveDoc(d); const msg = $('#editor-save-msg'); if (msg) msg.textContent = '⏳ Desant...'; });
@@ -420,16 +413,12 @@ function renderDocEditor() {
   return card;
 }
 
-function descarregaPDF(d) {
-  const win = window.open('', '_blank');
-  const title = d.title || 'Document';
-  const content = d.content || '<p>(buit)</p>';
-  const html = '<!doctype html><html lang="ca"><head><meta charset="utf-8"><title>' + title.replace(/</g,'&lt;') + '</title><style>body{font:14pt/1.6 Georgia,serif;max-width:800px;margin:40px auto;padding:0 20px;color:#1f1d1a}h1{font-size:22pt;margin:0 0 6px}h2{font-size:16pt;margin:20px 0 8px}h3{font-size:13pt;margin:16px 0 6px}p{margin:8px 0}ul,ol{margin:8px 0 8px 28px}blockquote{border-left:3px solid #ccc;padding-left:14px;margin:12px 0;color:#555}a{color:#b4471f;text-decoration:none}.footer{margin-top:40px;padding-top:14px;border-top:1px solid #ddd;font-size:10pt;color:#888;font-style:italic}@media print{body{margin:20mm}}</style></head><body><h1>' + title.replace(/</g,'&lt;') + '</h1><div>' + content + '</div><div class="footer">Un documental de David González i Joan Clusella</div><script>window.onload=function(){setTimeout(function(){window.print();},300);};<\/script></body></html>';
-  win.document.write(html);
-  win.document.close();
+function saveEditorContent(d) {
+  const ed = document.querySelector('.rich-editor');
+  if (ed) d.content = ed.innerHTML;
+  saveDoc(d);
 }
 
-// ---- Accions de documents ----
 async function nouDocument() {
   const title = prompt('Nom del nou document:', 'Nou document');
   if (!title) return;
@@ -474,10 +463,18 @@ function saveDoc(d) {
   }, 800);
 }
 
-// ---- Utilitat: data relativa ----
-function dataRelativa(iso) {
-  if (!iso) return '—';
-  const d = new Date(iso);
+function descarregaPDF(d) {
+  const win = window.open('', '_blank');
+  const title = d.title || 'Document';
+  const content = d.content || '<p>(buit)</p>';
+  const html = '<!doctype html><html lang="ca"><head><meta charset="utf-8"><title>' + title.replace(/</g,'&lt;') + '</title><style>body{font:14pt/1.6 Georgia,serif;max-width:800px;margin:40px auto;padding:0 20px;color:#1f1d1a}h1{font-size:22pt;margin:0 0 6px}h2{font-size:16pt;margin:20px 0 8px}h3{font-size:13pt;margin:16px 0 6px}p{margin:8px 0}ul,ol{margin:8px 0 8px 28px}blockquote{border-left:3px solid #ccc;padding-left:14px;margin:12px 0;color:#555}a{color:#b4471f;text-decoration:none}.footer{margin-top:40px;padding-top:14px;border-top:1px solid #ddd;font-size:10pt;color:#888;font-style:italic}@media print{body{margin:20mm}}</style></head><body><h1>' + title.replace(/</g,'&lt;') + '</h1><div>' + content + '</div><div class="footer">Un documental de David González i Joan Clusella</div><script>window.onload=function(){setTimeout(function(){window.print();},300);};<\/script></body></html>';
+  win.document.write(html);
+  win.document.close();
+}
+
+function dataRelativa(isoStr) {
+  if (!isoStr) return '—';
+  const d = new Date(isoStr);
   const now = new Date();
   const diffMs = now - d;
   const diffMin = Math.floor(diffMs / 60000);
@@ -491,22 +488,7 @@ function dataRelativa(iso) {
   return d.toLocaleDateString('ca-ES');
 }
 
-function saveText(s) {
-  clearTimeout(timers['text-' + s.id]);
-  const msg = $('#editor-save-msg');
-  timers['text-' + s.id] = setTimeout(async () => {
-    const payload = { id: s.id, pos: s.pos, name: s.name, notes: s.notes || '', tasks: s.tasks || [], budget: s.budget || [], files: s.files || [], text: s.text || '' };
-    const r = await db.from('sections').upsert(payload);
-    if (r.error) {
-      if (msg) msg.textContent = '❌ Error guardant';
-      console.error('Error guardant text:', r.error);
-    } else {
-      if (msg) msg.textContent = '✅ Guardat a les ' + new Date().toLocaleTimeString('ca-ES', { hour: '2-digit', minute: '2-digit' });
-    }
-  }, 800);
-}
-
-// ---- Tasques ----
+// ==================== TASQUES ====================
 function renderTasks(s) {
   const t = el('div', { class: 'card' }, el('h3', { textContent: 'Tasques' }));
   (s.tasks || []).forEach((k, i) => {
@@ -540,7 +522,7 @@ function renderTasks(s) {
   return t;
 }
 
-// ---- Fitxers adjunts ----
+// ==================== FITXERS ADJUNTS ====================
 function fileKind(mime, name) {
   if (!mime && name) mime = name.split('.').pop().toLowerCase();
   if (typeof mime === 'string') {
@@ -582,7 +564,7 @@ function renderFiles(s) {
       audio.src = f.url;
       fileCard.append(audio);
     }
-      const actions = el('div', { class: 'file-actions' });
+    const actions = el('div', { class: 'file-actions' });
     actions.append(el('button', { class: 'btn', textContent: 'Obrir', style: 'flex:1', onclick: () => obreFitxer(f) }));
     actions.append(el('button', { class: 'btn d', textContent: '🗑️', title: 'Esborrar', onclick: () => esborraFitxer(s, i, f) }));
     fileCard.append(actions);
@@ -624,8 +606,14 @@ async function esborraFitxer(s, idx, f) {
   save(s);
   render();
 }
+async function obreFitxer(f) {
+  if (!f.path) { window.open(f.url, '_blank'); return; }
+  const { data, error } = await db.storage.from('adjunts').createSignedUrl(f.path, 3600);
+  if (error) { alert('No s\'ha pogut obrir el fitxer: ' + error.message); return; }
+  window.open(data.signedUrl, '_blank');
+}
 
-// ---- Visió general ----
+// ==================== VISIÓ GENERAL ====================
 function renderOverview() {
   const wrap = el('div');
   const today = iso(new Date());
@@ -696,14 +684,6 @@ function renderOverview() {
 
   return wrap;
 }
-async function obreFitxer(f) {
-  if (!f.path) { window.open(f.url, '_blank'); return; }
-  // Genera una URL signada vàlida durant 1 hora
-  const { data, error } = await db.storage.from('adjunts').createSignedUrl(f.path, 3600);
-  if (error) { alert('No s\'ha pogut obrir el fitxer: ' + error.message); return; }
-  window.open(data.signedUrl, '_blank');
-}
-
 function renderBudget(s) {
   s.budget = s.budget || [];
   const wrap = el('div', { class: 'card' });
