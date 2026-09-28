@@ -374,6 +374,7 @@ function renderDocEditor() {
   const bar = el('div', { class: 'row', style: 'justify-content:space-between;margin:0 0 12px;align-items:center' });
   bar.append(el('button', { class: 'btn', textContent: '← Tornar', onclick: () => { currentDoc = null; render(); } }));
   bar.append(el('span', { class: 'badge', textContent: '📁 ' + d.folder }));
+  bar.append(el('button', { class: 'btn p', textContent: '📄 Descarregar PDF', onclick: () => descarregaPDF(d) }));
   card.append(bar);
 
   // Títol editable
