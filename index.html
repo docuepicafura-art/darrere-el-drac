@@ -255,7 +255,16 @@ function save(s) {
     if (r.error) console.error('Error guardant:', r.error);
   }, 500);
 }
-function savePeople() { db.from('settings').upsert({ id: 1, people }); }
+async function savePeople() {
+  console.log('Guardant people:', JSON.stringify(people));
+  const r = await db.from('settings').upsert({ id: 1, people });
+  if (r.error) {
+    console.error('❌ Error guardant people:', r.error);
+    alert('Error guardant les persones: ' + r.error.message);
+  } else {
+    console.log('✅ People guardat correctament');
+  }
+}
 
 const nm = e => e.split('@')[0];
 const others = id => Object.entries(peers).filter(([k, v]) => k !== me && v.some(x => x.sec === id)).map(([k]) => nm(k));
