@@ -130,6 +130,20 @@ audio{width:100%;height:32px;margin-top:4px}
   .files-grid{grid-template-columns:repeat(auto-fill,minmax(130px,1fr))}
   main{padding:12px}
 }
+/* Cercador */
+.search-wrap{position:relative;flex:1;max-width:400px;margin:0 10px}
+.search-input{width:100%;padding:8px 12px 8px 34px;border-radius:999px;border:1px solid var(--bd);background:var(--card);color:var(--tx);font:inherit;font-size:14px}
+.search-input:focus{outline:2px solid var(--ac);outline-offset:-2px}
+.search-icon{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--mut);pointer-events:none}
+.search-results{position:absolute;top:calc(100% + 6px);left:0;right:0;background:var(--card);border:1px solid var(--bd);border-radius:10px;max-height:500px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,.12);z-index:100;display:none}
+.search-results.open{display:block}
+.search-result{padding:10px 14px;border-bottom:1px solid var(--bd);cursor:pointer;font-size:14px}
+.search-result:last-child{border:0}
+.search-result:hover{background:rgba(180,71,31,.06)}
+.search-result .title{font-weight:600;margin-bottom:2px}
+.search-result .meta{font-size:11px;color:var(--mut)}
+.search-group{padding:8px 14px 4px;font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.05em;background:var(--bg);font-weight:600}
+.search-empty{padding:14px;color:var(--mut);font-size:13px;text-align:center}
 </style>
 </head>
 <body>
@@ -143,11 +157,16 @@ audio{width:100%;height:32px;margin-top:4px}
   <div id="err"></div>
 </div>
 <div id="ui" hidden>
-  <header>
-    <div>
+    <header>
+    <div style="flex:none">
       <h1>Darrere el drac</h1>
       <div class="byline">Un documental de David González i Joan Clusella</div>
       <div class="sub" id="who"></div>
+    </div>
+    <div class="search-wrap">
+      <span class="search-icon">🔍</span>
+      <input type="text" class="search-input" id="search-input" placeholder="Cercar tasques, documents, fitxers..." autocomplete="off">
+      <div class="search-results" id="search-results"></div>
     </div>
     <button class="btn" id="out">Sortir</button>
   </header>
@@ -967,7 +986,141 @@ function renderCal() {
     app.append(c);
   });
 }
+// ==================== CERCADOR ====================
+function inicialitzaCercador() {
+  const input = $('#search-input');
+  const results = $('#search-results');
+  if (!input || !results) return;
 
+  input.addEventListener('input', () => {
+    const q = input.value.trim().toLowerCase();
+    if (q.length < 2) { results.classList.remove('open'); results.innerHTML = ''; return; }
+    const found = cercaGlobal(q);
+    mostraResultats(found);
+  });
+
+  input.addEventListener('focus', () => {
+    if (input.value.trim().length >= 2) {
+      const found = cercaGlobal(input.value.trim().toLowerCase());
+      mostraResultats(found);
+    }
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.search-wrap')) {
+      results.classList.remove('open');
+    }
+  });
+}
+
+function cercaGlobal(q) {
+  const resultats = { tasques: [], documents: [], fitxers: [] };
+
+  // Cercar tasques
+  secs.forEach(s => {
+    (s.tasks || []).forEach(k => {
+      const text = (k.t || '').toLowerCase();
+      const cat = (k.k || '').toLowerCase();
+      const persons = tasquesPersones(k).join(' ').toLowerCase();
+      if (text.includes(q) || cat.includes(q) || persons.includes(q)) {
+        resultats.tasques.push({ tasca: k, seccio: s });
+      }
+    });
+  });
+
+  // Cercar documents
+  docs.forEach(d => {
+    const title = (d.title || '').toLowerCase();
+    const content = (d.content || '').toLowerCase().replace(/<[^>]+>/g, ' ');
+    if (title.includes(q) || content.includes(q)) {
+      resultats.documents.push(d);
+    }
+  });
+
+  // Cercar fitxers
+  secs.forEach(s => {
+    (s.files || []).forEach(f => {
+      const name = (f.name || '').toLowerCase();
+      if (name.includes(q)) {
+        resultats.fitxers.push({ fitxer: f, seccio: s });
+      }
+    });
+  });
+
+  return resultats;
+}
+
+function mostraResultats(r) {
+  const box = $('#search-results');
+  box.innerHTML = '';
+
+  const total = r.tasques.length + r.documents.length + r.fitxers.length;
+  if (!total) {
+    box.append(el('div', { class: 'search-empty', textContent: 'Cap resultat.' }));
+    box.classList.add('open');
+    return;
+  }
+
+  // Tasques
+  if (r.tasques.length) {
+    box.append(el('div', { class: 'search-group', textContent: '📋 Tasques (' + r.tasques.length + ')' }));
+    r.tasques.slice(0, 10).forEach(({ tasca, seccio }) => {
+      const meta = [
+        seccio.name,
+        tasca.d ? fmt(tasca.d) : '',
+        tasquesPersones(tasca).join(', ')
+      ].filter(Boolean).join(' · ');
+
+      box.append(el('div', { class: 'search-result', onclick: () => {
+        $('#search-results').classList.remove('open');
+        $('#search-input').value = '';
+        goto(seccio.id);
+      }}, [
+        el('div', { class: 'title', textContent: tasca.t || '(sense títol)' }),
+        el('div', { class: 'meta', textContent: meta })
+      ]));
+    });
+  }
+
+  // Documents
+  if (r.documents.length) {
+    box.append(el('div', { class: 'search-group', textContent: '📚 Documents (' + r.documents.length + ')' }));
+    r.documents.slice(0, 10).forEach(d => {
+      const meta = [
+        d.folder,
+        'Actualitzat ' + dataRelativa(d.updated_at)
+      ].filter(Boolean).join(' · ');
+
+      box.append(el('div', { class: 'search-result', onclick: () => {
+        $('#search-results').classList.remove('open');
+        $('#search-input').value = '';
+        currentDoc = d;
+        goto(secs.find(x => /^gui[oó]$/i.test(x.name))?.id || 'cal');
+      }}, [
+        el('div', { class: 'title', textContent: d.title || 'Sense títol' }),
+        el('div', { class: 'meta', textContent: meta })
+      ]));
+    });
+  }
+
+  // Fitxers
+  if (r.fitxers.length) {
+    box.append(el('div', { class: 'search-group', textContent: '📎 Fitxers (' + r.fitxers.length + ')' }));
+    r.fitxers.slice(0, 10).forEach(({ fitxer, seccio }) => {
+      const meta = [seccio.name, humanSize(fitxer.size)].filter(Boolean).join(' · ');
+      box.append(el('div', { class: 'search-result', onclick: () => {
+        $('#search-results').classList.remove('open');
+        $('#search-input').value = '';
+        goto(seccio.id);
+      }}, [
+        el('div', { class: 'title', textContent: fitxer.name || '(sense nom)' }),
+        el('div', { class: 'meta', textContent: meta })
+      ]));
+    });
+  }
+
+  box.classList.add('open');
+}
 const busy = () => { const a = document.activeElement; return a && $('#app').contains(a) && /INPUT|TEXTAREA|SELECT/.test(a.tagName); };
 async function start(user) {
   me = user.email;
@@ -984,6 +1137,7 @@ async function start(user) {
   await carregaBlocks();
   await carregaDocs();
   cur = 'cal'; render();
+  inicialitzaCercador();
   db.channel('canvis')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'sections' }, p => {
       if (p.eventType === 'DELETE') secs = secs.filter(x => x.id !== p.old.id);
