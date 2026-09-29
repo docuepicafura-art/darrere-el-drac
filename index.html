@@ -623,7 +623,7 @@ async function enviaConvocatoria(k, s) {
         'Authorization': 'Bearer ' + (session ? session.access_token : SUPABASE_KEY),
         'apikey': SUPABASE_KEY
       },
-      body: JSON.stringify({
+         body: JSON.stringify({
         mode: 'send-email',
         recipients: emails,
         event: {
@@ -632,7 +632,9 @@ async function enviaConvocatoria(k, s) {
           dateFormatted: dateFormatted,
           time: k.h || '',
           location: '',
-          description: 'Secció: ' + s.name + '\nTipus: ' + (k.k || 'Altres') + '\nPersones: ' + persons.join(', ')
+          description: 'Secció: ' + s.name + '\nTipus: ' + (k.k || 'Altres') + '\nPersones: ' + persons.join(', '),
+          notes: (s.notes || '').trim(),
+          createdBy: me
         }
       })
     });
