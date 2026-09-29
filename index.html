@@ -185,7 +185,6 @@ let docs = [];
 let currentDoc = null;
 const FOLDERS = ['Guió', 'Notes', 'Entrevistes', 'Producció', 'Altres'];
 
-// Normalitza el camp 'p' d'una tasca: pot ser string o array
 const tasquesPersones = k => {
   if (!k.p) return [];
   if (Array.isArray(k.p)) return k.p.filter(x => x);
@@ -508,7 +507,7 @@ function dataRelativa(isoStr) {
   return d.toLocaleDateString('ca-ES');
 }
 
-// ==================== TASQUES (amb caselles de persones) ====================
+// ==================== TASQUES ====================
 function renderTasks(s) {
   const t = el('div', { class: 'card' }, el('h3', { textContent: 'Tasques' }));
   (s.tasks || []).forEach((k, i) => {
@@ -516,11 +515,8 @@ function renderTasks(s) {
     row.append(el('input', { type: 'checkbox', checked: k.done, onchange: e => { k.done = e.target.checked; save(s); render(); } }));
 
     if (editing) {
-      // Nom de la tasca
       row.append(el('input', { type: 'text', value: k.t, style: 'flex:1;min-width:180px', placeholder: 'Descripció de la tasca', oninput: e => { k.t = e.target.value; save(s); } }));
-      // Categoria
       row.append(sel(k));
-      // Data i hora
       row.append(el('input', { type: 'date', value: k.d || '', oninput: e => {
         if (e.target.value && blockedDays[e.target.value]) {
           alert('🔒 Aquest dia està bloquejat. No es poden assignar tasques.');
@@ -529,9 +525,7 @@ function renderTasks(s) {
         k.d = e.target.value; save(s);
       } }));
       row.append(el('input', { type: 'time', value: k.h || '', oninput: e => { k.h = e.target.value; save(s); } }));
-      // Botó eliminar
       row.append(el('button', { class: 'x', textContent: '×', onclick: () => { s.tasks.splice(i, 1); save(s); render(); } }));
-      // Caselles de persones
       const checks = el('div', { class: 'people-checks', style: 'width:100%' });
       checks.append(el('span', { class: 'badge', textContent: 'Assignar a:', style: 'margin-right:6px' }));
       peopleNames().forEach(n => {
@@ -569,11 +563,8 @@ function renderTasks(s) {
 // ==================== ENVIAR CONVOCATÒRIA ====================
 async function enviaConvocatoria(k, s) {
   if (!k.d) { alert('Aquesta tasca no té data.'); return; }
-
   const persons = tasquesPersones(k);
   if (!persons.length) { alert('Aquesta tasca no té cap persona assignada.'); return; }
-
-  // Recull els correus de les persones assignades
   const emails = [];
   const senseCorreu = [];
   persons.forEach(n => {
@@ -583,25 +574,20 @@ async function enviaConvocatoria(k, s) {
     if (!mail) { senseCorreu.push(n); return; }
     emails.push(mail);
   });
-
   if (!emails.length) {
     alert('Cap de les persones assignades té correu electrònic configurat.\n\nVes a "Editar" → "Persones de l\'equip" i afegeix els seus correus.');
     return;
   }
-
   let msg = 'Enviar convocatòria a:\n\n' + persons.map((n, i) => '  • ' + n + (emails[i] ? ' <' + emails[i] + '>' : '')).join('\n');
   msg += '\n\nEsdeveniment: ' + (k.t || '(sense títol)');
   msg += '\nData: ' + fmt(k.d) + (k.h ? ' a les ' + k.h : '');
   if (senseCorreu.length) msg += '\n\n⚠️ Sense correu: ' + senseCorreu.join(', ');
   msg += '\n\nContinuar?';
-
   if (!confirm(msg)) return;
-
   try {
     const { data: { session } } = await db.auth.getSession();
     const [y, m, d] = k.d.split('-');
     const dateFormatted = d + '/' + m + '/' + y;
-
     const response = await fetch(SUPABASE_URL + '/functions/v1/smart-handler', {
       method: 'POST',
       headers: {
@@ -622,13 +608,11 @@ async function enviaConvocatoria(k, s) {
         }
       })
     });
-
     if (!response.ok) {
       const errText = await response.text();
       alert('Error enviant: ' + response.status + '\n\n' + errText.substring(0, 300));
       return;
     }
-
     const result = await response.json();
     if (result.error) { alert('Error: ' + result.error); return; }
     alert('✅ Convocatòria enviada a ' + emails.join(', '));
@@ -942,10 +926,92 @@ function renderBudget(s) {
 
   return wrap;
 }
-... TRAC 1 ...
-... TRAC 2 ...
-... TRAC 3 ...
-... TRAC 4 ...
+function renderCal() {
+  const app = $('#app'); app.innerHTML = '';
+  const by = {}; secs.forEach(s => (s.tasks || []).forEach(k => { if (k.d) (by[k.d] = by[k.d] || []).push({ k, s }); }));
+  app.append(el('div', { class: 'row', style: 'align-items:center;justify-content:space-between;margin:0 0 12px' }, [
+    el('button', { class: 'btn', textContent: '←', onclick: () => { cal.m--; if (cal.m < 0) { cal.m = 11; cal.y--; } render(); } }),
+    el('strong', { textContent: new Date(cal.y, cal.m, 1).toLocaleDateString('ca', { month: 'long', year: 'numeric' }) }),
+    el('button', { class: 'btn', textContent: '→', onclick: () => { cal.m++; if (cal.m > 11) { cal.m = 0; cal.y++; } render(); } })]));
+  app.append(el('div', { class: 'badge', style: 'margin:0 0 8px', textContent: '💡 Clica el 🔓 d\'un dia per bloquejar-lo o desbloquejar-lo.' }));
+  const g = el('div', { class: 'cal' });
+  ['Dl', 'Dt', 'Dc', 'Dj', 'Dv', 'Ds', 'Dg'].forEach(d => g.append(el('div', { class: 'wd', textContent: d })));
+  const off = (new Date(cal.y, cal.m, 1).getDay() + 6) % 7, dim = new Date(cal.y, cal.m + 1, 0).getDate();
+  for (let i = 0; i < off; i++) g.append(el('div', { class: 'cell e' }));
+  for (let d = 1; d <= dim; d++) {
+    const key = cal.y + '-' + String(cal.m + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+    const isBlocked = !!blockedDays[key];
+    const c = el('div', { class: 'cell' + (isBlocked ? ' blocked' : '') });
+    c.append(el('div', { class: 'dn', textContent: d }));
+    c.append(el('span', { class: 'lock', title: isBlocked ? 'Desbloquejar' : 'Bloquejar', textContent: isBlocked ? '🔒' : '🔓', onclick: () => toggleBlock(key) }));
+    (by[key] || []).forEach(({ k, s }) => c.append(el('div', { class: 'chip k' + ki(k) + (k.done ? ' done' : ''), textContent: (k.h ? k.h + ' ' : '') + (k.t || '(sense títol)'), title: s.name + ' · ' + (k.k || 'Altres') + ' · ' + tasquesPersones(k).join(', '), onclick: () => goto(s.id) })));
+    g.append(c);
+  }
+  app.append(g);
+  app.append(el('div', { class: 'row' }, KINDS.map((n, i) => el('span', { class: 'chip k' + i, textContent: n }))));
+  const t0 = new Date(), today = iso(t0), wk = iso(new Date(t0.getFullYear(), t0.getMonth(), t0.getDate() + 6));
+  const up = []; secs.forEach(s => (s.tasks || []).forEach(k => { if (k.d && !k.done && k.d >= today) up.push({ k, s }); }));
+  up.sort((a, b) => a.k.d < b.k.d ? -1 : a.k.d > b.k.d ? 1 : 0);
+  [['Aquesta setmana', up.filter(x => x.k.d <= wk)], ['Més endavant', up.filter(x => x.k.d > wk).slice(0, 10)]].forEach(([h, l]) => {
+    const c = el('div', { class: 'card', style: 'margin-top:16px' }, el('h3', { textContent: h }));
+    if (!l.length) c.append(el('div', { class: 'badge', textContent: 'Res pendent.' }));
+    l.forEach(({ k, s }) => {
+      const persons = tasquesPersones(k);
+      c.append(el('div', { class: 'task', style: 'cursor:pointer', onclick: () => goto(s.id) }, [
+        el('span', { class: 'pp', textContent: fmt(k.d) + (k.h ? ' ' + k.h : '') }),
+        el('span', { textContent: k.t || '(sense títol)' }),
+        el('span', { class: 'tag k' + ki(k), textContent: k.k || 'Altres' }),
+        persons.length ? el('span', { class: 'pp', textContent: '👤 ' + persons.join(', ') }) : ''
+      ]));
+    });
+    app.append(c);
+  });
+}
+
+const busy = () => { const a = document.activeElement; return a && $('#app').contains(a) && /INPUT|TEXTAREA|SELECT/.test(a.tagName); };
+async function start(user) {
+  me = user.email;
+  $('#login').hidden = true; $('#ui').hidden = false;
+  const a = await db.from('sections').select('*').order('pos');
+  if (a.error) { console.error('Error carregant:', a.error); alert('Error carregant dades.'); return; }
+  secs = a.data || [];
+  const b = await db.from('settings').select('people').eq('id', 1).maybeSingle();
+  if (b.data) {
+    if (Array.isArray(b.data.people) && b.data.people.length) {
+      people = b.data.people.map(p => typeof p === 'string' ? { name: p, email: '' } : p);
+    }
+  }
+  await carregaBlocks();
+  await carregaDocs();
+  cur = 'cal'; render();
+  db.channel('canvis')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'sections' }, p => {
+      if (p.eventType === 'DELETE') secs = secs.filter(x => x.id !== p.old.id);
+      else { if (p.new.id === cur && busy()) return; const i = secs.findIndex(x => x.id === p.new.id); if (i < 0) secs.push(p.new); else Object.assign(secs[i], p.new); }
+      secs.sort((x, y) => x.pos - y.pos); if (!busy()) render(); else paintNav();
+    })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'settings' }, p => {
+      if (p.new && p.new.people) {
+        people = (Array.isArray(p.new.people) ? p.new.people : []).map(x => typeof x === 'string' ? { name: x, email: '' } : x);
+        if (!busy()) render();
+      }
+    })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'blocks' }, async () => { await carregaBlocks(); if (cur === 'cal' && !busy()) render(); })
+    .subscribe();
+  pch = db.channel('presencia', { config: { presence: { key: me } } });
+  pch.on('presence', { event: 'sync' }, () => { peers = pch.presenceState(); paintNav(); })
+     .subscribe(st => { if (st === 'SUBSCRIBED') pch.track({ sec: cur }); });
+}
+$('#go').onclick = async () => {
+  const r = await db.auth.signInWithPassword({ email: $('#em').value.trim(), password: $('#pw').value });
+  if (r.error) $('#err').textContent = 'Correu o contrasenya incorrectes.';
+  else start(r.data.user);
+};
+$('#out').onclick = async () => { await db.auth.signOut(); location.reload(); };
+(async () => {
+  const { data } = await db.auth.getSession();
+  if (data.session) start(data.session.user); else $('#login').hidden = false;
+})();
 </script>
 </body>
 </html>
