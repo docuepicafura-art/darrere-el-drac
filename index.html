@@ -122,15 +122,6 @@ audio{width:100%;height:32px;margin-top:4px}
 .people-checks{display:flex;gap:12px;flex-wrap:wrap;align-items:center;padding:6px 0}
 .people-checks label{display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer;padding:3px 8px;border-radius:6px;background:var(--bg);border:1px solid var(--bd)}
 .people-checks label.checked{background:rgba(180,71,31,.1);border-color:var(--ac);color:var(--ac);font-weight:600}
-@media (max-width:640px){
-  .bud-head,.bud-row{grid-template-columns:24px 1fr 90px 32px}
-  .bud-head .hide-s,.bud-row .hide-s{display:none}
-  .agenda-item{grid-template-columns:100px 1fr;gap:8px}
-  .agenda-who{display:none}
-  .files-grid{grid-template-columns:repeat(auto-fill,minmax(130px,1fr))}
-  main{padding:12px}
-}
-/* Cercador */
 .search-wrap{position:relative;flex:1;max-width:400px;margin:0 10px}
 .search-input{width:100%;padding:8px 12px 8px 34px;border-radius:999px;border:1px solid var(--bd);background:var(--card);color:var(--tx);font:inherit;font-size:14px}
 .search-input:focus{outline:2px solid var(--ac);outline-offset:-2px}
@@ -144,6 +135,15 @@ audio{width:100%;height:32px;margin-top:4px}
 .search-result .meta{font-size:11px;color:var(--mut)}
 .search-group{padding:8px 14px 4px;font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.05em;background:var(--bg);font-weight:600}
 .search-empty{padding:14px;color:var(--mut);font-size:13px;text-align:center}
+@media (max-width:640px){
+  .bud-head,.bud-row{grid-template-columns:24px 1fr 90px 32px}
+  .bud-head .hide-s,.bud-row .hide-s{display:none}
+  .agenda-item{grid-template-columns:100px 1fr;gap:8px}
+  .agenda-who{display:none}
+  .files-grid{grid-template-columns:repeat(auto-fill,minmax(130px,1fr))}
+  main{padding:12px}
+  .search-wrap{max-width:200px}
+}
 </style>
 </head>
 <body>
@@ -157,7 +157,7 @@ audio{width:100%;height:32px;margin-top:4px}
   <div id="err"></div>
 </div>
 <div id="ui" hidden>
-    <header>
+  <header>
     <div style="flex:none">
       <h1>Darrere el drac</h1>
       <div class="byline">Un documental de David González i Joan Clusella</div>
@@ -350,12 +350,12 @@ function render() {
       const name = typeof p === 'string' ? p : p.name;
       const email = typeof p === 'string' ? '' : (p.email || '');
       const row = el('div', { class: 'task' });
-      row.append(el('input', { type: 'text', value: name, placeholder: 'Nom', style: 'flex:1;min-width:100px', onchange: e => { const v = e.target.value.trim(); if (!v) return; if (typeof people[i] === 'string') people[i] = { name: v, email: '' }; else people[i].name = v; savePeople(); render(); } }));
-      row.append(el('input', { type: 'email', value: email, placeholder: 'correu@exemple.com', style: 'flex:2;min-width:180px', onchange: e => { const v = e.target.value.trim(); if (typeof people[i] === 'string') people[i] = { name: people[i], email: v }; else people[i].email = v; savePeople(); render(); } }));
-      row.append(el('button', { class: 'x', textContent: '×', onclick: () => { people.splice(i, 1); savePeople(); render(); } }));
+      row.append(el('input', { type: 'text', value: name, placeholder: 'Nom', style: 'flex:1;min-width:100px', onchange: async e => { const v = e.target.value.trim(); if (!v) return; if (typeof people[i] === 'string') people[i] = { name: v, email: '' }; else people[i].name = v; await savePeople(); render(); } }));
+      row.append(el('input', { type: 'email', value: email, placeholder: 'correu@exemple.com', style: 'flex:2;min-width:180px', onchange: async e => { const v = e.target.value.trim(); if (typeof people[i] === 'string') people[i] = { name: people[i], email: v }; else people[i].email = v; await savePeople(); render(); } }));
+      row.append(el('button', { class: 'x', textContent: '×', onclick: async () => { people.splice(i, 1); await savePeople(); render(); } }));
       pc.append(row);
     });
-    pc.append(el('div', { class: 'row' }, el('button', { class: 'btn', textContent: '+ Persona', onclick: () => { people.push({ name: 'Nova persona', email: '' }); savePeople(); render(); } })));
+    pc.append(el('div', { class: 'row' }, el('button', { class: 'btn', textContent: '+ Persona', onclick: async () => { people.push({ name: 'Nova persona', email: '' }); await savePeople(); render(); } })));
     app.append(pc);
     app.append(el('div', { class: 'row' }, [
       el('button', { class: 'btn', textContent: '← Moure', onclick: () => move(-1) }),
@@ -623,7 +623,7 @@ async function enviaConvocatoria(k, s) {
         'Authorization': 'Bearer ' + (session ? session.access_token : SUPABASE_KEY),
         'apikey': SUPABASE_KEY
       },
-         body: JSON.stringify({
+      body: JSON.stringify({
         mode: 'send-email',
         recipients: emails,
         event: {
@@ -956,6 +956,7 @@ function renderBudget(s) {
 
   return wrap;
 }
+
 function renderCal() {
   const app = $('#app'); app.innerHTML = '';
   const by = {}; secs.forEach(s => (s.tasks || []).forEach(k => { if (k.d) (by[k.d] = by[k.d] || []).push({ k, s }); }));
@@ -997,6 +998,7 @@ function renderCal() {
     app.append(c);
   });
 }
+
 // ==================== CERCADOR ====================
 function inicialitzaCercador() {
   const input = $('#search-input');
