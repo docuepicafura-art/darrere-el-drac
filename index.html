@@ -101,7 +101,7 @@ input[type=time]{padding:6px;width:auto}
 .summary .big{font-size:18px;font-weight:700}
 .summary .pos{color:var(--err)}
 .summary .neg{color:var(--ok)}
-.files-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;margin-top:12px}
+.files-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin-top:12px}
 .file-card{background:var(--bg);border:1px solid var(--bd);border-radius:8px;padding:10px;display:flex;flex-direction:column;gap:8px}
 .file-thumb{width:100%;height:120px;object-fit:cover;border-radius:6px;background:var(--card)}
 .file-icon{width:100%;height:120px;display:flex;align-items:center;justify-content:center;font-size:48px;background:var(--card);border-radius:6px}
@@ -110,7 +110,6 @@ input[type=time]{padding:6px;width:auto}
 .file-actions{display:flex;gap:6px;margin-top:auto;flex-wrap:wrap}
 .file-actions .btn{flex:1;padding:4px 6px;font-size:12px;text-align:center;min-width:60px}
 .file-actions .btn.d{flex:0 0 auto}
-audio{width:100%;height:40px;margin-top:4px}
 .rich-editor{width:100%;min-height:400px;font:15px/1.7 Georgia,serif;padding:16px;background:var(--bg);border:1px solid var(--bd);border-radius:8px;color:var(--tx);outline:none}
 .rich-editor:focus{outline:2px solid var(--ac);outline-offset:-2px}
 .rich-toolbar{display:flex;gap:4px;flex-wrap:wrap;padding:8px;background:var(--bg);border:1px solid var(--bd);border-radius:8px;margin-bottom:8px}
@@ -152,7 +151,7 @@ audio{width:100%;height:40px;margin-top:4px}
   .bud-head .hide-s,.bud-row .hide-s{display:none}
   .agenda-item{grid-template-columns:100px 1fr;gap:8px}
   .agenda-who{display:none}
-  .files-grid{grid-template-columns:repeat(auto-fill,minmax(220px,1fr))}
+  .files-grid{grid-template-columns:repeat(auto-fill,minmax(140px,1fr))}
   main{padding:12px}
   .search-wrap{max-width:200px}
 }
@@ -276,14 +275,8 @@ function save(s) {
   }, 500);
 }
 async function savePeople() {
-  console.log('Guardant people:', JSON.stringify(people));
   const r = await db.from('settings').upsert({ id: 1, people });
-  if (r.error) {
-    console.error('❌ Error guardant people:', r.error);
-    alert('Error guardant les persones: ' + r.error.message);
-  } else {
-    console.log('✅ People guardat correctament');
-  }
+  if (r.error) { console.error('❌ Error guardant people:', r.error); alert('Error guardant les persones: ' + r.error.message); }
 }
 
 const nm = e => e.split('@')[0];
@@ -419,10 +412,10 @@ function renderDocsList() {
     folderCard.append(el('div', { style: 'font-weight:700;font-size:14px;margin-bottom:6px;color:var(--ac)', textContent: '📁 ' + folder }));
     list.forEach(d => {
       const row = el('div', { class: 'task', style: 'padding:8px 6px' });
-      row.append(el('span', { textContent: d.audio_path ? '🎧' : '📄', style: 'font-size:18px' }));
+      row.append(el('span', { textContent: '📄', style: 'font-size:18px' }));
       const info = el('div', { style: 'flex:1;cursor:pointer', onclick: () => obreDocument(d) }, [
         el('div', { style: 'font-weight:600', textContent: d.title || 'Sense títol' }),
-        el('div', { class: 'badge', textContent: 'Actualitzat ' + dataRelativa(d.updated_at) + (d.audio_path ? ' · 🎧 amb àudio' : '') })
+        el('div', { class: 'badge', textContent: 'Actualitzat ' + dataRelativa(d.updated_at) })
       ]);
       row.append(info);
       row.append(el('button', { class: 'btn s', textContent: '📄', title: 'Descarregar PDF', onclick: (e) => { e.stopPropagation(); descarregaPDF(d); } }));
@@ -435,7 +428,7 @@ function renderDocsList() {
   return card;
 }
 
-async function renderDocEditor() {
+function renderDocEditor() {
   const d = currentDoc;
   const card = el('div', { class: 'card' });
 
@@ -450,66 +443,6 @@ async function renderDocEditor() {
     style: 'font-size:20px;font-weight:700;font-family:Georgia,serif;margin-bottom:10px',
     oninput: e => { d.title = e.target.value; saveDoc(d); }
   }));
-
-  // Reproductor d'àudio + time codes clicables
-  if (d.audio_path) {
-    try {
-      const { data: urlData, error: urlErr } = await db.storage.from('adjunts').createSignedUrl(d.audio_path, 3600);
-      if (urlErr) {
-        const errBox = el('div', { class: 'card', style: 'background:rgba(192,57,43,.1);border-color:var(--err)' });
-        errBox.append(el('div', { style: 'font-weight:600;color:var(--err)', textContent: '⚠️ No s\'ha pogut carregar l\'àudio' }));
-        errBox.append(el('div', { class: 'badge', textContent: 'Path: ' + d.audio_path }));
-        errBox.append(el('div', { class: 'badge', textContent: 'Error: ' + urlErr.message }));
-        card.append(errBox);
-      } else if (urlData) {
-        const res = await fetch(urlData.signedUrl);
-        const blob = await res.blob();
-        const blobUrl = URL.createObjectURL(blob);
-        const playerCard = el('div', { style: 'background:var(--bg);border:1px solid var(--bd);border-radius:8px;padding:12px;margin-bottom:12px' });
-        playerCard.append(el('div', { style: 'font-size:13px;color:var(--mut);margin-bottom:8px;font-weight:600', textContent: '🎧 Àudio original' }));
-        const audio = el('audio', { controls: true, preload: 'auto', style: 'width:100%', id: 'doc-audio' });
-        audio.src = blobUrl;
-        playerCard.append(audio);
-        card.append(playerCard);
-
-        // Llista de frases clicables
-        if (d.utterances && d.utterances.length) {
-          const uBox = el('div', { style: 'max-height:500px;overflow-y:auto;background:var(--bg);border:1px solid var(--bd);border-radius:8px;padding:14px;margin-bottom:12px;font-size:15px;line-height:1.7' });
-          uBox.append(el('div', { style: 'font-size:11px;color:var(--mut);margin-bottom:10px;font-weight:600;text-transform:uppercase;letter-spacing:.05em', textContent: '⏱️ Clica una frase per saltar-hi' }));
-          d.utterances.forEach(u => {
-            const line = el('div', { style: 'display:grid;grid-template-columns:auto 1fr;gap:12px;padding:8px 10px;cursor:pointer;border-radius:6px;align-items:start;border-bottom:1px solid var(--bd)' });
-            line.addEventListener('mouseenter', () => line.style.background = 'rgba(180,71,31,.08)');
-            line.addEventListener('mouseleave', () => line.style.background = 'transparent');
-            line.addEventListener('click', () => {
-              const a = document.getElementById('doc-audio');
-              if (!a) return;
-              if (isNaN(a.duration)) { alert('Espera que l\'àudio es carregui.'); return; }
-              a.currentTime = (u.start || 0) / 1000;
-              a.play().catch(err => console.warn('Play error:', err));
-            });
-            const meta = el('div', { style: 'white-space:nowrap' });
-            meta.append(el('span', { style: 'color:#fff;background:var(--ac);font-weight:700;font-family:monospace;padding:3px 8px;border-radius:5px;font-size:13px', textContent: u.time }));
-            if (u.speaker) meta.append(el('div', { style: 'color:var(--mut);font-size:11px;margin-top:4px;font-weight:600;text-align:center', textContent: 'Persona ' + u.speaker }));
-            line.append(meta);
-            line.append(el('div', { textContent: u.text || '', style: 'color:var(--tx)' }));
-            uBox.append(line);
-          });
-          card.append(uBox);
-        }
-      }
-    } catch (e) {
-      console.error('Error carregant àudio:', e);
-      const errBox = el('div', { class: 'card', style: 'background:rgba(192,57,43,.1);border-color:var(--err)' });
-      errBox.append(el('div', { style: 'font-weight:600;color:var(--err)', textContent: '⚠️ Error inesperat carregant l\'àudio' }));
-      errBox.append(el('div', { class: 'badge', textContent: String(e) }));
-      card.append(errBox);
-    }
-  } else {
-    const infoBox = el('div', { class: 'card', style: 'background:rgba(196,123,31,.1);border-color:var(--warn)' });
-    infoBox.append(el('div', { style: 'font-weight:600;color:var(--warn)', textContent: 'ℹ️ Aquesta transcripció no té àudio associat' }));
-    infoBox.append(el('div', { class: 'badge', textContent: 'Les transcripcions creades abans de l\'actualització no tenen àudio. Cal tornar a transcriure l\'àudio original.' }));
-    card.append(infoBox);
-  }
 
   const tb = el('div', { class: 'rich-toolbar' });
   const btns = [
@@ -580,7 +513,7 @@ function saveDoc(d) {
   clearTimeout(timers['doc-' + d.id]);
   const msg = $('#editor-save-msg');
   timers['doc-' + d.id] = setTimeout(async () => {
-    const payload = { title: d.title || 'Sense títol', content: d.content || '', folder: d.folder || 'Altres', updated_at: new Date().toISOString(), audio_path: d.audio_path || '', utterances: d.utterances || [] };
+    const payload = { title: d.title || 'Sense títol', content: d.content || '', folder: d.folder || 'Altres', updated_at: new Date().toISOString() };
     const r = await db.from('documents').update(payload).eq('id', d.id);
     if (r.error) {
       if (msg) msg.textContent = '❌ Error guardant';
@@ -757,7 +690,7 @@ async function enviaConvocatoria(k, s) {
   }
 }
 
-// ==================== FITXERS ADJUNTS (amb reproductor blob) ====================
+// ==================== FITXERS ADJUNTS ====================
 function fileKind(mime, name) {
   if (!mime && name) mime = name.split('.').pop().toLowerCase();
   if (typeof mime === 'string') {
@@ -773,7 +706,7 @@ function fileIcon(kind) {
   return { image: '🖼️', audio: '🎵', video: '🎬', pdf: '📄', doc: '📝', file: '📎' }[kind] || '📎';
 }
 
-async function renderFiles(s) {
+function renderFiles(s) {
   s.files = s.files || [];
   const card = el('div', { class: 'card' });
   card.append(el('div', { class: 'row', style: 'justify-content:space-between;margin:0 0 10px;align-items:center' }, [
@@ -788,8 +721,7 @@ async function renderFiles(s) {
 
   const grid = el('div', { class: 'files-grid' });
 
-  for (let i = 0; i < s.files.length; i++) {
-    const f = s.files[i];
+  s.files.forEach((f, i) => {
     const kind = fileKind(f.mime, f.name);
     const fileCard = el('div', { class: 'file-card' });
 
@@ -802,63 +734,6 @@ async function renderFiles(s) {
     fileCard.append(el('div', { class: 'file-name', textContent: f.name, title: f.name }));
     fileCard.append(el('div', { class: 'file-size', textContent: humanSize(f.size) }));
 
-    if (kind === 'audio') {
-      const audioId = 'audio-' + s.id + '-' + i;
-      const audioContainer = el('div', { style: 'width:100%;margin-top:6px' });
-
-      try {
-        const { data: urlData } = await db.storage.from('adjunts').createSignedUrl(f.path, 3600);
-        if (urlData) {
-          const res = await fetch(urlData.signedUrl);
-          if (res.ok) {
-            const blob = await res.blob();
-            const blobUrl = URL.createObjectURL(blob);
-            const audio = el('audio', { controls: true, preload: 'auto', id: audioId, style: 'width:100%' });
-            audio.src = blobUrl;
-            audioContainer.append(audio);
-          } else {
-            audioContainer.append(el('div', { class: 'badge', style: 'color:var(--err)', textContent: '⚠️ No s\'ha pogut carregar l\'àudio' }));
-          }
-        }
-      } catch (e) {
-        console.warn('Error carregant àudio:', e);
-        audioContainer.append(el('div', { class: 'badge', style: 'color:var(--err)', textContent: '⚠️ Error carregant àudio' }));
-      }
-
-      fileCard.append(audioContainer);
-
-      if (f.utterances && f.utterances.length) {
-        const toggleBtn = el('button', { class: 'btn s', textContent: '📝 Veure transcripció', style: 'margin-top:8px;width:100%' });
-        const uBox = el('div', { style: 'display:none;max-height:400px;overflow-y:auto;background:var(--card);border:1px solid var(--bd);border-radius:6px;padding:10px;margin-top:8px;font-size:14px;line-height:1.6' });
-        uBox.append(el('div', { style: 'font-size:11px;color:var(--mut);margin-bottom:8px;font-weight:600;text-transform:uppercase', textContent: '⏱️ Clica una frase per saltar-hi' }));
-        f.utterances.forEach(u => {
-          const line = el('div', { style: 'display:grid;grid-template-columns:auto 1fr;gap:10px;padding:5px 6px;cursor:pointer;border-radius:4px;align-items:start' });
-          line.addEventListener('mouseenter', () => line.style.background = 'rgba(180,71,31,.08)');
-          line.addEventListener('mouseleave', () => line.style.background = 'transparent');
-          line.addEventListener('click', () => {
-            const a = document.getElementById(audioId);
-            if (!a) { alert('Reproductor no disponible.'); return; }
-            if (isNaN(a.duration)) { alert('Espera que l\'àudio es carregui.'); return; }
-            a.currentTime = (u.start || 0) / 1000;
-            a.play().catch(err => console.warn('Play error:', err));
-          });
-          const meta = el('div', { style: 'white-space:nowrap' });
-          meta.append(el('span', { style: 'color:var(--ac);font-weight:700;font-family:monospace;background:rgba(180,71,31,.1);padding:2px 6px;border-radius:4px;font-size:12px', textContent: u.time }));
-          if (u.speaker) meta.append(el('span', { style: 'color:var(--mut);font-size:11px;margin-left:6px;font-weight:600', textContent: 'P' + u.speaker }));
-          line.append(meta);
-          line.append(el('div', { textContent: u.text || '' }));
-          uBox.append(line);
-        });
-        toggleBtn.addEventListener('click', () => {
-          const isHidden = uBox.style.display === 'none';
-          uBox.style.display = isHidden ? 'block' : 'none';
-          toggleBtn.textContent = isHidden ? '📝 Amagar transcripció' : '📝 Veure transcripció';
-        });
-        fileCard.append(toggleBtn);
-        fileCard.append(uBox);
-      }
-    }
-
     const actions = el('div', { class: 'file-actions' });
     actions.append(el('button', { class: 'btn', textContent: 'Obrir', style: 'flex:1', onclick: () => obreFitxer(f) }));
     if (kind === 'audio') {
@@ -867,7 +742,7 @@ async function renderFiles(s) {
     actions.append(el('button', { class: 'btn d', textContent: '🗑️', title: 'Esborrar', onclick: () => esborraFitxer(s, i, f) }));
     fileCard.append(actions);
     grid.append(fileCard);
-  }
+  });
 
   card.append(grid);
   return card;
@@ -940,11 +815,9 @@ async function transcriuAudio(f, s) {
     const result = await response.json();
     if (result.error) { alert('Error: ' + result.error); return; }
     if (!result.transcript) { alert('No s\'ha pogut obtenir la transcripció.'); return; }
-    f.utterances = result.utterances || [];
-    save(s);
     const title = 'Transcripció: ' + (f.name || 'àudio').replace(/\.[^.]+$/, '');
     const content = '<p>' + result.transcript.replace(/\n/g, '</p><p>') + '</p>';
-    const nou = { folder: 'Entrevistes', title: title, content: content, audio_path: f.path || '', utterances: result.utterances || [] };
+    const nou = { folder: 'Entrevistes', title: title, content: content };
     const r = await db.from('documents').insert(nou).select().single();
     if (r.error) { alert('Error creant el document: ' + r.error.message); return; }
     docs.unshift(r.data);
@@ -1074,7 +947,7 @@ function renderGantt() {
 
   const wrap = el('div', { class: 'card' });
   wrap.append(el('h2', { textContent: '📊 Diagrama de Gantt' }));
-  wrap.append(el('div', { class: 'badge', style: 'margin-bottom:12px', textContent: 'Cada columna és 1 dia. Les barres representen les tasques. Clica una barra per anar-hi.' }));
+  wrap.append(el('div', { class: 'badge', style: 'margin-bottom:12px', textContent: 'Cada columna és 1 dia. Clica una barra per anar-hi.' }));
 
   const gantt = el('div', { class: 'gantt', style: 'grid-template-columns:240px repeat(' + totalCols + ',minmax(' + minCol + 'px,1fr))' });
 
@@ -1083,28 +956,21 @@ function renderGantt() {
   const mesCells = [];
   dies.forEach((d, idx) => {
     if (d.getMonth() !== mesActual) {
-      if (countMes > 0) {
-        mesCells.push({ span: countMes, text: mesos[mesActual] + ' ' + dies[idx - 1].getFullYear() });
-      }
+      if (countMes > 0) mesCells.push({ span: countMes, text: mesos[mesActual] + ' ' + dies[idx - 1].getFullYear() });
       mesActual = d.getMonth();
       countMes = 1;
     } else {
       countMes++;
     }
   });
-  if (countMes > 0) {
-    mesCells.push({ span: countMes, text: mesos[mesActual] + ' ' + dies[dies.length - 1].getFullYear() });
-  }
+  if (countMes > 0) mesCells.push({ span: countMes, text: mesos[mesActual] + ' ' + dies[dies.length - 1].getFullYear() });
   gantt.append(el('div', { class: 'gantt-head', textContent: '' }));
-  mesCells.forEach(m => {
-    gantt.append(el('div', { class: 'gantt-head month', style: 'grid-column:span ' + m.span, textContent: m.text }));
-  });
+  mesCells.forEach(m => gantt.append(el('div', { class: 'gantt-head month', style: 'grid-column:span ' + m.span, textContent: m.text })));
 
   gantt.append(el('div', { class: 'gantt-head', textContent: 'Tasca' }));
   dies.forEach(d => {
-    const label = String(d.getDate());
     const isWeekend = d.getDay() === 0 || d.getDay() === 6;
-    gantt.append(el('div', { class: 'gantt-head' + (isWeekend ? ' weekend' : ''), textContent: label }));
+    gantt.append(el('div', { class: 'gantt-head' + (isWeekend ? ' weekend' : ''), textContent: String(d.getDate()) }));
   });
 
   const avui = iso(new Date());
@@ -1123,8 +989,7 @@ function renderGantt() {
       if (i === startIdx) {
         const persons = tasquesPersones(tasca);
         const label = (tasca.h ? tasca.h + ' ' : '') + (persons.length ? '👤 ' + persons.join(', ') : '');
-        const bar = el('div', { class: rowClass + ' k' + ki(tasca), style: 'left:0;width:calc(100% * ' + span + ' + ' + (span - 1) + 'px)', textContent: (tasca.t || '') + (label ? ' · ' + label : ''), onclick: () => goto(seccio.id) });
-        cell.append(bar);
+        cell.append(el('div', { class: rowClass + ' k' + ki(tasca), style: 'left:0;width:calc(100% * ' + span + ' + ' + (span - 1) + 'px)', textContent: (tasca.t || '') + (label ? ' · ' + label : ''), onclick: () => goto(seccio.id) }));
       }
       gantt.append(cell);
     }
