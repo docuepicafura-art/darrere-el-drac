@@ -137,18 +137,28 @@ audio{width:100%;height:32px;margin-top:4px}
 .search-result .meta{font-size:11px;color:var(--mut)}
 .search-group{padding:8px 14px 4px;font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.05em;background:var(--bg);font-weight:600}
 .search-empty{padding:14px;color:var(--mut);font-size:13px;text-align:center}
-
-/* GANTT */
 .gantt-wrap{overflow-x:auto;border:1px solid var(--bd);border-radius:8px;background:var(--card)}
 .gantt{display:grid;font-size:12px}
-.gantt-row{display:contents}
 .gantt-label{padding:6px 10px;border-bottom:1px solid var(--bd);border-right:1px solid var(--bd);background:var(--card);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;position:sticky;left:0;z-index:2}
 .gantt-cell{padding:0;border-bottom:1px solid var(--bd);border-right:1px solid var(--bd);height:28px;position:relative;background:var(--card)}
 .gantt-head{background:var(--bg);font-weight:600;text-align:center;padding:6px 2px;border-bottom:2px solid var(--bd);border-right:1px solid var(--bd);font-size:11px;color:var(--mut)}
 .gantt-head.month{border-left:2px solid var(--bd)}
+.gantt-head.weekend{background:rgba(180,71,31,.06)}
 .gantt-bar{position:absolute;top:3px;height:22px;border-radius:4px;color:#fff;font-size:11px;line-height:22px;padding:0 6px;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .gantt-bar.done{opacity:.5}
 .gantt-today{background:rgba(180,71,31,.08)}
+.transcript-box{max-height:300px;overflow-y:auto;background:var(--card);border:1px solid var(--bd);border-radius:8px;padding:8px;margin-bottom:12px;font-size:13px}
+.transcript-line{padding:3px 0;cursor:pointer;line-height:1.5;border-bottom:1px dashed var(--bd)}
+.transcript-line:hover{background:rgba(180,71,31,.08)}
+@media (max-width:640px){
+  .bud-head,.bud-row{grid-template-columns:24px 1fr 90px 32px}
+  .bud-head .hide-s,.bud-row .hide-s{display:none}
+  .agenda-item{grid-template-columns:100px 1fr;gap:8px}
+  .agenda-who{display:none}
+  .files-grid{grid-template-columns:repeat(auto-fill,minmax(130px,1fr))}
+  main{padding:12px}
+  .search-wrap{max-width:200px}
+}
 </style>
 </head>
 <body>
@@ -202,7 +212,6 @@ const realOf = p => (p.exp || []).reduce((a, e) => a + (Number(e.a) || 0), 0);
 const isBudgetSec = s => /pressupost/i.test(s.name);
 const isOverviewSec = s => /visi[oó]\s*general/i.test(s.name);
 const dias = ['diumenge','dilluns','dimarts','dimecres','dijous','divendres','dissabte'];
-const diasCurts = ['Dl','Dt','Dc','Dj','Dv','Ds','Dg'];
 const mesos = ['gener','febrer','març','abril','maig','juny','juliol','agost','setembre','octubre','novembre','desembre'];
 const diaLabel = d => { const dt = new Date(d + 'T00:00:00'); return dias[dt.getDay()]; };
 const humanSize = b => { if (!b) return '0 B'; const u = ['B','KB','MB','GB']; const i = Math.floor(Math.log(b) / Math.log(1024)); return (b / Math.pow(1024, i)).toFixed(1) + ' ' + u[i]; };
@@ -218,7 +227,6 @@ const tasquesPersones = k => {
 };
 const setTasquesPersones = (k, arr) => { k.p = arr.length ? arr : null; };
 
-// Retorna [inici, fi] d'una tasca (YYYY-MM-DD)
 const rangTasca = k => {
   if (!k.d) return null;
   const inici = k.d;
@@ -414,10 +422,10 @@ function renderDocsList() {
     folderCard.append(el('div', { style: 'font-weight:700;font-size:14px;margin-bottom:6px;color:var(--ac)', textContent: '📁 ' + folder }));
     list.forEach(d => {
       const row = el('div', { class: 'task', style: 'padding:8px 6px' });
-      row.append(el('span', { textContent: '📄', style: 'font-size:18px' }));
+      row.append(el('span', { textContent: d.audio_path ? '🎧' : '📄', style: 'font-size:18px' }));
       const info = el('div', { style: 'flex:1;cursor:pointer', onclick: () => obreDocument(d) }, [
         el('div', { style: 'font-weight:600', textContent: d.title || 'Sense títol' }),
-        el('div', { class: 'badge', textContent: 'Actualitzat ' + dataRelativa(d.updated_at) })
+        el('div', { class: 'badge', textContent: 'Actualitzat ' + dataRelativa(d.updated_at) + (d.audio_path ? ' · 🎧 amb àudio' : '') })
       ]);
       row.append(info);
       row.append(el('button', { class: 'btn s', textContent: '📄', title: 'Descarregar PDF', onclick: (e) => { e.stopPropagation(); descarregaPDF(d); } }));
@@ -430,7 +438,7 @@ function renderDocsList() {
   return card;
 }
 
-function renderDocEditor() {
+async function renderDocEditor() {
   const d = currentDoc;
   const card = el('div', { class: 'card' });
 
@@ -445,6 +453,39 @@ function renderDocEditor() {
     style: 'font-size:20px;font-weight:700;font-family:Georgia,serif;margin-bottom:10px',
     oninput: e => { d.title = e.target.value; saveDoc(d); }
   }));
+
+  // Reproductor d'àudio + time codes clicables (si el document ve d'una transcripció)
+  if (d.audio_path) {
+    try {
+      const { data: urlData, error: urlErr } = await db.storage.from('adjunts').createSignedUrl(d.audio_path, 7200);
+      if (!urlErr && urlData) {
+        const playerCard = el('div', { style: 'background:var(--bg);border:1px solid var(--bd);border-radius:8px;padding:10px;margin-bottom:12px' });
+        playerCard.append(el('div', { style: 'font-size:12px;color:var(--mut);margin-bottom:6px;font-weight:600', textContent: '🎧 Àudio original' }));
+        const audio = el('audio', { controls: true, preload: 'metadata', style: 'width:100%' });
+        audio.src = urlData.signedUrl;
+        playerCard.append(audio);
+        card.append(playerCard);
+
+        // Time codes clicables
+        if (d.utterances && d.utterances.length) {
+          const uBox = el('div', { class: 'transcript-box' });
+          uBox.append(el('div', { style: 'font-size:12px;color:var(--mut);margin-bottom:6px;font-weight:600', textContent: '⏱️ Frases (clica per saltar)' }));
+          d.utterances.forEach(u => {
+            const line = el('div', { class: 'transcript-line' });
+            line.append(el('span', { style: 'color:var(--ac);font-weight:600;margin-right:6px', textContent: '[' + u.time + ']' }));
+            line.append(el('span', { style: 'color:var(--mut);margin-right:6px', textContent: u.speaker ? '[P' + u.speaker + ']' : '' }));
+            line.append(el('span', { textContent: u.text }));
+            line.addEventListener('click', () => {
+              audio.currentTime = (u.start || 0) / 1000;
+              audio.play();
+            });
+            uBox.append(line);
+          });
+          card.append(uBox);
+        }
+      }
+    } catch (e) { console.warn('No s\'ha pogut carregar l\'àudio:', e); }
+  }
 
   const tb = el('div', { class: 'rich-toolbar' });
   const btns = [
@@ -515,7 +556,7 @@ function saveDoc(d) {
   clearTimeout(timers['doc-' + d.id]);
   const msg = $('#editor-save-msg');
   timers['doc-' + d.id] = setTimeout(async () => {
-    const payload = { title: d.title || 'Sense títol', content: d.content || '', folder: d.folder || 'Altres', updated_at: new Date().toISOString() };
+    const payload = { title: d.title || 'Sense títol', content: d.content || '', folder: d.folder || 'Altres', updated_at: new Date().toISOString(), audio_path: d.audio_path || '', utterances: d.utterances || [] };
     const r = await db.from('documents').update(payload).eq('id', d.id);
     if (r.error) {
       if (msg) msg.textContent = '❌ Error guardant';
@@ -552,7 +593,7 @@ function dataRelativa(isoStr) {
   return d.toLocaleDateString('ca-ES');
 }
 
-// ==================== TASQUES (amb dates i notes) ====================
+// ==================== TASQUES ====================
 function renderTasks(s) {
   const t = el('div', { class: 'card' }, el('h3', { textContent: 'Tasques' }));
   (s.tasks || []).forEach((k, i) => {
@@ -580,14 +621,12 @@ function renderTasks(s) {
       } }));
       row.append(el('input', { type: 'time', value: k.h || '', oninput: e => { k.h = e.target.value; save(s); } }));
       row.append(el('button', { class: 'x', textContent: '×', onclick: () => { s.tasks.splice(i, 1); save(s); render(); } }));
-      // Camp de notes propi de la tasca
       row.append(el('textarea', {
         value: k.n || '',
         placeholder: 'Notes de la tasca (s\'enviaran al correu)',
         style: 'width:100%;min-height:50px;font-size:13px;margin-top:4px',
         oninput: e => { k.n = e.target.value; save(s); }
       }));
-      // Caselles de persones
       const checks = el('div', { class: 'people-checks', style: 'width:100%' });
       checks.append(el('span', { class: 'badge', textContent: 'Assignar a:', style: 'margin-right:6px' }));
       peopleNames().forEach(n => {
@@ -732,26 +771,24 @@ function renderFiles(s) {
     fileCard.append(el('div', { class: 'file-name', textContent: f.name, title: f.name }));
     fileCard.append(el('div', { class: 'file-size', textContent: humanSize(f.size) }));
     if (kind === 'audio') {
-      const audio = el('audio', { controls: true, preload: 'metadata', id: 'audio-' + i });
+      const audioId = 'audio-' + s.id + '-' + i;
+      const audio = el('audio', { controls: true, preload: 'metadata', id: audioId });
       audio.src = f.url;
       fileCard.append(audio);
-      // Time codes clicables (si ja s'ha transcrit abans)
       if (f.utterances && f.utterances.length) {
-        const uList = el('div', { style: 'max-height:180px;overflow-y:auto;background:var(--card);border:1px solid var(--bd);border-radius:6px;padding:6px;margin-top:6px;font-size:11px' });
+        const uBox = el('div', { class: 'transcript-box', style: 'max-height:180px;font-size:11px' });
         f.utterances.forEach(u => {
-          const line = el('div', { style: 'padding:2px 0;cursor:pointer;line-height:1.4' });
-          line.addEventListener('mouseenter', () => line.style.background = 'rgba(180,71,31,.08)');
-          line.addEventListener('mouseleave', () => line.style.background = 'transparent');
+          const line = el('div', { class: 'transcript-line' });
           line.append(el('span', { style: 'color:var(--ac);font-weight:600;margin-right:6px', textContent: '[' + u.time + ']' }));
           line.append(el('span', { style: 'color:var(--mut);margin-right:6px', textContent: u.speaker ? '[P' + u.speaker + ']' : '' }));
           line.append(el('span', { textContent: u.text }));
           line.addEventListener('click', () => {
-            const a = document.getElementById('audio-' + i);
+            const a = document.getElementById(audioId);
             if (a) { a.currentTime = (u.start || 0) / 1000; a.play(); }
           });
-          uList.append(line);
+          uBox.append(line);
         });
-        fileCard.append(uList);
+        fileCard.append(uBox);
       }
     }
     const actions = el('div', { class: 'file-actions' });
@@ -804,7 +841,7 @@ async function obreFitxer(f) {
   window.open(data.signedUrl, '_blank');
 }
 
-// ==================== TRANSCRIPCIÓ (amb time codes guardats) ====================
+// ==================== TRANSCRIPCIÓ ====================
 async function transcriuAudio(f, s) {
   if (!confirm('Vols transcriure aquest àudio amb IA? Això pot trigar uns minuts i consumirà crèdit d\'AssemblyAI.')) return;
   const btn = event && event.target ? event.target : null;
@@ -831,13 +868,11 @@ async function transcriuAudio(f, s) {
     const result = await response.json();
     if (result.error) { alert('Error: ' + result.error); return; }
     if (!result.transcript) { alert('No s\'ha pogut obtenir la transcripció.'); return; }
-    // Guarda les utterances al fitxer per als time codes clicables
     f.utterances = result.utterances || [];
     save(s);
-    // Crea document a Entrevistes
     const title = 'Transcripció: ' + (f.name || 'àudio').replace(/\.[^.]+$/, '');
     const content = '<p>' + result.transcript.replace(/\n/g, '</p><p>') + '</p>';
-    const nou = { folder: 'Entrevistes', title: title, content: content };
+    const nou = { folder: 'Entrevistes', title: title, content: content, audio_path: f.path || '', utterances: result.utterances || [] };
     const r = await db.from('documents').insert(nou).select().single();
     if (r.error) { alert('Error creant el document: ' + r.error.message); return; }
     docs.unshift(r.data);
@@ -856,7 +891,6 @@ function renderOverview() {
   const today = iso(new Date());
   const all = [];
   secs.forEach(sec => (sec.tasks || []).forEach(k => {
-    // Ignora tasques sense text
     if (!k.done && k.t && k.t.trim()) all.push({ k, sec });
   }));
   all.sort((a, b) => {
@@ -936,7 +970,6 @@ function renderOverview() {
 function renderGantt() {
   const app = $('#app'); app.innerHTML = '';
 
-  // Recull totes les tasques amb data
   const tasques = [];
   secs.forEach(s => (s.tasks || []).forEach(k => {
     if (k.d && k.t && k.t.trim()) {
@@ -950,16 +983,13 @@ function renderGantt() {
     return;
   }
 
-  // Rang: de la més antiga a la més nova
   tasques.sort((a, b) => a.inici < b.inici ? -1 : a.inici > b.inici ? 1 : 0);
   const primeraData = new Date(tasques[0].inici + 'T00:00:00');
   const ultimaData = new Date(tasques[tasques.length - 1].fi + 'T00:00:00');
 
-  // Amplia 2 dies a cada costat per tenir context
   const inici = new Date(primeraData); inici.setDate(inici.getDate() - 2);
   const fi = new Date(ultimaData); fi.setDate(fi.getDate() + 2);
 
-  // Dies totals
   const dies = [];
   const cursor = new Date(inici);
   while (cursor <= fi) {
@@ -967,7 +997,7 @@ function renderGantt() {
     cursor.setDate(cursor.getDate() + 1);
   }
 
-  const minCol = 24; // amplada mínima per dia
+  const minCol = 24;
   const totalCols = dies.length;
 
   const wrap = el('div', { class: 'card' });
@@ -977,14 +1007,13 @@ function renderGantt() {
   const gantt = el('div', { class: 'gantt', style: 'grid-template-columns:240px repeat(' + totalCols + ',minmax(' + minCol + 'px,1fr))' });
 
   // Fila de mesos
-  let mesosCells = [el('div', { class: 'gantt-head', style: 'grid-column:1' })];
   let mesActual = -1;
   let countMes = 0;
   const mesCells = [];
   dies.forEach((d, idx) => {
     if (d.getMonth() !== mesActual) {
       if (countMes > 0) {
-        mesCells.push({ span: countMes, text: mesos[mesActual] + ' ' + dies[idx-1].getFullYear() });
+        mesCells.push({ span: countMes, text: mesos[mesActual] + ' ' + dies[idx - 1].getFullYear() });
       }
       mesActual = d.getMonth();
       countMes = 1;
@@ -993,39 +1022,39 @@ function renderGantt() {
     }
   });
   if (countMes > 0) {
-    mesCells.push({ span: countMes, text: mesos[mesActual] + ' ' + dies[dies.length-1].getFullYear() });
+    mesCells.push({ span: countMes, text: mesos[mesActual] + ' ' + dies[dies.length - 1].getFullYear() });
   }
+  gantt.append(el('div', { class: 'gantt-head', textContent: '' }));
   mesCells.forEach(m => {
     gantt.append(el('div', { class: 'gantt-head month', style: 'grid-column:span ' + m.span, textContent: m.text }));
   });
 
-  // Fila de dies de la setmana
+  // Fila de dies
   gantt.append(el('div', { class: 'gantt-head', textContent: 'Tasca' }));
   dies.forEach(d => {
-    const diaSetmana = (d.getDay() + 6) % 7; // 0=Dl, 6=Dg
     const label = String(d.getDate());
-    gantt.append(el('div', { class: 'gantt-head' + (d.getDay() === 0 || d.getDay() === 6 ? ' weekend' : ''), textContent: label }));
+    const isWeekend = d.getDay() === 0 || d.getDay() === 6;
+    gantt.append(el('div', { class: 'gantt-head' + (isWeekend ? ' weekend' : ''), textContent: label }));
   });
 
   // Files de tasques
+  const avui = iso(new Date());
   tasques.forEach(({ tasca, seccio, inici, fi }) => {
     const rowClass = tasca.done ? 'gantt-bar done' : 'gantt-bar';
     gantt.append(el('div', { class: 'gantt-label', title: (tasca.t || '') + ' — ' + seccio.name, textContent: tasca.t || '(sense títol)' }));
 
-    // Calcula columnes
     const startIdx = dies.findIndex(d => iso(d) === inici);
     const endIdx = dies.findIndex(d => iso(d) === fi);
     const span = endIdx - startIdx + 1;
 
     for (let i = 0; i < totalCols; i++) {
       const d = dies[i];
-      const isInRange = i >= startIdx && i <= endIdx;
       const cell = el('div', { class: 'gantt-cell' });
-      if (iso(d) === iso(new Date())) cell.classList.add('gantt-today');
-      if (isInRange && i === startIdx) {
+      if (iso(d) === avui) cell.classList.add('gantt-today');
+      if (i === startIdx) {
         const persons = tasquesPersones(tasca);
         const label = (tasca.h ? tasca.h + ' ' : '') + (persons.length ? '👤 ' + persons.join(', ') : '');
-        const bar = el('div', { class: rowClass + ' k' + ki(tasca), style: 'left:0;width:calc(100% * ' + span + ' + ' + (span-1) + 'px)', textContent: (tasca.t || '') + (label ? ' · ' + label : ''), onclick: () => goto(seccio.id) });
+        const bar = el('div', { class: rowClass + ' k' + ki(tasca), style: 'left:0;width:calc(100% * ' + span + ' + ' + (span - 1) + 'px)', textContent: (tasca.t || '') + (label ? ' · ' + label : ''), onclick: () => goto(seccio.id) });
         cell.append(bar);
       }
       gantt.append(cell);
@@ -1036,7 +1065,6 @@ function renderGantt() {
   scroll.append(gantt);
   wrap.append(scroll);
 
-  // Llegenda
   const llegenda = el('div', { class: 'row', style: 'margin-top:12px' });
   KINDS.forEach((n, i) => llegenda.append(el('span', { class: 'chip k' + i, textContent: n })));
   wrap.append(llegenda);
@@ -1044,6 +1072,7 @@ function renderGantt() {
   app.append(wrap);
 }
 
+// ==================== PRESSUPOST ====================
 function renderBudget(s) {
   s.budget = s.budget || [];
   const wrap = el('div', { class: 'card' });
@@ -1141,6 +1170,7 @@ function renderBudget(s) {
   return wrap;
 }
 
+// ==================== CALENDARI ====================
 function renderCal() {
   const app = $('#app'); app.innerHTML = '';
   const by = {}; secs.forEach(s => (s.tasks || []).forEach(k => { if (k.d) (by[k.d] = by[k.d] || []).push({ k, s }); }));
@@ -1259,12 +1289,7 @@ function mostraResultats(r) {
   if (r.tasques.length) {
     box.append(el('div', { class: 'search-group', textContent: '📋 Tasques (' + r.tasques.length + ')' }));
     r.tasques.slice(0, 10).forEach(({ tasca, seccio }) => {
-      const meta = [
-        seccio.name,
-        tasca.d ? fmt(tasca.d) : 'Sense data',
-        tasquesPersones(tasca).join(', ')
-      ].filter(Boolean).join(' · ');
-
+      const meta = [seccio.name, tasca.d ? fmt(tasca.d) : 'Sense data', tasquesPersones(tasca).join(', ')].filter(Boolean).join(' · ');
       box.append(el('div', { class: 'search-result', onclick: () => {
         $('#search-results').classList.remove('open');
         $('#search-input').value = '';
@@ -1279,11 +1304,7 @@ function mostraResultats(r) {
   if (r.documents.length) {
     box.append(el('div', { class: 'search-group', textContent: '📚 Documents (' + r.documents.length + ')' }));
     r.documents.slice(0, 10).forEach(d => {
-      const meta = [
-        d.folder,
-        'Actualitzat ' + dataRelativa(d.updated_at)
-      ].filter(Boolean).join(' · ');
-
+      const meta = [d.folder, 'Actualitzat ' + dataRelativa(d.updated_at)].filter(Boolean).join(' · ');
       box.append(el('div', { class: 'search-result', onclick: () => {
         $('#search-results').classList.remove('open');
         $('#search-input').value = '';
