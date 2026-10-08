@@ -44,6 +44,9 @@ input[type=time]{padding:6px;width:auto}
 .cell{min-height:78px;background:var(--card);border:1px solid var(--bd);border-radius:8px;padding:4px;overflow:hidden;position:relative}
 .cell.e{background:none;border:0}
 .cell.blocked{background:rgba(192,57,43,.12);border-color:var(--err)}
+.cell.today{border:2px solid var(--ac);background:rgba(180,71,31,.10);box-shadow:0 0 0 2px rgba(180,71,31,.15)}
+.cell.today .dn{color:var(--ac);font-weight:700}
+.cell.today::after{content:'avui';position:absolute;bottom:2px;right:4px;font-size:9px;font-weight:700;color:var(--ac);letter-spacing:.05em;text-transform:uppercase}
 .cell .lock{position:absolute;top:2px;right:4px;font-size:14px;cursor:pointer;opacity:.6}
 .cell .lock:hover{opacity:1}
 .dn{font-size:12px;color:var(--mut)}
@@ -143,8 +146,10 @@ input[type=time]{padding:6px;width:auto}
 .gantt-head{background:var(--bg);font-weight:600;text-align:center;padding:6px 2px;border-bottom:2px solid var(--bd);border-right:1px solid var(--bd);font-size:11px;color:var(--mut)}
 .gantt-head.month{border-left:2px solid var(--bd)}
 .gantt-head.weekend{background:rgba(180,71,31,.06)}
+.gantt-head.today{background:var(--ac);color:#fff}
 .gantt-bar{position:absolute;top:3px;height:22px;border-radius:4px;color:#fff;font-size:11px;line-height:22px;padding:0 6px;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .gantt-bar.done{opacity:.5}
+.gantt-bar.auto{outline:2px dashed rgba(255,255,255,.65);outline-offset:-2px}
 .gantt-today{background:rgba(180,71,31,.08)}
 @media (max-width:640px){
   .bud-head,.bud-row{grid-template-columns:24px 1fr 90px 32px}
@@ -216,6 +221,10 @@ let docs = [];
 let currentDoc = null;
 const FOLDERS = ['Guió', 'Notes', 'Entrevistes', 'Producció', 'Altres'];
 
+// --- Rang de dates: ampliat per cobrir preproduccions obertes ---
+const MS_DIA = 86400000;
+const avuiISO = () => iso(new Date());
+
 const tasquesPersones = k => {
   if (!k.p) return [];
   if (Array.isArray(k.p)) return k.p.filter(x => x);
@@ -223,11 +232,26 @@ const tasquesPersones = k => {
 };
 const setTasquesPersones = (k, arr) => { k.p = arr.length ? arr : null; };
 
+// Retorna { inici, fi, auto } — auto = true si la data s'ha calculat automàticament
 const rangTasca = k => {
-  if (!k.d) return null;
-  const inici = k.d;
-  const fi = k.df && k.df >= k.d ? k.df : k.d;
-  return [inici, fi];
+  if (k.d) {
+    const inici = k.d;
+    const fi = k.df && k.df >= k.d ? k.df : k.d;
+    return { inici, fi, auto: false };
+  }
+  // Sense data: si és preproducció, mostrem un rang automàtic d'1 mes
+  if ((k.k || '') === 'Preproducció') {
+    const inici = k.created ? k.created.slice(0, 10) : avuiISO();
+    const fi = iso(new Date(new Date(inici + 'T00:00:00').getTime() + 30 * MS_DIA));
+    return { inici, fi, auto: true };
+  }
+  return null;
+};
+
+// Versió compatible amb el codi existent que esperava un array [inici, fi]
+const rangTascaArr = k => {
+  const r = rangTasca(k);
+  return r ? [r.inici, r.fi] : null;
 };
 
 const PARTIDES_INICIALS = [
@@ -604,10 +628,11 @@ function renderTasks(s) {
       row.append(checks);
     } else {
       row.append(el('span', { textContent: k.t }));
-      if (k.d) {
-        const rang = rangTasca(k);
-        const rangText = rang[0] === rang[1] ? fmt(k.d) : (fmt(rang[0]) + ' → ' + fmt(rang[1]));
-        row.append(el('span', { class: 'tag k' + ki(k), textContent: (k.k || 'Altres') + ' · ' + rangText + (k.h ? ' · ' + k.h : '') }));
+      const rang = rangTasca(k);
+      if (rang) {
+        const rangText = rang.inici === rang.fi ? fmt(rang.inici) : (fmt(rang.inici) + ' → ' + fmt(rang.fi));
+        const autoTag = rang.auto ? ' ⏱️' : '';
+        row.append(el('span', { class: 'tag k' + ki(k), textContent: (k.k || 'Altres') + ' · ' + rangText + (k.h ? ' · ' + k.h : '') + autoTag, title: rang.auto ? 'Rang automàtic (preproducció sense dates)' : '' }));
       } else {
         row.append(el('span', { class: 'tag k' + ki(k), textContent: (k.k || 'Altres') + ' · Sense data' }));
       }
@@ -621,7 +646,7 @@ function renderTasks(s) {
     t.append(row);
   });
   if (!(s.tasks || []).length) t.append(el('div', { class: 'badge', textContent: 'Cap tasca.' }));
-  if (editing) t.append(el('div', { class: 'row' }, el('button', { class: 'btn', textContent: '+ Tasca', onclick: () => { s.tasks = s.tasks || []; s.tasks.push({ t: '', done: false, k: 'Altres', d: '', df: '', h: '', p: null, n: '' }); save(s); render(); } })));
+  if (editing) t.append(el('div', { class: 'row' }, el('button', { class: 'btn', textContent: '+ Tasca', onclick: () => { s.tasks = s.tasks || []; s.tasks.push({ t: '', done: false, k: 'Altres', d: '', df: '', h: '', p: null, n: '', created: new Date().toISOString() }); save(s); render(); } })));
   return t;
 }
 
@@ -737,7 +762,7 @@ function renderFiles(s) {
     const actions = el('div', { class: 'file-actions' });
     actions.append(el('button', { class: 'btn', textContent: 'Obrir', style: 'flex:1', onclick: () => obreFitxer(f) }));
     if (kind === 'audio') {
-      actions.append(el('button', { class: 'btn', textContent: '🎤 Transcriure', style: 'flex:1', onclick: () => transcriuAudio(f, s) }));
+      actions.append(el('button', { class: 'btn', textContent: '🎤 Transcriure', style: 'flex:1', onclick: (ev) => transcriuAudio(f, s, ev) }));
     }
     actions.append(el('button', { class: 'btn d', textContent: '🗑️', title: 'Esborrar', onclick: () => esborraFitxer(s, i, f) }));
     fileCard.append(actions);
@@ -789,9 +814,9 @@ async function obreFitxer(f) {
 }
 
 // ==================== TRANSCRIPCIÓ ====================
-async function transcriuAudio(f, s) {
+async function transcriuAudio(f, s, ev) {
   if (!confirm('Vols transcriure aquest àudio amb IA? Això pot trigar uns minuts i consumirà crèdit d\'AssemblyAI.')) return;
-  const btn = event && event.target ? event.target : null;
+  const btn = ev && ev.target ? ev.target : null;
   if (btn) { btn.disabled = true; btn.textContent = '⏳ Transcriure...'; }
   try {
     if (!f.path) { alert('No es pot accedir a l\'àudio.'); return; }
@@ -839,10 +864,10 @@ function renderOverview() {
     if (!k.done && k.t && k.t.trim()) all.push({ k, sec });
   }));
   all.sort((a, b) => {
-    if (!a.k.d && !b.k.d) return 0;
-    if (!a.k.d) return 1;
-    if (!b.k.d) return -1;
-    return (a.k.d + (a.k.h || '')) < (b.k.d + (b.k.h || '')) ? -1 : 1;
+    const da = a.k.d || '9999-99-99';
+    const db_ = b.k.d || '9999-99-99';
+    if (da !== db_) return da < db_ ? -1 : 1;
+    return ((a.k.h || '99:99') < (b.k.h || '99:99')) ? -1 : 1;
   });
   const properes = all.filter(x => !x.k.d || x.k.d >= today);
   const entrevistes = properes.filter(x => (x.k.k || '') === 'Entrevista').slice(0, 8);
@@ -917,10 +942,10 @@ function renderGantt() {
 
   const tasques = [];
   secs.forEach(s => (s.tasks || []).forEach(k => {
-    if (k.d && k.t && k.t.trim()) {
-      const rang = rangTasca(k);
-      tasques.push({ tasca: k, seccio: s, inici: rang[0], fi: rang[1] });
-    }
+    if (!k.t || !k.t.trim()) return;
+    const r = rangTasca(k);
+    if (!r) return;
+    tasques.push({ tasca: k, seccio: s, inici: r.inici, fi: r.fi, auto: r.auto });
   }));
 
   if (!tasques.length) {
@@ -929,8 +954,12 @@ function renderGantt() {
   }
 
   tasques.sort((a, b) => a.inici < b.inici ? -1 : a.inici > b.inici ? 1 : 0);
-  const primeraData = new Date(tasques[0].inici + 'T00:00:00');
-  const ultimaData = new Date(tasques[tasques.length - 1].fi + 'T00:00:00');
+
+  const avuiStr = avuiISO();
+  let primeraData = new Date(tasques[0].inici + 'T00:00:00');
+  let ultimaData = new Date(tasques[tasques.length - 1].fi + 'T00:00:00');
+  if (avuiStr < iso(primeraData)) primeraData = new Date(avuiStr + 'T00:00:00');
+  if (avuiStr > iso(ultimaData)) ultimaData = new Date(avuiStr + 'T00:00:00');
 
   const inici = new Date(primeraData); inici.setDate(inici.getDate() - 2);
   const fi = new Date(ultimaData); fi.setDate(fi.getDate() + 2);
@@ -947,7 +976,7 @@ function renderGantt() {
 
   const wrap = el('div', { class: 'card' });
   wrap.append(el('h2', { textContent: '📊 Diagrama de Gantt' }));
-  wrap.append(el('div', { class: 'badge', style: 'margin-bottom:12px', textContent: 'Cada columna és 1 dia. Clica una barra per anar-hi.' }));
+  wrap.append(el('div', { class: 'badge', style: 'margin-bottom:12px', textContent: 'Cada columna és 1 dia. Les barres amb vora discontínua són preproduccions amb rang automàtic (1 mes). Clica una barra per anar-hi.' }));
 
   const gantt = el('div', { class: 'gantt', style: 'grid-template-columns:240px repeat(' + totalCols + ',minmax(' + minCol + 'px,1fr))' });
 
@@ -970,12 +999,11 @@ function renderGantt() {
   gantt.append(el('div', { class: 'gantt-head', textContent: 'Tasca' }));
   dies.forEach(d => {
     const isWeekend = d.getDay() === 0 || d.getDay() === 6;
-    gantt.append(el('div', { class: 'gantt-head' + (isWeekend ? ' weekend' : ''), textContent: String(d.getDate()) }));
+    const isToday = iso(d) === avuiStr;
+    gantt.append(el('div', { class: 'gantt-head' + (isWeekend ? ' weekend' : '') + (isToday ? ' today' : ''), textContent: String(d.getDate()) }));
   });
 
-  const avui = iso(new Date());
-  tasques.forEach(({ tasca, seccio, inici, fi }) => {
-    const rowClass = tasca.done ? 'gantt-bar done' : 'gantt-bar';
+  tasques.forEach(({ tasca, seccio, inici, fi, auto }) => {
     gantt.append(el('div', { class: 'gantt-label', title: (tasca.t || '') + ' — ' + seccio.name, textContent: tasca.t || '(sense títol)' }));
 
     const startIdx = dies.findIndex(d => iso(d) === inici);
@@ -985,11 +1013,12 @@ function renderGantt() {
     for (let i = 0; i < totalCols; i++) {
       const d = dies[i];
       const cell = el('div', { class: 'gantt-cell' });
-      if (iso(d) === avui) cell.classList.add('gantt-today');
-      if (i === startIdx) {
+      if (iso(d) === avuiStr) cell.classList.add('gantt-today');
+      if (i === startIdx && span > 0) {
         const persons = tasquesPersones(tasca);
         const label = (tasca.h ? tasca.h + ' ' : '') + (persons.length ? '👤 ' + persons.join(', ') : '');
-        cell.append(el('div', { class: rowClass + ' k' + ki(tasca), style: 'left:0;width:calc(100% * ' + span + ' + ' + (span - 1) + 'px)', textContent: (tasca.t || '') + (label ? ' · ' + label : ''), onclick: () => goto(seccio.id) }));
+        const barClass = 'gantt-bar' + (tasca.done ? ' done' : '') + (auto ? ' auto' : '') + ' k' + ki(tasca);
+        cell.append(el('div', { class: barClass, style: 'left:0;width:calc(100% * ' + span + ' + ' + (span - 1) + 'px)', textContent: (tasca.t || '') + (label ? ' · ' + label : ''), title: auto ? 'Rang automàtic (preproducció)' : '', onclick: () => goto(seccio.id) }));
       }
       gantt.append(cell);
     }
@@ -1108,11 +1137,12 @@ function renderBudget(s) {
 function renderCal() {
   const app = $('#app'); app.innerHTML = '';
   const by = {}; secs.forEach(s => (s.tasks || []).forEach(k => { if (k.d) (by[k.d] = by[k.d] || []).push({ k, s }); }));
+  const avuiStr = avuiISO();
   app.append(el('div', { class: 'row', style: 'align-items:center;justify-content:space-between;margin:0 0 12px' }, [
     el('button', { class: 'btn', textContent: '←', onclick: () => { cal.m--; if (cal.m < 0) { cal.m = 11; cal.y--; } render(); } }),
     el('strong', { textContent: new Date(cal.y, cal.m, 1).toLocaleDateString('ca', { month: 'long', year: 'numeric' }) }),
     el('button', { class: 'btn', textContent: '→', onclick: () => { cal.m++; if (cal.m > 11) { cal.m = 0; cal.y++; } render(); } })]));
-  app.append(el('div', { class: 'badge', style: 'margin:0 0 8px', textContent: '💡 Clica el 🔓 d\'un dia per bloquejar-lo o desbloquejar-lo.' }));
+  app.append(el('div', { class: 'badge', style: 'margin:0 0 8px', textContent: '💡 Clica el 🔓 d\'un dia per bloquejar-lo o desbloquejar-lo. El dia d\'avui està ressaltat.' }));
   const g = el('div', { class: 'cal' });
   ['Dl', 'Dt', 'Dc', 'Dj', 'Dv', 'Ds', 'Dg'].forEach(d => g.append(el('div', { class: 'wd', textContent: d })));
   const off = (new Date(cal.y, cal.m, 1).getDay() + 6) % 7, dim = new Date(cal.y, cal.m + 1, 0).getDate();
@@ -1120,7 +1150,8 @@ function renderCal() {
   for (let d = 1; d <= dim; d++) {
     const key = cal.y + '-' + String(cal.m + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
     const isBlocked = !!blockedDays[key];
-    const c = el('div', { class: 'cell' + (isBlocked ? ' blocked' : '') });
+    const isToday = key === avuiStr;
+    const c = el('div', { class: 'cell' + (isBlocked ? ' blocked' : '') + (isToday ? ' today' : '') });
     c.append(el('div', { class: 'dn', textContent: d }));
     c.append(el('span', { class: 'lock', title: isBlocked ? 'Desbloquejar' : 'Bloquejar', textContent: isBlocked ? '🔒' : '🔓', onclick: () => toggleBlock(key) }));
     (by[key] || []).forEach(({ k, s }) => c.append(el('div', { class: 'chip k' + ki(k) + (k.done ? ' done' : ''), textContent: (k.h ? k.h + ' ' : '') + (k.t || '(sense títol)'), title: s.name + ' · ' + (k.k || 'Altres') + ' · ' + tasquesPersones(k).join(', '), onclick: () => goto(s.id) })));
@@ -1128,21 +1159,51 @@ function renderCal() {
   }
   app.append(g);
   app.append(el('div', { class: 'row' }, KINDS.map((n, i) => el('span', { class: 'chip k' + i, textContent: n }))));
+
+  // Properes: inclou les tasques amb data >= avui
   const t0 = new Date(), today = iso(t0), wk = iso(new Date(t0.getFullYear(), t0.getMonth(), t0.getDate() + 6));
-  const up = []; secs.forEach(s => (s.tasks || []).forEach(k => { if (k.d && !k.done && k.d >= today) up.push({ k, s }); }));
+  const up = [];
+  secs.forEach(s => (s.tasks || []).forEach(k => { if (k.d && !k.done && k.d >= today) up.push({ k, s }); }));
   up.sort((a, b) => a.k.d < b.k.d ? -1 : a.k.d > b.k.d ? 1 : 0);
-  [['Aquesta setmana', up.filter(x => x.k.d <= wk)], ['Més endavant', up.filter(x => x.k.d > wk).slice(0, 10)]].forEach(([h, l]) => {
+  const aquesta = up.filter(x => x.k.d <= wk);
+  const mesEnllà = up.filter(x => x.k.d > wk);
+
+  [['Aquesta setmana', aquesta], ['Més endavant', mesEnllà]].forEach(([h, l]) => {
     const c = el('div', { class: 'card', style: 'margin-top:16px' }, el('h3', { textContent: h }));
-    if (!l.length) c.append(el('div', { class: 'badge', textContent: 'Res pendent.' }));
-    l.forEach(({ k, s }) => {
-      const persons = tasquesPersones(k);
-      c.append(el('div', { class: 'task', style: 'cursor:pointer', onclick: () => goto(s.id) }, [
-        el('span', { class: 'pp', textContent: fmt(k.d) + (k.h ? ' ' + k.h : '') }),
-        el('span', { textContent: k.t || '(sense títol)' }),
-        el('span', { class: 'tag k' + ki(k), textContent: k.k || 'Altres' }),
-        persons.length ? el('span', { class: 'pp', textContent: '👤 ' + persons.join(', ') }) : ''
-      ]));
-    });
+    if (!l.length) {
+      // Si "Més endavant" està buit, mostrem la primera tasca sense data amb persona assignada
+      if (h === 'Més endavant') {
+        const sensData = [];
+        secs.forEach(s => (s.tasks || []).forEach(k => {
+          if (!k.d && !k.done && k.t && k.t.trim() && tasquesPersones(k).length) sensData.push({ k, s });
+        }));
+        if (sensData.length) {
+          c.append(el('div', { class: 'badge', style: 'margin-bottom:8px', textContent: 'No hi ha tasques amb data futura. Aquí tens la primera tasca sense data amb persones assignades:' }));
+          const { k, s } = sensData[0];
+          const persons = tasquesPersones(k);
+          c.append(el('div', { class: 'task', style: 'cursor:pointer', onclick: () => goto(s.id) }, [
+            el('span', { class: 'pp', textContent: 'Sense data' }),
+            el('span', { textContent: k.t || '(sense títol)' }),
+            el('span', { class: 'tag k' + ki(k), textContent: k.k || 'Altres' }),
+            el('span', { class: 'pp', textContent: '👤 ' + persons.join(', ') })
+          ]));
+        } else {
+          c.append(el('div', { class: 'badge', textContent: 'Res pendent.' }));
+        }
+      } else {
+        c.append(el('div', { class: 'badge', textContent: 'Res pendent.' }));
+      }
+    } else {
+      l.forEach(({ k, s }) => {
+        const persons = tasquesPersones(k);
+        c.append(el('div', { class: 'task', style: 'cursor:pointer', onclick: () => goto(s.id) }, [
+          el('span', { class: 'pp', textContent: fmt(k.d) + (k.h ? ' ' + k.h : '') }),
+          el('span', { textContent: k.t || '(sense títol)' }),
+          el('span', { class: 'tag k' + ki(k), textContent: k.k || 'Altres' }),
+          persons.length ? el('span', { class: 'pp', textContent: '👤 ' + persons.join(', ') }) : ''
+        ]));
+      });
+    }
     app.append(c);
   });
 }
