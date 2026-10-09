@@ -328,4 +328,1212 @@ async function carregaBlocks() {
 
 async function carregaDocs() {
   const { data, error } = await db.from('documents').select('*').order('updated_at', { ascending: false });
-  if (error) { console.warn('No s\'han pogut carregar els documents:',
+  if (error) { console.warn('No s\'han pogut carregar els documents:', error.message); return; }
+  docs = data || [];
+}
+
+async function toggleBlock(day) {
+  if (blockedDays[day]) {
+    if (!confirm('Desbloquejar el dia ' + fmt(day) + '?')) return;
+    const r = await db.from('blocks').delete().eq('day', day);
+    if (r.error) { alert('Error: ' + r.error.message); return; }
+    delete blockedDays[day];
+  } else {
+    if (!confirm('Bloquejar el dia ' + fmt(day) + '? No es podran afegir tasques.')) return;
+    const r = await db.from('blocks').insert({ day: day, created_by: me });
+    if (r.error) { alert('Error: ' + r.error.message); return; }
+    blockedDays[day] = true;
+  }
+  render();
+}
+function render() {
+  if (activeAudioCleanup) { try { activeAudioCleanup(); } catch(e){} activeAudioCleanup = null; }
+  paintNav();
+  const app = $('#app'); app.innerHTML = '';
+  if (cur === 'cal') return renderCal();
+  if (cur === 'gantt') return renderGantt();
+  const s = cur_();
+  if (!s) { app.textContent = 'Encara no hi ha seccions.'; return; }
+
+  app.append(el('div', { class: 'row', style: 'margin:0 0 14px' }, el('button', { class: 'btn', textContent: editing ? "Acabar d'editar" : 'Editar', onclick: () => { editing = !editing; render(); } })));
+
+  const c = el('div', { class: 'card' });
+  if (editing) {
+    c.append(el('h3', { textContent: 'Nom de la secció' }), el('input', { type: 'text', value: s.name, oninput: e => { s.name = e.target.value; save(s); } }));
+    c.append(el('h3', { style: 'margin-top:14px', textContent: 'Notes de la secció' }), el('textarea', { value: s.notes || '', oninput: e => { s.notes = e.target.value; save(s); } }));
+  } else {
+    c.append(el('h2', { textContent: s.name }));
+    if (s.notes) c.append(el('div', { class: 'notes', textContent: s.notes }));
+  }
+  app.append(c);
+
+  if (isOverviewSec(s)) {
+    app.append(renderOverview());
+  } else if (isBudgetSec(s)) {
+    if (!s.budget || s.budget.length === 0) { s.budget = JSON.parse(JSON.stringify(PARTIDES_INICIALS)); save(s); }
+    app.append(renderBudget(s));
+  } else if (/^gui[oó]$/i.test(s.name)) {
+    app.append(renderDocsUI());
+  } else {
+    app.append(renderTasks(s));
+  }
+
+  if (!isOverviewSec(s)) {
+    app.append(renderFiles(s));
+  }
+
+  if (editing) {
+    const pc = el('div', { class: 'card' }, el('h3', { textContent: "Persones de l'equip" }));
+    people.forEach((p, i) => {
+      const name = typeof p === 'string' ? p : p.name;
+      const email = typeof p === 'string' ? '' : (p.email || '');
+      const row = el('div', { class: 'task' });
+      row.append(el('input', { type: 'text', value: name, placeholder: 'Nom', style: 'flex:1;min-width:100px', onchange: async e => { const v = e.target.value.trim(); if (!v) return; if (typeof people[i] === 'string') people[i] = { name: v, email: '' }; else people[i].name = v; await savePeople(); render(); } }));
+      row.append(el('input', { type: 'email', value: email, placeholder: 'correu@exemple.com', style: 'flex:2;min-width:180px', onchange: async e => { const v = e.target.value.trim(); if (typeof people[i] === 'string') people[i] = { name: people[i], email: v }; else people[i].email = v; await savePeople(); render(); } }));
+      row.append(el('button', { class: 'x', textContent: '×', onclick: async () => { people.splice(i, 1); await savePeople(); render(); } }));
+      pc.append(row);
+    });
+    pc.append(el('div', { class: 'row' }, el('button', { class: 'btn', textContent: '+ Persona', onclick: async () => { people.push({ name: 'Nova persona', email: '' }); await savePeople(); render(); } })));
+    app.append(pc);
+    app.append(el('div', { class: 'row' }, [
+      el('button', { class: 'btn', textContent: '← Moure', onclick: () => move(-1) }),
+      el('button', { class: 'btn', textContent: 'Moure →', onclick: () => move(1) }),
+      el('button', { class: 'btn d', textContent: 'Eliminar secció', onclick: () => { if (confirm('Eliminar aquesta secció?')) { secs = secs.filter(x => x.id !== s.id); db.from('sections').delete().eq('id', s.id); goto(secs[0] ? secs[0].id : 'cal'); } } })]));
+  }
+}
+
+// ==================== DOCUMENTS ====================
+function renderDocsUI() {
+  if (currentDoc) return renderDocEditor();
+  return renderDocsList();
+}
+
+function renderDocsList() {
+  const card = el('div', { class: 'card' });
+  card.append(el('div', { class: 'row', style: 'justify-content:space-between;margin:0 0 12px;align-items:center' }, [
+    el('h3', { textContent: '📚 Documents', style: 'margin:0' }),
+    el('button', { class: 'btn p', textContent: '+ Nou document', onclick: () => nouDocument() })
+  ]));
+
+  if (!docs.length) {
+    card.append(el('div', { class: 'badge', textContent: 'Cap document encara. Prem "+ Nou document" per començar.' }));
+    return card;
+  }
+
+  const grouped = {};
+  FOLDERS.forEach(f => grouped[f] = []);
+  docs.forEach(d => {
+    const folder = FOLDERS.includes(d.folder) ? d.folder : 'Altres';
+    if (!grouped[folder]) grouped[folder] = [];
+    grouped[folder].push(d);
+  });
+
+  Object.keys(grouped).forEach(folder => {
+    const list = grouped[folder];
+    if (!list.length) return;
+    const folderCard = el('div', { style: 'margin-bottom:16px' });
+    folderCard.append(el('div', { style: 'font-weight:700;font-size:14px;margin-bottom:6px;color:var(--ac)', textContent: '📁 ' + folder }));
+    list.forEach(d => {
+      const row = el('div', { class: 'task', style: 'padding:8px 6px' });
+      row.append(el('span', { textContent: d.audio_path ? '🎧' : '📄', style: 'font-size:18px' }));
+      const info = el('div', { style: 'flex:1;cursor:pointer', onclick: () => obreDocument(d) }, [
+        el('div', { style: 'font-weight:600', textContent: d.title || 'Sense títol' }),
+        el('div', { class: 'badge', textContent: 'Actualitzat ' + dataRelativa(d.updated_at) })
+      ]);
+      row.append(info);
+      row.append(el('button', { class: 'btn s', textContent: '📄', title: 'Descarregar PDF', onclick: (e) => { e.stopPropagation(); descarregaPDF(d); } }));
+      row.append(el('button', { class: 'btn d', textContent: '🗑️', title: 'Esborrar', onclick: (e) => { e.stopPropagation(); esborraDocument(d); } }));
+      folderCard.append(row);
+    });
+    card.append(folderCard);
+  });
+
+  return card;
+}
+
+function renderDocEditor() {
+  const d = currentDoc;
+  const card = el('div', { class: 'card' });
+
+  const bar = el('div', { class: 'row', style: 'justify-content:space-between;margin:0 0 12px;align-items:center' });
+  bar.append(el('button', { class: 'btn', textContent: '← Tornar', onclick: () => { currentDoc = null; render(); } }));
+  bar.append(el('span', { class: 'badge', textContent: '📁 ' + d.folder }));
+  const rightBtns = el('div', { class: 'row', style: 'margin:0' });
+  if (d.audio_path) {
+    rightBtns.append(el('button', { class: 'btn', textContent: '📝 Exportar SRT', title: 'Exportar subtítols SRT', onclick: () => exportaSubtitols(d, 'srt') }));
+    rightBtns.append(el('button', { class: 'btn', textContent: '📝 VTT', title: 'Exportar subtítols VTT', onclick: () => exportaSubtitols(d, 'vtt') }));
+  }
+  rightBtns.append(el('button', { class: 'btn p', textContent: '📄 Descarregar PDF', onclick: () => descarregaPDF(d) }));
+  bar.append(rightBtns);
+  card.append(bar);
+
+  card.append(el('input', {
+    type: 'text', value: d.title || 'Sense títol', placeholder: 'Títol del document',
+    style: 'font-size:20px;font-weight:700;font-family:Georgia,serif;margin-bottom:10px',
+    oninput: e => { d.title = e.target.value; saveDoc(d); }
+  }));
+
+  // --- Reproductor d'àudio (si el document en té) ---
+  let audioEl = null;
+  if (d.audio_path) {
+    const audioBox = el('div', { class: 'audio-box' });
+    audioBox.append(el('div', { class: 'audio-label', textContent: '🎧 ' + (d.audio_name || 'Àudio de la transcripció') }));
+    audioEl = el('audio', { controls: true, preload: 'metadata', class: 'audio-player' });
+    audioBox.append(audioEl);
+    card.append(audioBox);
+    (async () => {
+      const { data, error } = await db.storage.from('adjunts').createSignedUrl(d.audio_path, 7200);
+      if (error) { audioBox.append(el('div', { class: 'badge', textContent: '⚠️ No s\'ha pogut carregar l\'àudio: ' + error.message })); return; }
+      audioEl.src = data.signedUrl;
+    })();
+  }
+
+  const tb = el('div', { class: 'rich-toolbar' });
+  const btns = [
+    ['B', 'bold', 'Negreta'],
+    ['I', 'italic', 'Cursiva'],
+    ['U', 'underline', 'Subratllat'],
+    ['S', 'strikeThrough', 'Ratllat'],
+    ['H1', 'formatBlock', 'Encapçalament 1', 'h1'],
+    ['H2', 'formatBlock', 'Encapçalament 2', 'h2'],
+    ['¶', 'formatBlock', 'Paràgraf', 'p'],
+    ['•', 'insertUnorderedList', 'Llista'],
+    ['1.', 'insertOrderedList', 'Llista numerada'],
+    ['"', 'formatBlock', 'Cita', 'blockquote'],
+    ['🔗', 'createLink', 'Enllaç'],
+    ['↶', 'undo', 'Desfer'],
+    ['↷', 'redo', 'Refer']
+  ];
+  btns.forEach(([label, cmd, title, val]) => {
+    tb.append(el('button', { textContent: label, title: title, onclick: (e) => {
+      e.preventDefault();
+      document.execCommand(cmd, false, val || null);
+      saveEditorContent(d);
+    } }));
+  });
+  if (d.audio_path) {
+    tb.append(el('button', {
+      textContent: '⏱️',
+      title: 'Inserir marca de temps de l\'àudio al cursor',
+      style: 'background:var(--ac);color:#fff;border-color:var(--ac)',
+      onclick: (e) => { e.preventDefault(); insertaTimestamp(d, audioEl); }
+    }));
+    tb.append(el('button', {
+      textContent: '▶️',
+      title: 'Reproduir/Aturar',
+      onclick: (e) => { e.preventDefault(); if (!audioEl || !audioEl.src) return; if (audioEl.paused) audioEl.play(); else audioEl.pause(); }
+    }));
+  }
+  card.append(tb);
+
+  const ed = el('div', { class: 'rich-editor', contentEditable: 'true' });
+  ed.innerHTML = d.content || '';
+  ed.addEventListener('input', () => { d.content = ed.innerHTML; saveDoc(d); const msg = $('#editor-save-msg'); if (msg) msg.textContent = '⏳ Desant...'; });
+
+  // Delegació de clics sobre timestamps
+  ed.addEventListener('click', (ev) => {
+    const ts = ev.target.closest && ev.target.closest('.ts');
+    if (!ts) return;
+    ev.preventDefault();
+    if (!audioEl || !audioEl.src) return;
+    const t = parseFloat(ts.dataset.t) || 0;
+    audioEl.currentTime = t;
+    audioEl.play();
+  });
+
+  card.append(ed);
+  card.append(el('div', { class: 'editor-save', id: 'editor-save-msg', textContent: '' }));
+
+  // Karaoke: mentre sona l'àudio, ressaltem el timestamp més proper
+  if (audioEl) {
+    const tots = () => Array.from(ed.querySelectorAll('.ts')).map(x => ({ node: x, t: parseFloat(x.dataset.t) || 0 })).sort((a, b) => a.t - b.t);
+    let lastActive = null;
+    const onTime = () => {
+      const cur = audioEl.currentTime;
+      const list = tots();
+      let best = null;
+      for (const it of list) if (it.t <= cur + 0.01) best = it; else break;
+      if (best && best.node !== lastActive) {
+        if (lastActive) lastActive.classList.remove('active');
+        best.node.classList.add('active');
+        lastActive = best.node;
+      }
+    };
+    audioEl.addEventListener('timeupdate', onTime);
+    audioEl.addEventListener('seeked', onTime);
+    activeAudioCleanup = () => {
+      audioEl.removeEventListener('timeupdate', onTime);
+      audioEl.removeEventListener('seeked', onTime);
+    };
+  }
+
+  return card;
+}
+
+function fmtTemps(t, ambHores) {
+  const h = Math.floor(t / 3600);
+  const m = Math.floor((t % 3600) / 60);
+  const s = Math.floor(t % 60);
+  if (ambHores || h > 0) return h + ':' + String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+  return String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+}
+
+function insertaTimestamp(d, audioEl) {
+  if (!audioEl || !audioEl.src) { alert('Aquest document no té àudio associat.'); return; }
+  const t = audioEl.currentTime || 0;
+  const label = '[' + fmtTemps(t) + ']';
+  const html = '<span class="ts" contenteditable="false" data-t="' + t.toFixed(2) + '">' + label + '</span>&nbsp;';
+  document.execCommand('insertHTML', false, html);
+  saveEditorContent(d);
+}
+
+function exportaSubtitols(d, format) {
+  const tmp = document.createElement('div');
+  tmp.innerHTML = d.content || '';
+  const tsNodes = Array.from(tmp.querySelectorAll('.ts'));
+  if (!tsNodes.length) { alert('Aquest document no té cap marca de temps ⏱️.'); return; }
+  const items = tsNodes.map(n => ({ t: parseFloat(n.dataset.t) || 0, node: n }));
+  const cues = [];
+  for (let i = 0; i < items.length; i++) {
+    // Agafa el text entre aquest timestamp i el següent
+    const start = items[i];
+    const end = items[i + 1] ? items[i + 1].t : start.t + 3;
+    // Recorre els nodes germans fins al següent timestamp
+    let text = '';
+    let cur = start.node.nextSibling;
+    const stopNode = items[i + 1] ? items[i + 1].node : null;
+    while (cur && cur !== stopNode) {
+      text += (cur.textContent || '');
+      cur = cur.nextSibling;
+    }
+    text = text.replace(/\s+/g, ' ').trim();
+    if (text) cues.push({ start: start.t, end: Math.max(end, start.t + 0.5), text });
+  }
+  if (!cues.length) { alert('No s\'ha pogut extreure cap text entre marques de temps.'); return; }
+  const srtTemps = t => {
+    const h = Math.floor(t / 3600), m = Math.floor((t % 3600) / 60), s = Math.floor(t % 60), ms = Math.round((t - Math.floor(t)) * 1000);
+    return String(h).padStart(2,'0') + ':' + String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0') + ',' + String(ms).padStart(3,'0');
+  };
+  const vttTemps = t => srtTemps(t).replace(',', '.');
+  let out = '';
+  if (format === 'vtt') {
+    out = 'WEBVTT\n\n';
+    cues.forEach((c, i) => { out += (i + 1) + '\n' + vttTemps(c.start) + ' --> ' + vttTemps(c.end) + '\n' + c.text + '\n\n'; });
+  } else {
+    cues.forEach((c, i) => { out += (i + 1) + '\n' + srtTemps(c.start) + ' --> ' + srtTemps(c.end) + '\n' + c.text + '\n\n'; });
+  }
+  const blob = new Blob([out], { type: 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  const base = (d.title || 'subtitols').replace(/[^a-z0-9._-]+/gi, '_');
+  a.download = base + '.' + format;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+}
+
+function saveEditorContent(d) {
+  const ed = document.querySelector('.rich-editor');
+  if (ed) d.content = ed.innerHTML;
+  saveDoc(d);
+}
+
+async function nouDocument() {
+  const title = prompt('Nom del nou document:', 'Nou document');
+  if (!title) return;
+  const folder = prompt('Carpeta (Guió, Notes, Entrevistes, Producció, Altres):', 'Guió') || 'Guió';
+  const folderOk = FOLDERS.includes(folder) ? folder : 'Altres';
+  const nou = { folder: folderOk, title: title.trim(), content: '' };
+  const r = await db.from('documents').insert(nou).select().single();
+  if (r.error) { alert('Error creant el document: ' + r.error.message); return; }
+  docs.unshift(r.data);
+  currentDoc = r.data;
+  render();
+}
+
+function obreDocument(d) { currentDoc = d; render(); }
+
+async function esborraDocument(d) {
+  if (!confirm('Esborrar "' + (d.title || 'Sense títol') + '"? Aquesta acció no es pot desfer.')) return;
+  const r = await db.from('documents').delete().eq('id', d.id);
+  if (r.error) { alert('Error esborrant: ' + r.error.message); return; }
+  docs = docs.filter(x => x.id !== d.id);
+  if (currentDoc && currentDoc.id === d.id) currentDoc = null;
+  render();
+}
+
+function saveDoc(d) {
+  if (!d || !d.id) return;
+  clearTimeout(timers['doc-' + d.id]);
+  const msg = $('#editor-save-msg');
+  timers['doc-' + d.id] = setTimeout(async () => {
+    const payload = {
+      title: d.title || 'Sense títol',
+      content: d.content || '',
+      folder: d.folder || 'Altres',
+      updated_at: new Date().toISOString()
+    };
+    // Només actualitzem audio_path/audio_name si existeixen a l'objecte (per no esborrar-les sense voler)
+    if ('audio_path' in d) payload.audio_path = d.audio_path || null;
+    if ('audio_name' in d) payload.audio_name = d.audio_name || null;
+    const r = await db.from('documents').update(payload).eq('id', d.id);
+    if (r.error) {
+      if (msg) msg.textContent = '❌ Error guardant';
+      console.error('Error guardant doc:', r.error);
+    } else {
+      if (msg) msg.textContent = '✅ Guardat a les ' + new Date().toLocaleTimeString('ca-ES', { hour: '2-digit', minute: '2-digit' });
+      d.updated_at = payload.updated_at;
+    }
+  }, 800);
+}
+
+function descarregaPDF(d) {
+  const win = window.open('', '_blank');
+  const title = d.title || 'Document';
+  const content = d.content || '<p>(buit)</p>';
+  const html = '<!doctype html><html lang="ca"><head><meta charset="utf-8"><title>' + title.replace(/</g,'&lt;') + '</title><style>body{font:14pt/1.6 Georgia,serif;max-width:800px;margin:40px auto;padding:0 20px;color:#1f1d1a}h1{font-size:22pt;margin:0 0 6px}h2{font-size:16pt;margin:20px 0 8px}h3{font-size:13pt;margin:16px 0 6px}p{margin:8px 0}ul,ol{margin:8px 0 8px 28px}blockquote{border-left:3px solid #ccc;padding-left:14px;margin:12px 0;color:#555}a{color:#b4471f;text-decoration:none}.ts{color:#b4471f;font-weight:600;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:10pt}.footer{margin-top:40px;padding-top:14px;border-top:1px solid #ddd;font-size:10pt;color:#888;font-style:italic}@media print{body{margin:20mm}}</style></head><body><h1>' + title.replace(/</g,'&lt;') + '</h1><div>' + content + '</div><div class="footer">Un documental de David González i Joan Clusella</div><script>window.onload=function(){setTimeout(function(){window.print();},300);};<\/script></body></html>';
+  win.document.write(html);
+  win.document.close();
+}
+
+function dataRelativa(isoStr) {
+  if (!isoStr) return '—';
+  const d = new Date(isoStr);
+  const now = new Date();
+  const diffMs = now - d;
+  const diffMin = Math.floor(diffMs / 60000);
+  const diffH = Math.floor(diffMin / 60);
+  const diffD = Math.floor(diffH / 24);
+  if (diffMin < 1) return 'ara mateix';
+  if (diffMin < 60) return 'fa ' + diffMin + ' min';
+  if (diffH < 24) return 'fa ' + diffH + ' h';
+  if (diffD === 1) return 'ahir';
+  if (diffD < 7) return 'fa ' + diffD + ' dies';
+  return d.toLocaleDateString('ca-ES');
+}
+
+// ==================== TASQUES ====================
+function renderTasks(s) {
+  const t = el('div', { class: 'card' }, el('h3', { textContent: 'Tasques' }));
+  (s.tasks || []).forEach((k, i) => {
+    const row = el('div', { class: 'task' + (k.done ? ' done' : '') });
+    row.append(el('input', { type: 'checkbox', checked: k.done, onchange: e => { k.done = e.target.checked; save(s); render(); } }));
+
+    if (editing) {
+      row.append(el('input', { type: 'text', value: k.t, style: 'flex:1;min-width:180px', placeholder: 'Descripció de la tasca', oninput: e => { k.t = e.target.value; save(s); } }));
+      row.append(sel(k));
+      row.append(el('span', { class: 'badge', textContent: 'Inici:' }));
+      row.append(el('input', { type: 'date', value: k.d || '', oninput: e => {
+        if (e.target.value && blockedDays[e.target.value]) {
+          alert('🔒 Aquest dia està bloquejat. No es poden assignar tasques.');
+          e.target.value = ''; k.d = ''; return;
+        }
+        k.d = e.target.value; save(s);
+      } }));
+      row.append(el('span', { class: 'badge', textContent: 'Fi:' }));
+      row.append(el('input', { type: 'date', value: k.df || '', oninput: e => {
+        if (e.target.value && blockedDays[e.target.value]) {
+          alert('🔒 Aquest dia està bloquejat. No es poden assignar tasques.');
+          e.target.value = ''; k.df = ''; return;
+        }
+        k.df = e.target.value; save(s);
+      } }));
+      row.append(el('input', { type: 'time', value: k.h || '', oninput: e => { k.h = e.target.value; save(s); } }));
+      row.append(el('button', { class: 'x', textContent: '×', onclick: () => { s.tasks.splice(i, 1); save(s); render(); } }));
+      row.append(el('textarea', {
+        value: k.n || '',
+        placeholder: 'Notes de la tasca (s\'enviaran al correu)',
+        style: 'width:100%;min-height:50px;font-size:13px;margin-top:4px',
+        oninput: e => { k.n = e.target.value; save(s); }
+      }));
+      const checks = el('div', { class: 'people-checks', style: 'width:100%' });
+      checks.append(el('span', { class: 'badge', textContent: 'Assignar a:', style: 'margin-right:6px' }));
+      peopleNames().forEach(n => {
+        const current = tasquesPersones(k);
+        const isChecked = current.includes(n);
+        const lbl = el('label', { class: isChecked ? 'checked' : '' });
+        const cb = el('input', { type: 'checkbox', checked: isChecked });
+        cb.addEventListener('change', () => {
+          let arr = tasquesPersones(k);
+          if (cb.checked) { if (!arr.includes(n)) arr.push(n); }
+          else { arr = arr.filter(x => x !== n); }
+          setTasquesPersones(k, arr);
+          save(s); render();
+        });
+        lbl.append(cb, el('span', { textContent: n }));
+        checks.append(lbl);
+      });
+      row.append(checks);
+    } else {
+      row.append(el('span', { textContent: k.t }));
+      const rang = rangTasca(k);
+      if (rang) {
+        const rangText = rang.inici === rang.fi ? fmt(rang.inici) : (fmt(rang.inici) + ' → ' + fmt(rang.fi));
+        const autoTag = rang.auto ? ' ⏱️' : '';
+        row.append(el('span', { class: 'tag k' + ki(k), textContent: (k.k || 'Altres') + ' · ' + rangText + (k.h ? ' · ' + k.h : '') + autoTag, title: rang.auto ? 'Rang automàtic (preproducció sense dates)' : '' }));
+      } else {
+        row.append(el('span', { class: 'tag k' + ki(k), textContent: (k.k || 'Altres') + ' · Sense data' }));
+      }
+      const persons = tasquesPersones(k);
+      if (persons.length) row.append(el('span', { class: 'pp', textContent: '👤 ' + persons.join(', ') }));
+      if (k.n) row.append(el('div', { class: 'task-notes', textContent: '📒 ' + k.n }));
+      if (persons.length) {
+        row.append(el('button', { class: 'btn email', textContent: '📧 Enviar convocatòria', title: 'Enviar correu a les persones assignades', onclick: () => enviaConvocatoria(k, s) }));
+      }
+    }
+    t.append(row);
+  });
+  if (!(s.tasks || []).length) t.append(el('div', { class: 'badge', textContent: 'Cap tasca.' }));
+  if (editing) t.append(el('div', { class: 'row' }, el('button', { class: 'btn', textContent: '+ Tasca', onclick: () => { s.tasks = s.tasks || []; s.tasks.push({ t: '', done: false, k: 'Altres', d: '', df: '', h: '', p: null, n: '', created: new Date().toISOString() }); save(s); render(); } })));
+  return t;
+}
+
+// ==================== ENVIAR CONVOCATÒRIA ====================
+async function enviaConvocatoria(k, s) {
+  const persons = tasquesPersones(k);
+  if (!persons.length) { alert('Aquesta tasca no té cap persona assignada.'); return; }
+  const emails = [];
+  const senseCorreu = [];
+  persons.forEach(n => {
+    const p = people.find(x => (typeof x === 'string' ? x : x.name) === n);
+    if (!p) { senseCorreu.push(n); return; }
+    const mail = typeof p === 'string' ? '' : (p.email || '');
+    if (!mail) { senseCorreu.push(n); return; }
+    emails.push(mail);
+  });
+  if (!emails.length) {
+    alert('Cap de les persones assignades té correu electrònic configurat.\n\nVes a "Editar" → "Persones de l\'equip" i afegeix els seus correus.');
+    return;
+  }
+  const teData = !!k.d;
+  let msg = 'Enviar convocatòria a:\n\n' + persons.map((n, i) => '  • ' + n + (emails[i] ? ' <' + emails[i] + '>' : '')).join('\n');
+  msg += '\n\nEsdeveniment: ' + (k.t || '(sense títol)');
+  msg += '\nData: ' + (teData ? fmt(k.d) + (k.h ? ' a les ' + k.h : '') : '(sense data)');
+  if (senseCorreu.length) msg += '\n\n⚠️ Sense correu: ' + senseCorreu.join(', ');
+  msg += '\n\nContinuar?';
+  if (!confirm(msg)) return;
+  try {
+    const { data: { session } } = await db.auth.getSession();
+    const [y, m, d] = (k.d || '0000-00-00').split('-');
+    const dateFormatted = k.d ? (d + '/' + m + '/' + y) : 'Sense data';
+    const response = await fetch(SUPABASE_URL + '/functions/v1/smart-handler', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + (session ? session.access_token : SUPABASE_KEY),
+        'apikey': SUPABASE_KEY
+      },
+      body: JSON.stringify({
+        mode: 'send-email',
+        recipients: emails,
+        event: {
+          title: k.t || 'Esdeveniment',
+          date: k.d || '',
+          dateFormatted: dateFormatted,
+          time: k.h || '',
+          location: '',
+          description: 'Secció: ' + s.name + '\nTipus: ' + (k.k || 'Altres') + '\nPersones: ' + persons.join(', '),
+          notes: (k.n || '').trim(),
+          sectionNotes: (s.notes || '').trim(),
+          createdBy: me
+        }
+      })
+    });
+    if (!response.ok) {
+      const errText = await response.text();
+      alert('Error enviant: ' + response.status + '\n\n' + errText.substring(0, 300));
+      return;
+    }
+    const result = await response.json();
+    if (result.error) { alert('Error: ' + result.error); return; }
+    alert('✅ Convocatòria enviada a ' + emails.join(', '));
+  } catch (e) {
+    console.error(e);
+    alert('Error inesperat: ' + e.message);
+  }
+}
+
+// ==================== FITXERS ADJUNTS ====================
+function fileKind(mime, name) {
+  if (!mime && name) mime = name.split('.').pop().toLowerCase();
+  if (typeof mime === 'string') {
+    if (mime.startsWith('image/')) return 'image';
+    if (mime.startsWith('audio/')) return 'audio';
+    if (mime.startsWith('video/')) return 'video';
+    if (mime === 'application/pdf' || mime === 'pdf') return 'pdf';
+    if (mime.includes('word') || mime === 'doc' || mime === 'docx') return 'doc';
+  }
+  return 'file';
+}
+function fileIcon(kind) {
+  return { image: '🖼️', audio: '🎵', video: '🎬', pdf: '📄', doc: '📝', file: '📎' }[kind] || '📎';
+}
+
+function renderFiles(s) {
+  s.files = s.files || [];
+  const card = el('div', { class: 'card' });
+  card.append(el('div', { class: 'row', style: 'justify-content:space-between;margin:0 0 10px;align-items:center' }, [
+    el('h3', { textContent: '📎 Fitxers adjunts', style: 'margin:0' }),
+    el('button', { class: 'btn p', textContent: '+ Pujar fitxer', onclick: () => pujaFitxer(s) })
+  ]));
+
+  if (!s.files.length) {
+    card.append(el('div', { class: 'badge', textContent: 'Cap fitxer pujat encara.' }));
+    return card;
+  }
+
+  const grid = el('div', { class: 'files-grid' });
+
+  s.files.forEach((f, i) => {
+    const kind = fileKind(f.mime, f.name);
+    const fileCard = el('div', { class: 'file-card' });
+
+    if (kind === 'image') {
+      fileCard.append(el('img', { class: 'file-thumb', src: f.url, alt: f.name, loading: 'lazy' }));
+    } else {
+      fileCard.append(el('div', { class: 'file-icon', textContent: fileIcon(kind) }));
+    }
+
+    fileCard.append(el('div', { class: 'file-name', textContent: f.name, title: f.name }));
+    fileCard.append(el('div', { class: 'file-size', textContent: humanSize(f.size) }));
+
+    const actions = el('div', { class: 'file-actions' });
+    actions.append(el('button', { class: 'btn', textContent: 'Obrir', style: 'flex:1', onclick: () => obreFitxer(f) }));
+    if (kind === 'audio') {
+      actions.append(el('button', { class: 'btn', textContent: '🎤 Transcriure', style: 'flex:1', onclick: (ev) => transcriuAudio(f, s, ev) }));
+    }
+    actions.append(el('button', { class: 'btn d', textContent: '🗑️', title: 'Esborrar', onclick: () => esborraFitxer(s, i, f) }));
+    fileCard.append(actions);
+    grid.append(fileCard);
+  });
+
+  card.append(grid);
+  return card;
+}
+
+async function pujaFitxer(s) {
+  const input = el('input', { type: 'file', style: 'display:none' });
+  input.addEventListener('change', async () => {
+    const file = input.files[0];
+    if (!file) return;
+    if (file.size > 50 * 1024 * 1024) { alert('El fitxer és massa gran (màxim 50 MB).'); return; }
+    const secName = s.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'general';
+    const timestamp = Date.now();
+    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const path = secName + '/' + timestamp + '-' + safeName;
+    const bar = el('div', { class: 'card', style: 'text-align:center' }, el('div', { textContent: '⏳ Pujant...', style: 'font-weight:600' }));
+    $('#app').prepend(bar);
+    const { data, error } = await db.storage.from('adjunts').upload(path, file, { cacheControl: '3600', upsert: false });
+    bar.remove();
+    if (error) { console.error('Error pujant:', error); alert('Error pujant el fitxer: ' + error.message); return; }
+    const { data: urlData } = db.storage.from('adjunts').getPublicUrl(path);
+    s.files = s.files || [];
+    s.files.push({ name: file.name, size: file.size, mime: file.type, path: path, url: urlData.publicUrl, uploaded: new Date().toISOString() });
+    save(s); render();
+  });
+  input.click();
+}
+
+async function esborraFitxer(s, idx, f) {
+  if (!confirm('Esborrar "' + f.name + '"? Aquesta acció no es pot desfer.')) return;
+  if (f.path) {
+    const r = await db.storage.from('adjunts').remove([f.path]);
+    if (r.error) console.warn('No s\'ha pogut esborrar del Storage:', r.error.message);
+  }
+  s.files.splice(idx, 1);
+  save(s); render();
+}
+
+async function obreFitxer(f) {
+  if (!f.path) { window.open(f.url, '_blank'); return; }
+  const { data, error } = await db.storage.from('adjunts').createSignedUrl(f.path, 3600);
+  if (error) { alert('No s\'ha pogut obrir el fitxer: ' + error.message); return; }
+  window.open(data.signedUrl, '_blank');
+}
+
+// ==================== TRANSCRIPCIÓ ====================
+async function transcriuAudio(f, s, ev) {
+  if (!confirm('Vols transcriure aquest àudio amb IA? Això pot trigar uns minuts i consumirà crèdit d\'AssemblyAI.')) return;
+  const btn = ev && ev.target ? ev.target : null;
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Transcriure...'; }
+  try {
+    if (!f.path) { alert('No es pot accedir a l\'àudio.'); return; }
+    const { data: urlData, error: urlError } = await db.storage.from('adjunts').createSignedUrl(f.path, 3600);
+    if (urlError) { alert('Error generant URL: ' + urlError.message); return; }
+    const { data: { session } } = await db.auth.getSession();
+    const response = await fetch(SUPABASE_URL + '/functions/v1/smart-handler', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + (session ? session.access_token : SUPABASE_KEY),
+        'apikey': SUPABASE_KEY
+      },
+      body: JSON.stringify({ mode: 'transcribe', audioUrl: urlData.signedUrl, languageCode: 'ca', withTimestamps: true })
+    });
+    if (!response.ok) {
+      const errText = await response.text();
+      alert('Error: ' + response.status + ' - ' + errText.substring(0, 200));
+      return;
+    }
+    const result = await response.json();
+    if (result.error) { alert('Error: ' + result.error); return; }
+    if (!result.transcript) { alert('No s\'ha pogut obtenir la transcripció.'); return; }
+
+    // Construeix el contingut: si tenim segments amb timestamps, els inserim a cada paràgraf
+    let content = '';
+    if (Array.isArray(result.segments) && result.segments.length) {
+      content = result.segments.map(seg => {
+        const t = (seg.start || 0);
+        const ts = '<span class="ts" contenteditable="false" data-t="' + t.toFixed(2) + '">[' + fmtTemps(t) + ']</span>';
+        const text = (seg.text || '').trim();
+        return '<p>' + ts + ' ' + escapeHtml(text) + '</p>';
+      }).join('');
+    } else {
+      content = (result.transcript || '').split(/\n\n+/).map(p => '<p>' + escapeHtml(p.trim()) + '</p>').join('');
+    }
+
+    const title = 'Transcripció: ' + (f.name || 'àudio').replace(/\.[^.]+$/, '');
+    const nou = {
+      folder: 'Entrevistes',
+      title: title,
+      content: content,
+      audio_path: f.path || null,
+      audio_name: f.name || null
+    };
+    const r = await db.from('documents').insert(nou).select().single();
+    if (r.error) { alert('Error creant el document: ' + r.error.message); return; }
+    docs.unshift(r.data);
+    alert('✅ Transcripció completada! La trobaràs a Guió → carpeta Entrevistes:\n\n"' + title + '"\n\nS\'ha adjuntat l\'àudio i les marques de temps.');
+    render();
+  } catch (e) {
+    console.error('Error transcripció:', e);
+    alert('Error inesperat: ' + e.message);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '🎤 Transcriure'; }
+  }
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+// ==================== VISIÓ GENERAL ====================
+function renderOverview() {
+  const wrap = el('div');
+  const today = iso(new Date());
+  const all = [];
+  secs.forEach(sec => (sec.tasks || []).forEach(k => {
+    if (!k.done && k.t && k.t.trim()) all.push({ k, sec });
+  }));
+  all.sort((a, b) => {
+    const da = a.k.d || '9999-99-99';
+    const db_ = b.k.d || '9999-99-99';
+    if (da !== db_) return da < db_ ? -1 : 1;
+    return ((a.k.h || '99:99') < (b.k.h || '99:99')) ? -1 : 1;
+  });
+  const properes = all.filter(x => !x.k.d || x.k.d >= today);
+  const entrevistes = properes.filter(x => (x.k.k || '') === 'Entrevista').slice(0, 8);
+  const altres = properes.filter(x => (x.k.k || '') !== 'Entrevista').slice(0, 20);
+
+  const c1 = el('div', { class: 'card' }, el('h3', { textContent: '🎤 Properes entrevistes' }));
+  if (!entrevistes.length) c1.append(el('div', { class: 'agenda-empty', textContent: 'Cap entrevista programada.' }));
+  entrevistes.forEach(({ k, sec }) => {
+    const persons = tasquesPersones(k);
+    c1.append(el('div', { class: 'agenda-item', onclick: () => goto(sec.id) }, [
+      el('div', { class: 'agenda-when' }, [el('div', { textContent: k.d ? (diaLabel(k.d) + ' ' + fmt(k.d)) : 'Sense data' }), k.h ? el('div', { class: 'hr', textContent: k.h }) : '']),
+      el('div', {}, [el('div', { class: 'agenda-title', textContent: k.t || '(sense títol)' }), el('div', { class: 'agenda-who', textContent: sec.name })]),
+      persons.length ? el('div', { class: 'agenda-who', textContent: '👤 ' + persons.join(', ') }) : el('div')
+    ]));
+  });
+  wrap.append(c1);
+
+  const c2 = el('div', { class: 'card' }, el('h3', { textContent: '📅 Properes tasques' }));
+  if (!altres.length) c2.append(el('div', { class: 'agenda-empty', textContent: 'Cap tasca programada.' }));
+  altres.forEach(({ k, sec }) => {
+    const persons = tasquesPersones(k);
+    c2.append(el('div', { class: 'agenda-item', onclick: () => goto(sec.id) }, [
+      el('div', { class: 'agenda-when' }, [el('div', { textContent: k.d ? (diaLabel(k.d) + ' ' + fmt(k.d)) : 'Sense data' }), k.h ? el('div', { class: 'hr', textContent: k.h }) : '']),
+      el('div', {}, [el('div', { class: 'agenda-title', textContent: k.t || '(sense títol)' }), el('div', { class: 'agenda-who', textContent: sec.name })]),
+      el('div', { class: 'agenda-chip k' + ki(k), textContent: k.k || 'Altres' })
+    ]));
+  });
+  wrap.append(c2);
+
+  const bsec = secs.find(x => isBudgetSec(x));
+  const c3 = el('div', { class: 'card', style: 'cursor:pointer', onclick: () => { if (bsec) goto(bsec.id); } },
+    el('div', { class: 'row', style: 'justify-content:space-between;margin:0 0 10px' }, [
+      el('h3', { textContent: '💰 Pressupost', style: 'margin:0' }),
+      el('div', { class: 'badge', textContent: 'Veure detall →' })
+    ]));
+  if (bsec && bsec.budget && bsec.budget.length) {
+    const totalP = bsec.budget.reduce((a, p) => a + (Number(p.p) || 0), 0);
+    const totalR = bsec.budget.reduce((a, p) => a + realOf(p), 0);
+    const diff = totalR - totalP;
+    const pendentPag = bsec.budget.filter(p => (p.st || 'pendent') !== 'pagat').reduce((a, p) => a + Math.max(0, (Number(p.p) || 0) - realOf(p)), 0);
+    const sum = el('div', { class: 'summary' });
+    sum.append(el('div', { class: 'lbl', textContent: 'Total previst' }), el('div', { class: 'val big', textContent: eur(totalP) }));
+    sum.append(el('div', { class: 'lbl', textContent: 'Total real' }), el('div', { class: 'val big', textContent: eur(totalR) }));
+    sum.append(el('div', { class: 'lbl', textContent: 'Pendent de pagar' }), el('div', { class: 'val', textContent: eur(pendentPag) }));
+    sum.append(el('div', { class: 'lbl', textContent: 'Diferència' }), el('div', { class: 'val ' + (diff > 0 ? 'pos' : diff < 0 ? 'neg' : ''), textContent: (diff > 0 ? '+' : '') + eur(diff) + (diff > 0 ? ' (excés)' : diff < 0 ? ' (estalvi)' : '') }));
+    c3.append(sum);
+  } else {
+    c3.append(el('div', { class: 'agenda-empty', textContent: 'Encara no hi ha pressupost.' }));
+  }
+  wrap.append(c3);
+
+  const fitxers = [];
+  secs.forEach(sec => (sec.files || []).forEach(f => fitxers.push({ ...f, secName: sec.name, secId: sec.id })));
+  if (fitxers.length) {
+    const c4 = el('div', { class: 'card' }, el('h3', { textContent: '📎 Últims fitxers pujats' }));
+    fitxers.slice(-6).reverse().forEach(f => {
+      c4.append(el('div', { class: 'agenda-item', onclick: () => goto(f.secId) }, [
+        el('div', { class: 'agenda-when', textContent: '📄' }),
+        el('div', {}, [el('div', { class: 'agenda-title', textContent: f.name }), el('div', { class: 'agenda-who', textContent: f.secName })]),
+        el('div', { class: 'agenda-chip', textContent: humanSize(f.size) })
+      ]));
+    });
+    wrap.append(c4);
+  }
+
+  return wrap;
+}
+
+// ==================== GANTT ====================
+function renderGantt() {
+  const app = $('#app'); app.innerHTML = '';
+
+  const tasques = [];
+  secs.forEach(s => (s.tasks || []).forEach(k => {
+    if (!k.t || !k.t.trim()) return;
+    const r = rangTasca(k);
+    if (!r) return;
+    tasques.push({ tasca: k, seccio: s, inici: r.inici, fi: r.fi, auto: r.auto });
+  }));
+
+  if (!tasques.length) {
+    app.append(el('div', { class: 'card' }, el('div', { class: 'badge', textContent: 'Cap tasca amb data. Afegeix alguna tasca per veure el Gantt.' })));
+    return;
+  }
+
+  tasques.sort((a, b) => a.inici < b.inici ? -1 : a.inici > b.inici ? 1 : 0);
+
+  const avuiStr = avuiISO();
+  let primeraData = new Date(tasques[0].inici + 'T00:00:00');
+  let ultimaData = new Date(tasques[tasques.length - 1].fi + 'T00:00:00');
+  if (avuiStr < iso(primeraData)) primeraData = new Date(avuiStr + 'T00:00:00');
+  if (avuiStr > iso(ultimaData)) ultimaData = new Date(avuiStr + 'T00:00:00');
+
+  const inici = new Date(primeraData); inici.setDate(inici.getDate() - 2);
+  const fi = new Date(ultimaData); fi.setDate(fi.getDate() + 2);
+
+  const dies = [];
+  const cursor = new Date(inici);
+  while (cursor <= fi) {
+    dies.push(new Date(cursor));
+    cursor.setDate(cursor.getDate() + 1);
+  }
+
+  const minCol = 24;
+  const totalCols = dies.length;
+
+  const wrap = el('div', { class: 'card' });
+  wrap.append(el('h2', { textContent: '📊 Diagrama de Gantt' }));
+  wrap.append(el('div', { class: 'badge', style: 'margin-bottom:12px', textContent: 'Cada columna és 1 dia. Les barres amb vora discontínua són preproduccions amb rang automàtic (1 mes). Clica una barra per anar-hi.' }));
+
+  const gantt = el('div', { class: 'gantt', style: 'grid-template-columns:240px repeat(' + totalCols + ',minmax(' + minCol + 'px,1fr))' });
+
+  let mesActual = -1;
+  let countMes = 0;
+  const mesCells = [];
+  dies.forEach((d, idx) => {
+    if (d.getMonth() !== mesActual) {
+      if (countMes > 0) mesCells.push({ span: countMes, text: mesos[mesActual] + ' ' + dies[idx - 1].getFullYear() });
+      mesActual = d.getMonth();
+      countMes = 1;
+    } else {
+      countMes++;
+    }
+  });
+  if (countMes > 0) mesCells.push({ span: countMes, text: mesos[mesActual] + ' ' + dies[dies.length - 1].getFullYear() });
+  gantt.append(el('div', { class: 'gantt-head', textContent: '' }));
+  mesCells.forEach(m => gantt.append(el('div', { class: 'gantt-head month', style: 'grid-column:span ' + m.span, textContent: m.text })));
+
+  gantt.append(el('div', { class: 'gantt-head', textContent: 'Tasca' }));
+  dies.forEach(d => {
+    const isWeekend = d.getDay() === 0 || d.getDay() === 6;
+    const isToday = iso(d) === avuiStr;
+    gantt.append(el('div', { class: 'gantt-head' + (isWeekend ? ' weekend' : '') + (isToday ? ' today' : ''), textContent: String(d.getDate()) }));
+  });
+
+  tasques.forEach(({ tasca, seccio, inici, fi, auto }) => {
+    gantt.append(el('div', { class: 'gantt-label', title: (tasca.t || '') + ' — ' + seccio.name, textContent: tasca.t || '(sense títol)' }));
+
+    const startIdx = dies.findIndex(d => iso(d) === inici);
+    const endIdx = dies.findIndex(d => iso(d) === fi);
+    const span = endIdx - startIdx + 1;
+
+    for (let i = 0; i < totalCols; i++) {
+      const d = dies[i];
+      const cell = el('div', { class: 'gantt-cell' });
+      if (iso(d) === avuiStr) cell.classList.add('gantt-today');
+      if (i === startIdx && span > 0) {
+        const persons = tasquesPersones(tasca);
+        const label = (tasca.h ? tasca.h + ' ' : '') + (persons.length ? '👤 ' + persons.join(', ') : '');
+        const barClass = 'gantt-bar' + (tasca.done ? ' done' : '') + (auto ? ' auto' : '') + ' k' + ki(tasca);
+        cell.append(el('div', { class: barClass, style: 'left:0;width:calc(100% * ' + span + ' + ' + (span - 1) + 'px)', textContent: (tasca.t || '') + (label ? ' · ' + label : ''), title: auto ? 'Rang automàtic (preproducció)' : '', onclick: () => goto(seccio.id) }));
+      }
+      gantt.append(cell);
+    }
+  });
+
+  const scroll = el('div', { class: 'gantt-wrap' });
+  scroll.append(gantt);
+  wrap.append(scroll);
+
+  const llegenda = el('div', { class: 'row', style: 'margin-top:12px' });
+  KINDS.forEach((n, i) => llegenda.append(el('span', { class: 'chip k' + i, textContent: n })));
+  wrap.append(llegenda);
+
+  app.append(wrap);
+}
+
+// ==================== PRESSUPOST ====================
+function renderBudget(s) {
+  s.budget = s.budget || [];
+  const wrap = el('div', { class: 'card' });
+  wrap.append(el('div', { class: 'row', style: 'justify-content:space-between;margin:0 0 8px;align-items:center' }, [
+    el('h3', { textContent: 'Full de pressupost', style: 'margin:0' }),
+    el('div', { class: 'row', style: 'margin:0' }, [
+      editing ? el('button', { class: 'btn s', textContent: '📥 Recarregar partides', onclick: () => {
+        if (!confirm('Això sobreescriurà el pressupost actual amb les 21 partides inicials. Continuar?')) return;
+        s.budget = JSON.parse(JSON.stringify(PARTIDES_INICIALS));
+        save(s); render();
+      } }) : '',
+      editing ? el('button', { class: 'btn', textContent: '+ Nova partida', onclick: () => { s.budget.push({ c: '', cat: 'Altres', p: 0, st: 'pendent', exp: [] }); save(s); render(); } }) : ''
+    ].filter(Boolean))
+  ].filter(Boolean)));
+
+  if (!s.budget.length) {
+    wrap.append(el('div', { class: 'badge', textContent: 'Cap partida. Prem "Editar" i després "+ Nova partida".' }));
+    return wrap;
+  }
+
+  const list = el('div', { class: 'bud-list' });
+  list.append(el('div', { class: 'bud-head' }, [
+    el('div', { class: 'bc-caret' }),
+    el('div', { textContent: 'Concepte' }),
+    el('div', { class: 'hide-s', textContent: 'Tipus' }),
+    el('div', { class: 'bc-num', textContent: 'Previst' }),
+    el('div', { class: 'bc-num', textContent: 'Real' }),
+    el('div', { class: 'hide-s', textContent: 'Estat' }),
+    el('div', { class: 'bc-x' })
+  ]));
+
+  s.budget.forEach((p, idx) => {
+    const open = !!openBud[idx];
+    const real = realOf(p);
+    const row = el('div', { class: 'bud-row' + (open ? ' open' : '') });
+    row.append(el('div', { class: 'bc-caret' }, el('button', { class: 'caret' + (open ? ' open' : ''), textContent: '▶', title: 'Veure despeses', onclick: () => { openBud[idx] = !openBud[idx]; render(); } })));
+
+    if (editing) {
+      row.append(el('div', {}, el('input', { type: 'text', value: p.c, placeholder: 'Concepte', oninput: e => { p.c = e.target.value; save(s); } })));
+      row.append(el('div', { class: 'hide-s' }, el('select', { onchange: e => { p.cat = e.target.value; save(s); } }, CATS.map(c => el('option', { value: c, textContent: c, selected: (p.cat || 'Altres') === c })))));
+      row.append(el('div', { class: 'bc-num' }, el('input', { type: 'number', value: p.p, min: 0, step: '0.01', style: 'text-align:right', oninput: e => { p.p = Number(e.target.value) || 0; save(s); } })));
+    } else {
+      row.append(el('div', { textContent: p.c || '(sense nom)' }));
+      row.append(el('div', { class: 'hide-s' }, el('span', { class: 'cat-pill', textContent: p.cat || 'Altres' })));
+      row.append(el('div', { class: 'bc-num', textContent: eur(p.p) }));
+    }
+
+    row.append(el('div', { class: 'bc-num strong', textContent: eur(real) }));
+
+    if (editing) {
+      row.append(el('div', { class: 'hide-s' }, el('select', { onchange: e => { p.st = e.target.value; save(s); } }, STATS.map(([v, l]) => el('option', { value: v, textContent: l, selected: (p.st || 'pendent') === v })))));
+    } else {
+      row.append(el('div', { class: 'hide-s' }, el('span', { class: 'st-pill ' + stClass(p.st), textContent: stLabel(p.st) })));
+    }
+
+    row.append(el('div', { class: 'bc-x' }, editing ? el('button', { class: 'x', textContent: '×', title: 'Eliminar partida', onclick: () => { if (confirm('Eliminar aquesta partida?')) { s.budget.splice(idx, 1); save(s); render(); } } }) : ''));
+    list.append(row);
+
+    if (open) {
+      const box = el('div', { class: 'exp-box' });
+      (p.exp || []).forEach((e, ei) => {
+        const item = el('div', { class: 'exp-item' });
+        if (editing) {
+          item.append(el('input', { type: 'date', class: 'd', value: e.d || '', oninput: ev => { e.d = ev.target.value; save(s); } }));
+          item.append(el('input', { type: 'text', class: 't', placeholder: 'Concepte', value: e.t || '', oninput: ev => { e.t = ev.target.value; save(s); } }));
+          item.append(el('input', { type: 'number', class: 'a', value: e.a || 0, min: 0, step: '0.01', oninput: ev => { e.a = Number(ev.target.value) || 0; save(s); } }));
+          item.append(el('button', { class: 'x', textContent: '×', onclick: () => { p.exp.splice(ei, 1); save(s); render(); } }));
+        } else {
+          item.append(el('span', { class: 'exp-date', textContent: e.d ? fmt(e.d) : '—' }));
+          item.append(el('span', { class: 'exp-name', textContent: e.t || '(sense concepte)' }));
+          item.append(el('span', { class: 'exp-amt', textContent: eur(e.a) }));
+        }
+        box.append(item);
+      });
+      if (!(p.exp || []).length) box.append(el('div', { class: 'badge', textContent: 'Cap despesa apuntada.' }));
+      if (editing) box.append(el('div', { class: 'exp-add' }, el('button', { class: 'btn s', textContent: '+ Afegir despesa', onclick: () => { p.exp = p.exp || []; p.exp.push({ d: '', t: '', a: 0 }); save(s); render(); } })));
+      list.append(box);
+    }
+  });
+
+  wrap.append(list);
+
+  const totalP = s.budget.reduce((a, p) => a + (Number(p.p) || 0), 0);
+  const totalR = s.budget.reduce((a, p) => a + realOf(p), 0);
+  const diff = totalR - totalP;
+  const pendentPag = s.budget.filter(p => (p.st || 'pendent') !== 'pagat').reduce((a, p) => a + Math.max(0, (Number(p.p) || 0) - realOf(p)), 0);
+
+  const sum = el('div', { class: 'summary', style: 'margin-top:16px;padding-top:14px;border-top:2px solid var(--bd)' });
+  sum.append(el('div', { class: 'lbl', textContent: 'Total previst' }), el('div', { class: 'val big', textContent: eur(totalP) }));
+  sum.append(el('div', { class: 'lbl', textContent: 'Total real' }), el('div', { class: 'val big', textContent: eur(totalR) }));
+  sum.append(el('div', { class: 'lbl', textContent: 'Diferència (real − previst)' }), el('div', { class: 'val big ' + (diff > 0 ? 'pos' : diff < 0 ? 'neg' : ''), textContent: (diff > 0 ? '+' : '') + eur(diff) + (diff > 0 ? ' (excés)' : diff < 0 ? ' (estalvi)' : '') }));
+  sum.append(el('div', { class: 'lbl', textContent: 'Pendent de pagar' }), el('div', { class: 'val', textContent: eur(pendentPag) }));
+  wrap.append(sum);
+
+  return wrap;
+}
+
+// ==================== CALENDARI ====================
+function renderCal() {
+  const app = $('#app'); app.innerHTML = '';
+  const by = {}; secs.forEach(s => (s.tasks || []).forEach(k => { if (k.d) (by[k.d] = by[k.d] || []).push({ k, s }); }));
+  const avuiStr = avuiISO();
+  app.append(el('div', { class: 'row', style: 'align-items:center;justify-content:space-between;margin:0 0 12px' }, [
+    el('button', { class: 'btn', textContent: '←', onclick: () => { cal.m--; if (cal.m < 0) { cal.m = 11; cal.y--; } render(); } }),
+    el('strong', { textContent: new Date(cal.y, cal.m, 1).toLocaleDateString('ca', { month: 'long', year: 'numeric' }) }),
+    el('button', { class: 'btn', textContent: '→', onclick: () => { cal.m++; if (cal.m > 11) { cal.m = 0; cal.y++; } render(); } })]));
+  app.append(el('div', { class: 'badge', style: 'margin:0 0 8px', textContent: '💡 Clica el 🔓 d\'un dia per bloquejar-lo o desbloquejar-lo. El dia d\'avui està ressaltat.' }));
+  const g = el('div', { class: 'cal' });
+  ['Dl', 'Dt', 'Dc', 'Dj', 'Dv', 'Ds', 'Dg'].forEach(d => g.append(el('div', { class: 'wd', textContent: d })));
+  const off = (new Date(cal.y, cal.m, 1).getDay() + 6) % 7, dim = new Date(cal.y, cal.m + 1, 0).getDate();
+  for (let i = 0; i < off; i++) g.append(el('div', { class: 'cell e' }));
+  for (let d = 1; d <= dim; d++) {
+    const key = cal.y + '-' + String(cal.m + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+    const isBlocked = !!blockedDays[key];
+    const isToday = key === avuiStr;
+    const c = el('div', { class: 'cell' + (isBlocked ? ' blocked' : '') + (isToday ? ' today' : '') });
+    c.append(el('div', { class: 'dn', textContent: d }));
+    c.append(el('span', { class: 'lock', title: isBlocked ? 'Desbloquejar' : 'Bloquejar', textContent: isBlocked ? '🔒' : '🔓', onclick: () => toggleBlock(key) }));
+    (by[key] || []).forEach(({ k, s }) => c.append(el('div', { class: 'chip k' + ki(k) + (k.done ? ' done' : ''), textContent: (k.h ? k.h + ' ' : '') + (k.t || '(sense títol)'), title: s.name + ' · ' + (k.k || 'Altres') + ' · ' + tasquesPersones(k).join(', '), onclick: () => goto(s.id) })));
+    g.append(c);
+  }
+  app.append(g);
+  app.append(el('div', { class: 'row' }, KINDS.map((n, i) => el('span', { class: 'chip k' + i, textContent: n }))));
+
+  const t0 = new Date(), today = iso(t0), wk = iso(new Date(t0.getFullYear(), t0.getMonth(), t0.getDate() + 6));
+  const up = [];
+  secs.forEach(s => (s.tasks || []).forEach(k => { if (k.d && !k.done && k.d >= today) up.push({ k, s }); }));
+  up.sort((a, b) => a.k.d < b.k.d ? -1 : a.k.d > b.k.d ? 1 : 0);
+  const aquesta = up.filter(x => x.k.d <= wk);
+  const mesEnllà = up.filter(x => x.k.d > wk);
+
+  [['Aquesta setmana', aquesta], ['Més endavant', mesEnllà]].forEach(([h, l]) => {
+    const c = el('div', { class: 'card', style: 'margin-top:16px' }, el('h3', { textContent: h }));
+    if (!l.length) {
+      if (h === 'Més endavant') {
+        const sensData = [];
+        secs.forEach(s => (s.tasks || []).forEach(k => {
+          if (!k.d && !k.done && k.t && k.t.trim() && tasquesPersones(k).length) sensData.push({ k, s });
+        }));
+        if (sensData.length) {
+          c.append(el('div', { class: 'badge', style: 'margin-bottom:8px', textContent: 'No hi ha tasques amb data futura. Aquí tens la primera tasca sense data amb persones assignades:' }));
+          const { k, s } = sensData[0];
+          const persons = tasquesPersones(k);
+          c.append(el('div', { class: 'task', style: 'cursor:pointer', onclick: () => goto(s.id) }, [
+            el('span', { class: 'pp', textContent: 'Sense data' }),
+            el('span', { textContent: k.t || '(sense títol)' }),
+            el('span', { class: 'tag k' + ki(k), textContent: k.k || 'Altres' }),
+            el('span', { class: 'pp', textContent: '👤 ' + persons.join(', ') })
+          ]));
+        } else {
+          c.append(el('div', { class: 'badge', textContent: 'Res pendent.' }));
+        }
+      } else {
+        c.append(el('div', { class: 'badge', textContent: 'Res pendent.' }));
+      }
+    } else {
+      l.forEach(({ k, s }) => {
+        const persons = tasquesPersones(k);
+        c.append(el('div', { class: 'task', style: 'cursor:pointer', onclick: () => goto(s.id) }, [
+          el('span', { class: 'pp', textContent: fmt(k.d) + (k.h ? ' ' + k.h : '') }),
+          el('span', { textContent: k.t || '(sense títol)' }),
+          el('span', { class: 'tag k' + ki(k), textContent: k.k || 'Altres' }),
+          persons.length ? el('span', { class: 'pp', textContent: '👤 ' + persons.join(', ') }) : ''
+        ]));
+      });
+    }
+    app.append(c);
+  });
+}
+
+// ==================== CERCADOR ====================
+function inicialitzaCercador() {
+  const input = $('#search-input');
+  const results = $('#search-results');
+  if (!input || !results) return;
+
+  input.addEventListener('input', () => {
+    const q = input.value.trim().toLowerCase();
+    if (q.length < 2) { results.classList.remove('open'); results.innerHTML = ''; return; }
+    const found = cercaGlobal(q);
+    mostraResultats(found);
+  });
+
+  input.addEventListener('focus', () => {
+    if (input.value.trim().length >= 2) {
+      const found = cercaGlobal(input.value.trim().toLowerCase());
+      mostraResultats(found);
+    }
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.search-wrap')) {
+      results.classList.remove('open');
+    }
+  });
+}
+
+function cercaGlobal(q) {
+  const resultats = { tasques: [], documents: [], fitxers: [] };
+
+  secs.forEach(s => {
+    (s.tasks || []).forEach(k => {
+      const text = (k.t || '').toLowerCase();
+      const cat = (k.k || '').toLowerCase();
+      const persons = tasquesPersones(k).join(' ').toLowerCase();
+      const notes = (k.n || '').toLowerCase();
+      if (text.includes(q) || cat.includes(q) || persons.includes(q) || notes.includes(q)) {
+        resultats.tasques.push({ tasca: k, seccio: s });
+      }
+    });
+  });
+
+  docs.forEach(d => {
+    const title = (d.title || '').toLowerCase();
+    const content = (d.content || '').toLowerCase().replace(/<[^>]+>/g, ' ');
+    if (title.includes(q) || content.includes(q)) {
+      resultats.documents.push(d);
+    }
+  });
+
+  secs.forEach(s => {
+    (s.files || []).forEach(f => {
+      const name = (f.name || '').toLowerCase();
+      if (name.includes(q)) {
+        resultats.fitxers.push({ fitxer: f, seccio: s });
+      }
+    });
+  });
+
+  return resultats;
+}
+
+function mostraResultats(r) {
+  const box = $('#search-results');
+  box.innerHTML = '';
+
+  const total = r.tasques.length + r.documents.length + r.fitxers.length;
+  if (!total) {
+    box.append(el('div', { class: 'search-empty', textContent: 'Cap resultat.' }));
+    box.classList.add('open');
+    return;
+  }
+
+  if (r.tasques.length) {
+    box.append(el('div', { class: 'search-group', textContent: '📋 Tasques (' + r.tasques.length + ')' }));
+    r.tasques.slice(0, 10).forEach(({ tasca, seccio }) => {
+      const meta = [seccio.name, tasca.d ? fmt(tasca.d) : 'Sense data', tasquesPersones(tasca).join(', ')].filter(Boolean).join(' · ');
+      box.append(el('div', { class: 'search-result', onclick: () => {
+        $('#search-results').classList.remove('open');
+        $('#search-input').value = '';
+        goto(seccio.id);
+      }}, [
+        el('div', { class: 'title', textContent: tasca.t || '(sense títol)' }),
+        el('div', { class: 'meta', textContent: meta })
+      ]));
+    });
+  }
+
+  if (r.documents.length) {
+    box.append(el('div', { class: 'search-group', textContent: '📚 Documents (' + r.documents.length + ')' }));
+    r.documents.slice(0, 10).forEach(d => {
+      const meta = [d.folder, 'Actualitzat ' + dataRelativa(d.updated_at)].filter(Boolean).join(' · ');
+      box.append(el('div', { class: 'search-result', onclick: () => {
+        $('#search-results').classList.remove('open');
+        $('#search-input').value = '';
+        currentDoc = d;
+        goto(secs.find(x => /^gui[oó]$/i.test(x.name))?.id || 'cal');
+      }}, [
+        el('div', { class: 'title', textContent: d.title || 'Sense títol' }),
+        el('div', { class: 'meta', textContent: meta })
+      ]));
+    });
+  }
+
+  if (r.fitxers.length) {
+    box.append(el('div', { class: 'search-group', textContent: '📎 Fitxers (' + r.fitxers.length + ')' }));
+    r.fitxers.slice(0, 10).forEach(({ fitxer, seccio }) => {
+      const meta = [seccio.name, humanSize(fitxer.size)].filter(Boolean).join(' · ');
+      box.append(el('div', { class: 'search-result', onclick: () => {
+        $('#search-results').classList.remove('open');
+        $('#search-input').value = '';
+        goto(seccio.id);
+      }}, [
+        el('div', { class: 'title', textContent: fitxer.name || '(sense nom)' }),
+        el('div', { class: 'meta', textContent: meta })
+      ]));
+    });
+  }
+
+  box.classList.add('open');
+}
+const busy = () => { const a = document.activeElement; return a && $('#app').contains(a) && /INPUT|TEXTAREA|SELECT/.test(a.tagName); };
+async function start(user) {
+  me = user.email;
+  $('#login').hidden = true; $('#ui').hidden = false;
+  const a = await db.from('sections').select('*').order('pos');
+  if (a.error) { console.error('Error carregant:', a.error); alert('Error carregant dades.'); return; }
+  secs = a.data || [];
+  const b = await db.from('settings').select('people').eq('id', 1).maybeSingle();
+  if (b.data) {
+    if (Array.isArray(b.data.people) && b.data.people.length) {
+      people = b.data.people.map(p => typeof p === 'string' ? { name: p, email: '' } : p);
+    }
+  }
+  await carregaBlocks();
+  await carregaDocs();
+  cur = 'cal'; render();
+  inicialitzaCercador();
+  db.channel('canvis')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'sections' }, p => {
+      if (p.eventType === 'DELETE') secs = secs.filter(x => x.id !== p.old.id);
+      else { if (p.new.id === cur && busy()) return; const i = secs.findIndex(x => x.id === p.new.id); if (i < 0) secs.push(p.new); else Object.assign(secs[i], p.new); }
+      secs.sort((x, y) => x.pos - y.pos); if (!busy()) render(); else paintNav();
+    })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'settings' }, p => {
+      if (p.new && p.new.people) {
+        people = (Array.isArray(p.new.people) ? p.new.people : []).map(x => typeof x === 'string' ? { name: x, email: '' } : x);
+        if (!busy()) render();
+      }
+    })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'blocks' }, async () => { await carregaBlocks(); if (cur === 'cal' && !busy()) render(); })
+    .subscribe();
+  pch = db.channel('presencia', { config: { presence: { key: me } } });
+  pch.on('presence', { event: 'sync' }, () => { peers = pch.presenceState(); paintNav(); })
+     .subscribe(st => { if (st === 'SUBSCRIBED') pch.track({ sec: cur }); });
+}
+$('#go').onclick = async () => {
+  const r = await db.auth.signInWithPassword({ email: $('#em').value.trim(), password: $('#pw').value });
+  if (r.error) $('#err').textContent = 'Correu o contrasenya incorrectes.';
+  else start(r.data.user);
+};
+$('#out').onclick = async () => { await db.auth.signOut(); location.reload(); };
+(async () => {
+  const { data } = await db.auth.getSession();
+  if (data.session) start(data.session.user); else $('#login').hidden = false;
+})();
+</script>
+</body>
+</html>
