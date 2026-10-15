@@ -159,9 +159,10 @@ input[type=time]{padding:6px;width:auto}
 .ts.active{background:var(--ac);color:#fff;box-shadow:0 0 0 2px rgba(180,71,31,.25)}
 
 /* === Mòdul de drets musicals === */
-.mr-list{display:grid;grid-template-columns:1fr;gap:10px;margin-top:14px}
-.mr-item{background:var(--bg);border:1px solid var(--bd);border-radius:10px;padding:12px;display:grid;grid-template-columns:1fr auto;gap:8px;align-items:start;cursor:pointer}
+.mr-list{display:grid;grid-template-columns:1fr;gap:8px;margin-top:14px}
+.mr-item{background:var(--bg);border:1px solid var(--bd);border-radius:10px;padding:12px;display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center}
 .mr-item:hover{background:rgba(180,71,31,.05)}
+.mr-item.selected{background:rgba(180,71,31,.08);border-color:var(--ac)}
 .mr-item .t{font-weight:700;font-size:15px}
 .mr-item .s{font-size:12px;color:var(--mut)}
 .mr-item .ref{font:600 11px/1.3 ui-monospace,Menlo,Consolas,monospace;color:var(--ac);margin-bottom:2px}
@@ -184,6 +185,8 @@ input[type=time]{padding:6px;width:auto}
 .mr-report{font:12px/1.5 ui-monospace,Menlo,Consolas,monospace;white-space:pre-wrap;background:var(--bg);border:1px solid var(--bd);border-radius:8px;padding:12px;margin-top:12px;max-height:420px;overflow:auto}
 .mr-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
 .mr-audit{font-size:11px;color:var(--mut);margin-top:10px;padding-top:8px;border-top:1px dashed var(--bd)}
+.mr-select-bar{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;background:var(--bg);border:1px solid var(--bd);border-radius:8px;padding:8px 12px;margin-top:12px}
+.mr-select-bar .row{margin:0}
 
 @media (max-width:640px){
   .bud-head,.bud-row{grid-template-columns:24px 1fr 90px 32px}
@@ -193,7 +196,8 @@ input[type=time]{padding:6px;width:auto}
   .files-grid{grid-template-columns:repeat(auto-fill,minmax(140px,1fr))}
   main{padding:12px}
   .search-wrap{max-width:200px}
-  .mr-item{grid-template-columns:1fr}
+  .mr-item{grid-template-columns:auto 1fr}
+  .mr-item > div:last-child{grid-column:1/-1;justify-self:start}
 }
 </style>
 </head>
@@ -320,6 +324,7 @@ const peopleNames = () => people.map(p => typeof p === 'string' ? p : p.name);
 let musicRights = [];
 let currentMR = null;
 let editingMR = false;
+let seleccioMR = new Set(); // IDs seleccionats per a l'informe agregat
 const ANNO_ACTUAL = new Date().getFullYear();
 
 function save(s) {
@@ -454,28 +459,22 @@ function calcularDiagnosticoLegal(c) {
   const ovM = c.override_mundial || '';
   const ovS = c.override_sgae || '';
 
-  // Regla A: Màster Europa (70 anys des de la fixació)
   if (anyG > 0 && anyG <= (ANNO_ACTUAL - 70)) {
     out.estat_master_europa = { ok: true,  text: '🟢 DOMINI PÚBLIC A EUROPA (Cost 0€)', base: 'Gravació de fa més de 70 anys (≤ ' + (ANNO_ACTUAL-70) + ')' };
   } else {
     out.estat_master_europa = { ok: false, text: '🔴 MÀSTER COMERCIAL / PROTEGIT (Requereix llicència)', base: anyG ? 'Gravació posterior a ' + (ANNO_ACTUAL-70) : 'Any de gravació no informat' };
   }
-
-  // Regla B: Màster mundial / EUA (anterior a 1923)
   if (anyG > 0 && anyG < 1923) {
     out.estat_master_mundial = { ok: true,  text: '🟢 DOMINI PÚBLIC MUNDIAL (Cost 0€)', base: 'Anterior a 1923 (Music Modernization Act)' };
   } else {
     out.estat_master_mundial = { ok: false, text: '🔴 REQUEREIX CONTRACTE COMERCIAL MUNDIAL (Sony/Universal)', base: anyG ? 'Posterior a 1922' : 'Any de gravació no informat' };
   }
-
-  // Regla C: Composició a Espanya (autors morts abans de 1987 → 80 anys post-mortem)
   if (anyM > 0 && anyM <= (ANNO_ACTUAL - 80)) {
     out.estat_composicio_sgae = { ok: true,  text: '🟢 COMPOSICIÓ EN DOMINI PÚBLIC (Sense pagament SGAE)', base: 'Autor mort fa més de 80 anys (≤ ' + (ANNO_ACTUAL-80) + ')' };
   } else {
     out.estat_composicio_sgae = { ok: false, text: '🔴 COMPOSICIÓ PROTEGIDA (Requereix pagament Editorial/SGAE)', base: anyM ? 'Autor mort després de ' + (ANNO_ACTUAL-80) : 'Any de defunció no informat' };
   }
 
-  // Overrides manuals
   if (ovE === 'ok') { out.estat_master_europa = { ok: true,  text: '🟢 DOMINI PÚBLIC A EUROPA (Decisió manual)', base: c.override_nota || 'Override manual' }; }
   if (ovE === 'ko') { out.estat_master_europa = { ok: false, text: '🔴 MÀSTER COMERCIAL / PROTEGIT (Decisió manual)', base: c.override_nota || 'Override manual' }; }
   if (ovM === 'ok') { out.estat_master_mundial = { ok: true,  text: '🟢 DOMINI PÚBLIC MUNDIAL (Decisió manual)', base: c.override_nota || 'Override manual' }; }
@@ -483,7 +482,6 @@ function calcularDiagnosticoLegal(c) {
   if (ovS === 'ok') { out.estat_composicio_sgae = { ok: true,  text: '🟢 COMPOSICIÓ EN DOMINI PÚBLIC (Decisió manual)', base: c.override_nota || 'Override manual' }; }
   if (ovS === 'ko') { out.estat_composicio_sgae = { ok: false, text: '🔴 COMPOSICIÓ PROTEGIDA (Decisió manual)', base: c.override_nota || 'Override manual' }; }
 
-  // Regla D: Acció suggerida
   const masterOk = out.estat_master_mundial.ok || out.estat_master_europa.ok;
   const sgaeOk = out.estat_composicio_sgae.ok;
   if (out.estat_master_mundial.ok && sgaeOk) {
@@ -497,7 +495,6 @@ function calcularDiagnosticoLegal(c) {
   }
   if (c.override_nota && (ovE || ovM || ovS)) out.accio_requerida += '\n📝 Nota d\'override: ' + c.override_nota;
 
-  // Color global
   if (out.estat_master_mundial.ok && sgaeOk) out.color = 'ok';
   else if (!out.estat_master_europa.ok && !sgaeOk) out.color = 'ko';
   else out.color = 'warn';
@@ -559,6 +556,75 @@ function textInforme(c) {
   ].filter(x => x !== '').join('\n');
 }
 
+function textInformeAgregat(cancions) {
+  const avui = new Date();
+  const dataGen = avui.toLocaleDateString('ca-ES', { day: '2-digit', month: 'long', year: 'numeric' });
+  const horaGen = avui.toLocaleTimeString('ca-ES', { hour: '2-digit', minute: '2-digit' });
+  const linia = '===========================================================';
+  const liniaCurta = '-----------------------------------------------------------';
+
+  let aptes = 0, sgae = 0, master = 0, negociar = 0;
+  let costTotal = 0;
+  cancions.forEach(c => {
+    const d = calcularDiagnosticoLegal(c);
+    if (d.estat_master_mundial.ok && d.estat_composicio_sgae.ok) aptes++;
+    else if (d.estat_master_europa.ok && !d.estat_composicio_sgae.ok) sgae++;
+    else if (d.estat_composicio_sgae.ok && !d.estat_master_europa.ok) master++;
+    else negociar++;
+    costTotal += Number(c.partida_presupuesto) || 0;
+  });
+
+  const cap = [
+    linia,
+    'BADALONA COMUNICACIÓ · INFORME AGREGAT DE DRETS MUSICALS',
+    'Documental "Darrere el drac" — Cadena de drets (Chain of Title)',
+    linia,
+    'Data de generació: ' + dataGen + ' a les ' + horaGen,
+    'Generat per: ' + (me || '—'),
+    'Nombre de cançons incloses: ' + cancions.length,
+    '',
+    'RESUM EXECUTIU',
+    liniaCurta,
+    '✅ Obres 100% lliures (aptes per muntatge directe): ' + aptes,
+    '⚠️ Obres amb només pagament de partitura (SGAE):    ' + sgae,
+    '⚠️ Obres amb només negociació de màster:            ' + master,
+    '❌ Obres que requereixen negociació completa:       ' + negociar,
+    'Cost total previst:                                 ' + costTotal.toLocaleString('ca-ES') + ' €',
+    '',
+    'LLISTAT DE REFERÈNCIES',
+    liniaCurta
+  ];
+
+  cancions.forEach((c, i) => {
+    const d = calcularDiagnosticoLegal(c);
+    let estat = '❌ NEGOCIAR';
+    if (d.estat_master_mundial.ok && d.estat_composicio_sgae.ok) estat = '✅ APTE';
+    else if (d.estat_master_europa.ok && !d.estat_composicio_sgae.ok) estat = '⚠️ SGAE';
+    else if (d.estat_composicio_sgae.ok && !d.estat_master_europa.ok) estat = '⚠️ MÀSTER';
+    cap.push(
+      String(i + 1).padStart(3, ' ') + '. ' + (c.referencia || '—') + '  ' +
+      (c.titulo || '(sense títol)') + '  (' + (c.ano_grabacion || '—') + ')  →  ' + estat
+    );
+  });
+  cap.push('');
+
+  const informes = cancions.map((c, i) => {
+    const header = '\n\n' + '╔' + '═'.repeat(57) + '╗\n' +
+                   '║ FITXA ' + String(i + 1).padStart(3, '0') + ' / ' + String(cancions.length).padStart(3, '0') + ' · ' + (c.titulo || '').slice(0, 40).padEnd(40, ' ') + ' ║\n' +
+                   '╚' + '═'.repeat(57) + '╝\n';
+    return header + textInforme(c);
+  });
+
+  const peu = [
+    '',
+    linia,
+    'Fi de l\'informe agregat. Total de fitxes adjuntes: ' + cancions.length,
+    linia
+  ];
+
+  return cap.concat(informes).concat(peu).join('\n');
+}
+
 function novaCancion() {
   currentMR = {
     id: null,
@@ -583,6 +649,10 @@ function suggereixReferencia() {
 }
 
 function obreCancion(c) { currentMR = JSON.parse(JSON.stringify(c)); editingMR = false; render(); }
+
+function cancionsSeleccionades() {
+  return musicRights.filter(c => seleccioMR.has(c.id));
+}
 
 async function desaCancion(c) {
   if (!c.titulo || !c.titulo.trim()) { alert('Cal indicar el títol de la peça.'); return; }
@@ -626,6 +696,7 @@ async function esborraCancion(c) {
   const r = await db.from('music_rights').delete().eq('id', c.id);
   if (r.error) { alert('Error esborrant: ' + r.error.message); return; }
   musicRights = musicRights.filter(x => x.id !== c.id);
+  seleccioMR.delete(c.id);
   currentMR = null;
   editingMR = false;
   render();
@@ -661,26 +732,95 @@ function exportaInformePdf(c) {
   win.document.close();
 }
 
+function exportaAgregatTxt(cancions) {
+  if (!cancions.length) { alert('No hi ha cap cançó seleccionada.'); return; }
+  const blob = new Blob([textInformeAgregat(cancions)], { type: 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  const data = new Date().toISOString().slice(0, 10);
+  a.download = 'Informe_Drets_Agregat_' + data + '_' + cancions.length + 'cancons.txt';
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+}
+
+function exportaAgregatPdf(cancions) {
+  if (!cancions.length) { alert('No hi ha cap cançó seleccionada.'); return; }
+  const text = textInformeAgregat(cancions);
+  const win = window.open('', '_blank');
+  const escapat = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const html = '<!doctype html><html lang="ca"><head><meta charset="utf-8"><title>Informe agregat de drets musicals</title><style>'
+    + 'body{font:10pt/1.4 ui-monospace,Menlo,Consolas,monospace;max-width:840px;margin:30px auto;padding:0 22px;color:#1f1d1a;white-space:pre-wrap}'
+    + '.head{border-bottom:2px solid #b4471f;padding-bottom:8px;margin-bottom:14px;font-family:Georgia,serif}'
+    + '.head h1{margin:0 0 4px;font-size:18pt;color:#b4471f}'
+    + '.head .sub{font-size:10pt;color:#666;font-style:italic}'
+    + '@media print{body{margin:14mm}}'
+    + '</style></head><body>'
+    + '<div class="head"><h1>Badalona Comunicació</h1><div class="sub">Informe agregat de drets musicals · Documental "Darrere el drac"</div></div>'
+    + '<pre style="margin:0;font-family:inherit;white-space:pre-wrap">' + escapat + '</pre>'
+    + '<script>window.onload=function(){setTimeout(function(){window.print();},350);};<\/script></body></html>';
+  win.document.write(html);
+  win.document.close();
+}
+
+async function copiaAgregat(cancions) {
+  if (!cancions.length) { alert('No hi ha cap cançó seleccionada.'); return; }
+  try { await navigator.clipboard.writeText(textInformeAgregat(cancions)); alert('✅ Informe agregat copiat al porta-retalls (' + cancions.length + ' cançons).'); }
+  catch(e) { alert('No s\'ha pogut copiar. Selecciona el text manualment.'); }
+}
+
+function enviarInformePerCorreu(c) {
+  const assumpte = encodeURIComponent('Informe de drets musicals · ' + (c.referencia || '') + ' · ' + (c.titulo || ''));
+  const cos = encodeURIComponent(textInforme(c));
+  window.location.href = 'mailto:?subject=' + assumpte + '&body=' + cos;
+}
+
 function renderDrets() {
   const app = $('#app'); app.innerHTML = '';
 
   if (!currentMR) {
-    // --- LLISTA ---
     const card = el('div', { class: 'card' });
     card.append(el('div', { class: 'row', style: 'justify-content:space-between;align-items:center;margin:0' }, [
       el('h2', { textContent: '🎼 Control de drets musicals', style: 'margin:0' }),
       el('button', { class: 'btn p', textContent: '+ Nova cançó', onclick: () => novaCancion() })
     ]));
-    card.append(el('div', { class: 'badge', style: 'margin-top:6px', textContent: 'Diagnòstic automàtic de domini públic (UE + EUA + SGAE). Any de referència: ' + ANNO_ACTUAL + '.' }));
+    card.append(el('div', { class: 'badge', style: 'margin-top:6px', textContent: 'Diagnòstic automàtic de domini públic (UE + EUA + SGAE). Any de referència: ' + ANNO_ACTUAL + '. Selecciona cançons per exportar-les juntes.' }));
 
     if (!musicRights.length) {
       card.append(el('div', { class: 'agenda-empty', textContent: 'Cap cançó registrada encara. Prem "+ Nova cançó" per començar.' }));
     } else {
+      // Barra de selecció
+      const bar = el('div', { class: 'mr-select-bar' });
+      const n = seleccioMR.size;
+      bar.append(el('span', { class: 'badge', textContent: n ? '📌 ' + n + ' cançó' + (n > 1 ? 's' : '') + ' seleccionada' + (n > 1 ? 's' : '') : 'Marca les cançons que vulguis exportar juntes.' }));
+      const btns = el('div', { class: 'row', style: 'margin:0' });
+      btns.append(el('button', { class: 'btn s', textContent: '✅ Totes', onclick: () => { musicRights.forEach(c => seleccioMR.add(c.id)); render(); } }));
+      btns.append(el('button', { class: 'btn s', textContent: '⬜ Cap', onclick: () => { seleccioMR.clear(); render(); } }));
+      if (n > 0) {
+        btns.append(el('button', { class: 'btn s', textContent: '📋 Copiar', title: 'Copiar informe agregat', onclick: () => copiaAgregat(cancionsSeleccionades()) }));
+        btns.append(el('button', { class: 'btn s', textContent: '📄 .txt', title: 'Exportar informe agregat a .txt', onclick: () => exportaAgregatTxt(cancionsSeleccionades()) }));
+        btns.append(el('button', { class: 'btn p s', textContent: '📄 PDF', title: 'Exportar informe agregat a PDF', onclick: () => exportaAgregatPdf(cancionsSeleccionades()) }));
+      }
+      bar.append(btns);
+      card.append(bar);
+
       const list = el('div', { class: 'mr-list' });
       musicRights.forEach(c => {
         const d = calcularDiagnosticoLegal(c);
-        const item = el('div', { class: 'mr-item', onclick: () => obreCancion(c) });
-        const left = el('div');
+        const marcat = seleccioMR.has(c.id);
+        const item = el('div', { class: 'mr-item' + (marcat ? ' selected' : '') });
+
+        const cb = el('input', { type: 'checkbox', checked: marcat, title: 'Seleccionar per a l\'informe agregat' });
+        cb.addEventListener('change', (ev) => {
+          ev.stopPropagation();
+          if (cb.checked) seleccioMR.add(c.id); else seleccioMR.delete(c.id);
+          render();
+        });
+
+        const left = el('div', { style: 'cursor:pointer', onclick: (ev) => {
+          if (ev.target.tagName === 'INPUT') return;
+          obreCancion(c);
+        }});
         if (c.referencia) left.append(el('div', { class: 'ref', textContent: '📎 ' + c.referencia }));
         left.append(el('div', { class: 't', textContent: c.titulo || '(sense títol)' }));
         left.append(el('div', { class: 's', textContent: [c.interprete, c.ano_grabacion ? '(' + c.ano_grabacion + ')' : '', c.autor ? '· ' + c.autor : '', c.ano_muerte_autor ? '†' + c.ano_muerte_autor : ''].filter(Boolean).join(' ') }));
@@ -690,8 +830,10 @@ function renderDrets() {
         pills.append(el('span', { class: 'pill ' + (overM ? 'override' : (d.estat_master_mundial.ok ? 'ok' : 'ko')), textContent: '🌐 MÓN ' + (d.estat_master_mundial.ok ? 'OK' : 'PROTEGIT') }));
         pills.append(el('span', { class: 'pill ' + (overS ? 'override' : (d.estat_composicio_sgae.ok ? 'ok' : 'ko')), textContent: '🎼 SGAE ' + (d.estat_composicio_sgae.ok ? 'OK' : 'PROTEGIT') }));
         left.append(pills);
-        item.append(left);
-        item.append(el('div', { class: 's', textContent: d.accio_requerida.split(':')[0] }));
+
+        const right = el('div', { class: 's', style: 'cursor:pointer', onclick: () => obreCancion(c), textContent: d.accio_requerida.split(':')[0] });
+
+        item.append(cb, left, right);
         list.append(item);
       });
       card.append(list);
@@ -700,7 +842,7 @@ function renderDrets() {
     return;
   }
 
-  // --- FITXA / FORMULARI ---
+  // FITXA
   const c = currentMR;
   const d = calcularDiagnosticoLegal(c);
   const card = el('div', { class: 'card' });
@@ -730,7 +872,10 @@ function renderDrets() {
     l.append(el('span', { textContent: label }));
     const inp = el('input', { type: type || 'text', value: c[key] == null ? '' : c[key], placeholder: ph || '' });
     inp.disabled = !editingMR;
-    inp.addEventListener('input', () => { c[key] = inp.value; if (key === 'ano_grabacion' || key === 'ano_muerte_autor') renderDiag(); });
+    inp.addEventListener('input', () => {
+      if (type === 'number') c[key] = (inp.value === '' ? '' : Number(inp.value));
+      else c[key] = inp.value;
+    });
     l.append(inp);
     return l;
   };
@@ -751,7 +896,6 @@ function renderDrets() {
   form.append(lNotes);
   card.append(form);
 
-  // --- Override manual ---
   if (editingMR) {
     const ov = el('div', { class: 'mr-override' });
     ov.append(el('h4', { textContent: '⚖️ Override manual (opcional)' }));
@@ -774,40 +918,34 @@ function renderDrets() {
     const lN = el('label', { class: 'full' });
     lN.append(el('span', { textContent: 'Motiu de l\'override' }));
     const iN = el('input', { type: 'text', value: c.override_nota || '', placeholder: 'Ex: dictamen jurídic 12/2026' });
-    iN.addEventListener('input', () => { c.override_nota = iN.value; renderDiag(); });
+    iN.addEventListener('input', () => { c.override_nota = iN.value; });
     lN.append(iN);
     grid.append(lN);
     ov.append(grid);
     card.append(ov);
   }
 
-  // --- Diagnòstic en viu ---
   const diag = el('div', { class: 'mr-diag' });
   diag.append(el('h4', { textContent: 'Diagnòstic jurídic automàtic (any ' + ANNO_ACTUAL + ')' }));
   const p1 = el('p');
   p1.append(el('strong', { textContent: 'Màster UE: ' }), el('span', { textContent: d.estat_master_europa.text }));
   diag.append(p1);
-  const p1b = el('p', { class: 'badge', style: 'margin-left:14px', textContent: '↳ ' + d.estat_master_europa.base });
-  diag.append(p1b);
+  diag.append(el('p', { class: 'badge', style: 'margin-left:14px', textContent: '↳ ' + d.estat_master_europa.base }));
   const p2 = el('p');
   p2.append(el('strong', { textContent: 'Màster mundial: ' }), el('span', { textContent: d.estat_master_mundial.text }));
   diag.append(p2);
-  const p2b = el('p', { class: 'badge', style: 'margin-left:14px', textContent: '↳ ' + d.estat_master_mundial.base });
-  diag.append(p2b);
+  diag.append(el('p', { class: 'badge', style: 'margin-left:14px', textContent: '↳ ' + d.estat_master_mundial.base }));
   const p3 = el('p');
   p3.append(el('strong', { textContent: 'Partitura/SGAE: ' }), el('span', { textContent: d.estat_composicio_sgae.text }));
   diag.append(p3);
-  const p3b = el('p', { class: 'badge', style: 'margin-left:14px', textContent: '↳ ' + d.estat_composicio_sgae.base });
-  diag.append(p3b);
+  diag.append(el('p', { class: 'badge', style: 'margin-left:14px', textContent: '↳ ' + d.estat_composicio_sgae.base }));
   diag.append(el('p', { style: 'margin-top:8px' }, el('strong', { textContent: 'Acció recomanada:' })));
   diag.append(el('p', { style: 'white-space:pre-wrap', textContent: d.accio_requerida }));
   card.append(diag);
 
-  // --- Informe Chain of Title ---
   card.append(el('h3', { style: 'margin-top:16px', textContent: 'Informe Chain of Title' }));
   card.append(el('div', { class: 'mr-report', textContent: textInforme(c) }));
 
-  // --- Auditoria ---
   if (c.id) {
     const parts = [];
     if (c.created_by) parts.push('Creat per ' + c.created_by + (c.created_at ? ' el ' + new Date(c.created_at).toLocaleString('ca-ES') : ''));
@@ -816,18 +954,6 @@ function renderDrets() {
   }
 
   app.append(card);
-
-  function renderDiag() {
-    // Recàlcul ràpid (sense re-renderitzar tot) — simplement tornem a renderitzar
-    // perquè la fitxa és lleugera. Si molestés, es podria fer granular.
-    // Ho deixem així per simplicitat.
-  }
-}
-
-function enviarInformePerCorreu(c) {
-  const assumpte = encodeURIComponent('Informe de drets musicals · ' + (c.referencia || '') + ' · ' + (c.titulo || ''));
-  const cos = encodeURIComponent(textInforme(c));
-  window.location.href = 'mailto:?subject=' + assumpte + '&body=' + cos;
 }
 
 // ==================== DOCUMENTS ====================
@@ -974,10 +1100,10 @@ function renderDocEditor() {
     const tots = () => Array.from(ed.querySelectorAll('.ts')).map(x => ({ node: x, t: parseFloat(x.dataset.t) || 0 })).sort((a, b) => a.t - b.t);
     let lastActive = null;
     const onTime = () => {
-      const cur = audioEl.currentTime;
+      const curT = audioEl.currentTime;
       const list = tots();
       let best = null;
-      for (const it of list) if (it.t <= cur + 0.01) best = it; else break;
+      for (const it of list) if (it.t <= curT + 0.01) best = it; else break;
       if (best && best.node !== lastActive) {
         if (lastActive) lastActive.classList.remove('active');
         best.node.classList.add('active');
