@@ -71,16 +71,23 @@ input[type=time]{padding:6px;width:auto}
 .agenda-who{font-size:12px;color:var(--mut);white-space:nowrap}
 .agenda-empty{color:var(--mut);font-size:13px;padding:6px 0}
 .agenda-chip{font-size:11px;padding:2px 8px;border-radius:999px;color:#fff;white-space:nowrap}
+
+/* === Pressupost (amb drag handle) === */
 .bud-list{width:100%;font-size:14px}
-.bud-head{display:grid;grid-template-columns:28px 1fr 130px 110px 110px 100px 32px;gap:8px;padding:6px 0;border-bottom:2px solid var(--bd);font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--mut);font-weight:600;align-items:center}
-.bud-row{display:grid;grid-template-columns:28px 1fr 130px 110px 110px 100px 32px;gap:8px;padding:6px 0;border-bottom:1px solid var(--bd);align-items:center}
+.bud-head{display:grid;grid-template-columns:36px 1fr 130px 110px 110px 100px 32px;gap:8px;padding:6px 0;border-bottom:2px solid var(--bd);font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--mut);font-weight:600;align-items:center}
+.bud-row{display:grid;grid-template-columns:36px 1fr 130px 110px 110px 100px 32px;gap:8px;padding:6px 0;border-bottom:1px solid var(--bd);align-items:center}
 .bud-row:hover{background:rgba(180,71,31,.05)}
-.bud-row .bc-caret{text-align:center}
+.bud-row .bc-caret{text-align:center;display:flex;align-items:center;justify-content:center;gap:2px}
 .bud-row .bc-num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
 .bud-row .bc-num.strong{font-weight:600}
 .bud-row .bc-estat{white-space:nowrap}
 .bud-row .bc-x{text-align:center}
-.caret{background:none;border:0;color:var(--mut);cursor:pointer;font-size:14px;padding:0 6px;transition:transform .15s;display:inline-block}
+.bud-row.dragging{opacity:.35}
+.bud-row.drop-target{background:rgba(180,71,31,.10);box-shadow:inset 0 -2px 0 var(--ac)}
+.drag-handle{display:inline-block;cursor:grab;color:var(--mut);font-size:14px;letter-spacing:-2px;padding:0 3px;user-select:none;line-height:1;transition:color .15s}
+.drag-handle:hover{color:var(--ac)}
+.drag-handle:active{cursor:grabbing}
+.caret{background:none;border:0;color:var(--mut);cursor:pointer;font-size:14px;padding:0 4px;transition:transform .15s;display:inline-block}
 .caret.open{transform:rotate(90deg)}
 .cat-pill{display:inline-block;font-size:11px;padding:2px 8px;border-radius:999px;background:var(--bg);border:1px solid var(--bd);color:var(--mut);white-space:nowrap}
 .st-pill{display:inline-block;font-size:11px;padding:2px 8px;border-radius:999px;color:#fff;white-space:nowrap}
@@ -104,6 +111,7 @@ input[type=time]{padding:6px;width:auto}
 .summary .big{font-size:18px;font-weight:700}
 .summary .pos{color:var(--err)}
 .summary .neg{color:var(--ok)}
+
 .files-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin-top:12px}
 .file-card{background:var(--bg);border:1px solid var(--bd);border-radius:8px;padding:10px;display:flex;flex-direction:column;gap:8px}
 .file-thumb{width:100%;height:120px;object-fit:cover;border-radius:6px;background:var(--card)}
@@ -191,6 +199,7 @@ input[type=time]{padding:6px;width:auto}
 @media (max-width:640px){
   .bud-head,.bud-row{grid-template-columns:24px 1fr 90px 32px}
   .bud-head .hide-s,.bud-row .hide-s{display:none}
+  .drag-handle{display:none}
   .agenda-item{grid-template-columns:100px 1fr;gap:8px}
   .agenda-who{display:none}
   .files-grid{grid-template-columns:repeat(auto-fill,minmax(140px,1fr))}
@@ -1869,8 +1878,27 @@ function renderGantt() {
 }
 
 // ==================== PRESSUPOST ====================
+function mouPartidaA(s, from, to) {
+  if (from === to) return;
+  if (from < 0 || from >= s.budget.length) return;
+  if (to < 0 || to >= s.budget.length) return;
+  const [item] = s.budget.splice(from, 1);
+  s.budget.splice(to, 0, item);
+  s.budget.forEach((p, i) => { p.pos = i; });
+  save(s);
+  render();
+}
+
 function renderBudget(s) {
   s.budget = s.budget || [];
+  // Assegura que totes les partides tinguin 'pos' i ordena-les
+  let calDesar = false;
+  s.budget.forEach((p, i) => {
+    if (typeof p.pos !== 'number') { p.pos = i; calDesar = true; }
+  });
+  s.budget.sort((a, b) => (a.pos || 0) - (b.pos || 0));
+  if (calDesar) save(s);
+
   const wrap = el('div', { class: 'card' });
   wrap.append(el('div', { class: 'row', style: 'justify-content:space-between;margin:0 0 8px;align-items:center' }, [
     el('h3', { textContent: 'Full de pressupost', style: 'margin:0' }),
@@ -1878,9 +1906,13 @@ function renderBudget(s) {
       editing ? el('button', { class: 'btn s', textContent: '📥 Recarregar partides', onclick: () => {
         if (!confirm('Això sobreescriurà el pressupost actual amb les 21 partides inicials. Continuar?')) return;
         s.budget = JSON.parse(JSON.stringify(PARTIDES_INICIALS));
+        s.budget.forEach((p, i) => p.pos = i);
         save(s); render();
       } }) : '',
-      editing ? el('button', { class: 'btn', textContent: '+ Nova partida', onclick: () => { s.budget.push({ c: '', cat: 'Altres', p: 0, st: 'pendent', exp: [] }); save(s); render(); } }) : ''
+      editing ? el('button', { class: 'btn', textContent: '+ Nova partida', onclick: () => {
+        s.budget.push({ c: '', cat: 'Altres', p: 0, st: 'pendent', exp: [], pos: s.budget.length });
+        save(s); render();
+      } }) : ''
     ].filter(Boolean))
   ].filter(Boolean)));
 
@@ -1888,6 +1920,8 @@ function renderBudget(s) {
     wrap.append(el('div', { class: 'badge', textContent: 'Cap partida. Prem "Editar" i després "+ Nova partida".' }));
     return wrap;
   }
+
+  if (editing) wrap.append(el('div', { class: 'badge', style: 'margin-bottom:8px', textContent: '💡 Arrossega el ⋮⋮ de cada partida per reordenar-la.' }));
 
   const list = el('div', { class: 'bud-list' });
   list.append(el('div', { class: 'bud-head' }, [
@@ -1904,7 +1938,27 @@ function renderBudget(s) {
     const open = !!openBud[idx];
     const real = realOf(p);
     const row = el('div', { class: 'bud-row' + (open ? ' open' : '') });
-    row.append(el('div', { class: 'bc-caret' }, el('button', { class: 'caret' + (open ? ' open' : ''), textContent: '▶', title: 'Veure despeses', onclick: () => { openBud[idx] = !openBud[idx]; render(); } })));
+
+    const cellCaret = el('div', { class: 'bc-caret' });
+    if (editing) {
+      const handle = el('span', {
+        class: 'drag-handle',
+        textContent: '⋮⋮',
+        title: 'Arrossega per reordenar',
+        draggable: 'true'
+      });
+      handle.addEventListener('dragstart', (ev) => {
+        ev.dataTransfer.setData('text/plain', String(idx));
+        ev.dataTransfer.effectAllowed = 'move';
+        row.classList.add('dragging');
+      });
+      handle.addEventListener('dragend', () => {
+        row.classList.remove('dragging');
+      });
+      cellCaret.append(handle);
+    }
+    cellCaret.append(el('button', { class: 'caret' + (open ? ' open' : ''), textContent: '▶', title: 'Veure despeses', onclick: () => { openBud[idx] = !openBud[idx]; render(); } }));
+    row.append(cellCaret);
 
     if (editing) {
       row.append(el('div', {}, el('input', { type: 'text', value: p.c, placeholder: 'Concepte', oninput: e => { p.c = e.target.value; save(s); } })));
@@ -1924,7 +1978,27 @@ function renderBudget(s) {
       row.append(el('div', { class: 'hide-s' }, el('span', { class: 'st-pill ' + stClass(p.st), textContent: stLabel(p.st) })));
     }
 
-    row.append(el('div', { class: 'bc-x' }, editing ? el('button', { class: 'x', textContent: '×', title: 'Eliminar partida', onclick: () => { if (confirm('Eliminar aquesta partida?')) { s.budget.splice(idx, 1); save(s); render(); } } }) : ''));
+    row.append(el('div', { class: 'bc-x' }, editing ? el('button', { class: 'x', textContent: '×', title: 'Eliminar partida', onclick: () => { if (confirm('Eliminar aquesta partida?')) { s.budget.splice(idx, 1); s.budget.forEach((q, i) => q.pos = i); save(s); render(); } } }) : ''));
+
+    // Drag & drop events
+    if (editing) {
+      row.addEventListener('dragover', (ev) => {
+        ev.preventDefault();
+        ev.dataTransfer.dropEffect = 'move';
+        row.classList.add('drop-target');
+      });
+      row.addEventListener('dragleave', () => {
+        row.classList.remove('drop-target');
+      });
+      row.addEventListener('drop', (ev) => {
+        ev.preventDefault();
+        row.classList.remove('drop-target');
+        const from = parseInt(ev.dataTransfer.getData('text/plain'), 10);
+        if (isNaN(from)) return;
+        mouPartidaA(s, from, idx);
+      });
+    }
+
     list.append(row);
 
     if (open) {
