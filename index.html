@@ -178,6 +178,18 @@ input[type=time]{padding:6px;width:auto}
 .cred-frase-bar{display:flex;gap:8px;align-items:center;background:rgba(180,71,31,.06);border:1px solid var(--bd);border-radius:8px;padding:8px 12px;margin-bottom:12px;flex-wrap:wrap}
 .cred-frase-bar label{font-size:12px;color:var(--mut);font-weight:600;white-space:nowrap}
 .cred-frase-bar input{flex:1;min-width:220px}
+.budget-indicator{background:linear-gradient(90deg, rgba(180,71,31,.08), rgba(180,71,31,.03));border:1px solid var(--bd);border-left:4px solid var(--ac);border-radius:10px;padding:12px 16px;margin-bottom:14px}
+.budget-indicator .b-title{font-weight:700;font-size:15px;margin-bottom:8px;color:var(--ac)}
+.budget-indicator .b-stats{display:flex;gap:16px;flex-wrap:wrap;font-size:13px;margin-bottom:8px}
+.budget-indicator .b-stats span{font-variant-numeric:tabular-nums}
+.budget-indicator .b-stats strong{font-weight:700}
+.budget-indicator .b-bar{height:12px;background:var(--bg);border-radius:6px;overflow:hidden;position:relative}
+.budget-indicator .b-bar-fill{height:100%;background:var(--ok);transition:width .3s}
+.budget-indicator .b-bar-fill.warn{background:var(--warn)}
+.budget-indicator .b-bar-fill.over{background:var(--err)}
+.budget-indicator .b-pct{font-size:11px;color:var(--mut);margin-top:4px;text-align:right}
+.budget-indicator .b-alert{color:var(--err);font-weight:700;font-size:13px;margin-top:6px}
+.budget-badge{display:inline-block;font-size:10px;padding:2px 8px;border-radius:999px;background:rgba(180,71,31,.12);color:var(--ac);margin-left:8px;font-weight:600;white-space:nowrap}
 @media (max-width:640px){
   .bud-head,.bud-row{grid-template-columns:24px 1fr 90px 32px}
   .bud-head .hide-s,.bud-row .hide-s{display:none}
@@ -188,6 +200,7 @@ input[type=time]{padding:6px;width:auto}
   main{padding:12px}
   .mr-item{grid-template-columns:auto 1fr}
   .mr-item > div:last-child{grid-column:1/-1}
+  .budget-indicator .b-stats{flex-direction:column;gap:4px}
 }
 </style>
 </head>
@@ -277,6 +290,7 @@ const PARTIDES_INICIALS = [
   {c:"Postproducció so",cat:"Personal extern",p:1500,st:"pendent",exp:[]},
   {c:"Composició BSO",cat:"Personal extern",p:3250,st:"pendent",exp:[]},
   {c:"Drets imatges arxiu",cat:"Altres",p:7000,st:"pendent",exp:[]},
+  {c:"Drets Soundtrack",cat:"Altres",p:3000,st:"pendent",exp:[]},
   {c:"Rodatge en localitzacions",cat:"Altres",p:6000,st:"pendent",exp:[]},
   {c:"Material tècnic",cat:"Altres",p:5000,st:"pendent",exp:[]},
   {c:"Subtitulació",cat:"Empresa externa",p:3000,st:"pendent",exp:[]},
@@ -401,6 +415,21 @@ async function toggleBlock(day) {
 
 const busy = () => { const a = document.activeElement; return a && $('#app').contains(a) && /INPUT|TEXTAREA|SELECT/.test(a.tagName); };
 
+// --- Càlcul del pressupost de Drets Soundtrack ---
+function calculaDretsSoundtrack() {
+  const bsec = secs.find(s => isBudgetSec(s));
+  if (!bsec || !bsec.budget) return { pressupostat: 0, gastat: 0, disponible: 0, pct: 0, existeix: false };
+  const partida = bsec.budget.find(p => /soundtrack/i.test(p.c || ''));
+  if (!partida) return { pressupostat: 0, gastat: 0, disponible: 0, pct: 0, existeix: false };
+  const pressupostat = Number(partida.p) || 0;
+  const gastat = musicRights
+    .filter(m => ['negociada', 'pagada', 'cedida'].includes(m.adquisicio || 'cap'))
+    .reduce((a, m) => a + (Number(m.adquisicio_import) || 0), 0);
+  const disponible = pressupostat - gastat;
+  const pct = pressupostat > 0 ? Math.round((gastat / pressupostat) * 100) : 0;
+  return { pressupostat, gastat, disponible, pct, existeix: true };
+}
+
 function render() {
   if (activeAudioCleanup) { try { activeAudioCleanup(); } catch(e){} activeAudioCleanup = null; }
   paintNav();
@@ -467,14 +496,31 @@ function calcularDiagnosticoLegal(c) {
   if (ovM === 'ko') out.estat_master_mundial = { ok: false, text: '🔴 CONTRACTE COMERCIAL (manual)', base: c.override_nota || 'Override' };
   if (ovS === 'ok') out.estat_composicio_sgae = { ok: true, text: '🟢 COMPOSICIÓ LLIURE (manual)', base: c.override_nota || 'Override' };
   if (ovS === 'ko') out.estat_composicio_sgae = { ok: false, text: '🔴 COMPOSICIÓ PROTEGIDA (manual)', base: c.override_nota || 'Override' };
+
+  // Adquisició de drets
+  const adq = c.adquisicio || 'cap';
+  out.adquisicio = adq;
+  out.adquisicio_ref = c.adquisicio_ref || '';
+  out.adquisicio_data = c.adquisicio_data || '';
+  out.adquisicio_import = Number(c.adquisicio_import) || 0;
+  const adqResolta = ['negociada', 'pagada', 'cedida', 'no_necessari'].includes(adq);
+  if (adqResolta) {
+    const refTxt = (out.adquisicio_ref ? ' · Ref: ' + out.adquisicio_ref : '');
+    if (!out.estat_master_europa.ok) out.estat_master_europa = { ok: true, text: '🟢 ADQUIRIT PER CONTRACTE', base: 'Adquisició: ' + adq + refTxt };
+    if (!out.estat_master_mundial.ok) out.estat_master_mundial = { ok: true, text: '🟢 ADQUIRIT PER CONTRACTE', base: 'Adquisició: ' + adq + refTxt };
+    if (!out.estat_composicio_sgae.ok) out.estat_composicio_sgae = { ok: true, text: '🟢 ADQUIRIT PER CONTRACTE', base: 'Adquisició: ' + adq + refTxt };
+  }
+
   const masterOk = out.estat_master_mundial.ok || out.estat_master_europa.ok;
   const sgaeOk = out.estat_composicio_sgae.ok;
-  if (out.estat_master_mundial.ok && sgaeOk) out.accio_requerida = '✅ APTE: Integrar directament al muntatge.';
+  if (adqResolta) out.accio_requerida = '✅ APTE: drets adquirits' + (out.adquisicio_ref ? ' (Ref: ' + out.adquisicio_ref + ')' : '') + '. Es pot integrar al muntatge.';
+  else if (out.estat_master_mundial.ok && sgaeOk) out.accio_requerida = '✅ APTE: Integrar directament al muntatge.';
   else if (out.estat_master_europa.ok && !sgaeOk) out.accio_requerida = '⚠️ ATENCIÓ: Àudio lliure a Europa, però cal pagar SGAE.';
   else if (sgaeOk && !masterOk) out.accio_requerida = '⚠️ ATENCIÓ: Partitura lliure, però cal negociar el màster.';
   else out.accio_requerida = '❌ NEGOCIACIÓ COMERCIAL: Cal pressupost de Màster i Editorial.';
   if (c.override_nota && (ovE || ovM || ovS)) out.accio_requerida += '\n📝 Override: ' + c.override_nota;
   if (out.estat_master_mundial.ok && sgaeOk) out.color = 'ok';
+  else if (adqResolta) out.color = 'ok';
   else if (!out.estat_master_europa.ok && !sgaeOk) out.color = 'ko';
   else out.color = 'warn';
   return out;
@@ -487,6 +533,7 @@ function textInforme(c) {
   const horaGen = avui.toLocaleTimeString('ca-ES', { hour: '2-digit', minute: '2-digit' });
   const linia = '===========================================================';
   const liniaCurta = '-----------------------------------------------------------';
+  const adqText = (c.adquisicio && c.adquisicio !== 'cap') ? ('Adquisició: ' + c.adquisicio + (c.adquisicio_ref ? ' · Ref: ' + c.adquisicio_ref : '') + (c.adquisicio_data ? ' · ' + c.adquisicio_data : '') + (c.adquisicio_import ? ' · ' + Number(c.adquisicio_import).toLocaleString('ca-ES') + ' €' : '')) : '';
   return [
     linia, 'BADALONA COMUNICACIÓ · CONTROL DE DRETS MUSICALS',
     'Informe de cadena de drets (Chain of Title)', linia,
@@ -500,6 +547,7 @@ function textInforme(c) {
     'Any de defunció de l\'autor: ' + (c.ano_muerte_autor || '—'),
     'Origen de l\'arxiu: ' + (c.link_descarga || '—'),
     c.partida_presupuesto ? 'Cost previst: ' + Number(c.partida_presupuesto).toLocaleString('ca-ES') + ' €' : 'Cost previst: 0 €',
+    adqText,
     '', 'DIAGNÒSTIC JURÍDIC AUTOMÀTIC (Any ' + ANNO_ACTUAL + ')', liniaCurta,
     '[MÀSTER · EUROPA]   ' + d.estat_master_europa.text,
     '                    Criteri: ' + d.estat_master_europa.base,
@@ -594,7 +642,7 @@ function textResumAgregat(cancions) {
 }
 
 function novaCancion() {
-  currentMR = { id:null, referencia: suggereixReferencia(), link_descarga:'', titulo:'', interprete:'', ano_grabacion:'', autor:'', ano_muerte_autor:'', partida_presupuesto:0, notas:'', override_europa:'', override_mundial:'', override_sgae:'', override_nota:'', created_by: me };
+  currentMR = { id:null, referencia: suggereixReferencia(), link_descarga:'', titulo:'', interprete:'', ano_grabacion:'', autor:'', ano_muerte_autor:'', partida_presupuesto:0, notas:'', override_europa:'', override_mundial:'', override_sgae:'', override_nota:'', adquisicio:'cap', adquisicio_ref:'', adquisicio_data:'', adquisicio_import:0, created_by: me };
   editingMR = true; render();
 }
 function suggereixReferencia() {
@@ -614,6 +662,8 @@ async function desaCancion(c) {
     partida_presupuesto: Number(c.partida_presupuesto) || 0, notas: c.notas || '',
     override_europa: c.override_europa || '', override_mundial: c.override_mundial || '',
     override_sgae: c.override_sgae || '', override_nota: c.override_nota || '',
+    adquisicio: c.adquisicio || 'cap', adquisicio_ref: c.adquisicio_ref || '',
+    adquisicio_data: c.adquisicio_data || '', adquisicio_import: Number(c.adquisicio_import) || 0,
     updated_at: new Date().toISOString(), updated_by: me
   };
   if (c.id) {
@@ -676,9 +726,42 @@ function enviarInformePerCorreu(c) {
   window.location.href = 'mailto:?subject=' + as + '&body=' + cos;
 }
 
+function renderIndicadorDrets() {
+  const d = calculaDretsSoundtrack();
+  const wrap = el('div', { class: 'budget-indicator' });
+  wrap.append(el('div', { class: 'b-title', textContent: '🎼 Drets Soundtrack' }));
+
+  if (!d.existeix) {
+    wrap.append(el('div', { class: 'b-stats', textContent: 'No s\'ha trobat cap partida amb "soundtrack" al pressupost. Crea\'n una amb el nom "Drets Soundtrack".' }));
+    return wrap;
+  }
+
+  const stats = el('div', { class: 'b-stats' });
+  stats.append(el('span', {}, [el('strong', { textContent: 'Pressupostat: ' }), document.createTextNode(eur(d.pressupostat))]));
+  stats.append(el('span', {}, [el('strong', { textContent: 'Gastat: ' }), document.createTextNode(eur(d.gastat))]));
+  stats.append(el('span', {}, [el('strong', { textContent: 'Disponible: ' }), document.createTextNode(eur(d.disponible))]));
+  wrap.append(stats);
+
+  const bar = el('div', { class: 'b-bar' });
+  const pct = d.pressupostat > 0 ? Math.min(100, d.pct) : 0;
+  let fillClass = 'b-bar-fill';
+  if (d.pct > 100) fillClass += ' over';
+  else if (d.pct > 80) fillClass += ' warn';
+  bar.append(el('div', { class: fillClass, style: 'width:' + pct + '%' }));
+  wrap.append(bar);
+
+  wrap.append(el('div', { class: 'b-pct', textContent: d.pressupostat > 0 ? d.pct + '% del pressupost' : '—' }));
+
+  if (d.pressupostat > 0 && d.gastat > d.pressupostat) {
+    wrap.append(el('div', { class: 'b-alert', textContent: '⚠️ Excés de ' + eur(d.gastat - d.pressupostat) }));
+  }
+  return wrap;
+}
+
 function renderDrets() {
   const app = $('#app'); app.innerHTML = '';
   if (!currentMR) {
+    app.append(renderIndicadorDrets());
     const card = el('div', { class: 'card' });
     card.append(el('div', { class: 'row', style: 'justify-content:space-between;align-items:center;margin:0' }, [
       el('h2', { textContent: '🎼 Control de drets musicals', style: 'margin:0' }),
@@ -720,6 +803,7 @@ function renderDrets() {
         pills.append(el('span', { class: 'pill ' + (d.estat_master_europa.ok ? 'ok':'ko'), textContent: '🌍 EU ' + (d.estat_master_europa.ok?'OK':'PROTEGIT') }));
         pills.append(el('span', { class: 'pill ' + (d.estat_master_mundial.ok ? 'ok':'ko'), textContent: '🌐 MÓN ' + (d.estat_master_mundial.ok?'OK':'PROTEGIT') }));
         pills.append(el('span', { class: 'pill ' + (d.estat_composicio_sgae.ok ? 'ok':'ko'), textContent: '🎼 SGAE ' + (d.estat_composicio_sgae.ok?'OK':'PROTEGIT') }));
+        if (c.adquisicio && c.adquisicio !== 'cap') pills.append(el('span', { class: 'pill override', textContent: '📝 ' + c.adquisicio.toUpperCase() + (c.adquisicio_import ? ' ' + eur(c.adquisicio_import) : '') }));
         left.append(pills);
         const right = el('div', { class: 's', style: 'cursor:pointer', onclick: () => obreCancion(c), textContent: d.accio_requerida.split(':')[0] });
         item.append(cb, left, right);
@@ -763,16 +847,58 @@ function renderDrets() {
   form.append(camp('Autor', 'autor'));
   form.append(camp('Any defunció', 'ano_muerte_autor', 'number'));
   form.append(camp('Cost previst (€)', 'partida_presupuesto', 'number'));
-  const lN = el('label', { class: 'full' });
+  card.append(form);
+
+  // Bloc adquisició
+  const adqBox = el('div', { class: 'mr-override', style: 'margin-top:16px' });
+  adqBox.append(el('h4', { textContent: '💼 Adquisició de drets' }));
+  const adqGrid = el('div', { class: 'mr-form' });
+  const lAdq = el('label');
+  lAdq.append(el('span', { textContent: 'Estat' }));
+  const selAdq = el('select', { onchange: e => { c.adquisicio = e.target.value; render(); } }, [
+    ['cap', '— No adquirida —'],
+    ['negociada', '🟡 Negociada amb discogràfica/editorial'],
+    ['pagada', '🟢 Pagada (amb factura)'],
+    ['cedida', '🟢 Cedida gratuïtament'],
+    ['no_necessari', '🟢 No cal (domini públic)']
+  ].map(([v, t]) => el('option', { value: v, textContent: t, selected: (c.adquisicio || 'cap') === v })));
+  selAdq.disabled = !editingMR;
+  lAdq.append(selAdq);
+  adqGrid.append(lAdq);
+  const lRef = el('label');
+  lRef.append(el('span', { textContent: 'Ref. contracte/factura' }));
+  const inpRef = el('input', { type: 'text', value: c.adquisicio_ref || '', placeholder: '2026/045' });
+  inpRef.disabled = !editingMR;
+  inpRef.addEventListener('input', () => c.adquisicio_ref = inpRef.value);
+  lRef.append(inpRef);
+  adqGrid.append(lRef);
+  const lData = el('label');
+  lData.append(el('span', { textContent: 'Data adquisició' }));
+  const inpData = el('input', { type: 'text', value: c.adquisicio_data || '', placeholder: '2026-10-01' });
+  inpData.disabled = !editingMR;
+  inpData.addEventListener('input', () => c.adquisicio_data = inpData.value);
+  lData.append(inpData);
+  adqGrid.append(lData);
+  const lImp = el('label');
+  lImp.append(el('span', { textContent: 'Import (€)' }));
+  const inpImp = el('input', { type: 'number', value: c.adquisicio_import || 0, min: 0, step: '0.01' });
+  inpImp.disabled = !editingMR;
+  inpImp.addEventListener('input', () => c.adquisicio_import = Number(inpImp.value) || 0);
+  lImp.append(inpImp);
+  adqGrid.append(lImp);
+  adqBox.append(adqGrid);
+  card.append(adqBox);
+
+  const lN = el('label', { class: 'full', style: 'margin-top:14px' });
   lN.append(el('span', { textContent: 'Notes internes' }));
   const ta = el('textarea', { value: c.notas || '' });
   ta.disabled = !editingMR;
   ta.addEventListener('input', () => c.notas = ta.value);
-  lN.append(ta); form.append(lN);
-  card.append(form);
+  lN.append(ta); card.append(lN);
+
   if (editingMR) {
     const ov = el('div', { class: 'mr-override' });
-    ov.append(el('h4', { textContent: '⚖️ Override manual' }));
+    ov.append(el('h4', { textContent: '⚖️ Override manual del diagnòstic' }));
     const grid = el('div', { class: 'mr-form' });
     const ovSel = (label, key) => {
       const l = el('label');
@@ -1786,6 +1912,10 @@ function renderBudget(s) {
   s.budget.forEach((p, i) => { if (typeof p.pos !== 'number') { p.pos = i; calDesar = true; } });
   s.budget.sort((a, b) => (a.pos || 0) - (b.pos || 0));
   if (calDesar) save(s);
+
+  // Calcula el gastat de drets soundtrack per mostrar badge
+  const dSoundtrack = calculaDretsSoundtrack();
+
   const wrap = el('div', { class: 'card' });
   wrap.append(el('div', { class: 'row', style: 'justify-content:space-between;margin:0 0 8px;align-items:center' }, [
     el('h3', { textContent: 'Full de pressupost', style: 'margin:0' }),
@@ -1813,6 +1943,7 @@ function renderBudget(s) {
   s.budget.forEach((p, idx) => {
     const open = !!openBud[idx];
     const real = realOf(p);
+    const isSoundtrack = /soundtrack/i.test(p.c || '');
     const row = el('div', { class: 'bud-row' + (open ? ' open' : '') });
     const cellCaret = el('div', { class: 'bc-caret' });
     if (editing) {
@@ -1828,7 +1959,11 @@ function renderBudget(s) {
       row.append(el('div', { class: 'hide-s' }, el('select', { onchange: e => { p.cat = e.target.value; save(s); } }, CATS.map(c => el('option', { value: c, textContent: c, selected: (p.cat || 'Altres') === c })))));
       row.append(el('div', { class: 'bc-num' }, el('input', { type: 'number', value: p.p, min: 0, step: '0.01', style: 'text-align:right', oninput: e => { p.p = Number(e.target.value) || 0; save(s); } })));
     } else {
-      row.append(el('div', { textContent: p.c || '(sense nom)' }));
+      const concepteCell = el('div', { textContent: p.c || '(sense nom)' });
+      if (isSoundtrack && dSoundtrack.existeix && dSoundtrack.gastat > 0) {
+        concepteCell.append(el('span', { class: 'budget-badge', textContent: '🎼 ' + eur(dSoundtrack.gastat) + ' compromesos en drets musicals' }));
+      }
+      row.append(concepteCell);
       row.append(el('div', { class: 'hide-s' }, el('span', { class: 'cat-pill', textContent: p.cat || 'Altres' })));
       row.append(el('div', { class: 'bc-num', textContent: eur(p.p) }));
     }
