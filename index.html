@@ -136,8 +136,6 @@ input[type=time]{padding:6px;width:auto}
 .audio-player{width:100%;height:40px}
 .ts{background:rgba(180,71,31,.12);color:var(--ac);border-radius:4px;padding:1px 6px;font:600 13px/1.4 ui-monospace,monospace;cursor:pointer}
 .ts:hover,.ts.active{background:var(--ac);color:#fff}
-
-/* === Drets musicals === */
 .mr-list{display:grid;grid-template-columns:1fr;gap:8px;margin-top:14px}
 .mr-item{background:var(--bg);border:1px solid var(--bd);border-radius:10px;padding:12px;display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center}
 .mr-item.selected{background:rgba(180,71,31,.08);border-color:var(--ac)}
@@ -155,8 +153,6 @@ input[type=time]{padding:6px;width:auto}
 .mr-report{font:12px/1.5 ui-monospace,monospace;white-space:pre-wrap;background:var(--bg);border:1px solid var(--bd);border-radius:8px;padding:12px;margin-top:12px;max-height:420px;overflow:auto}
 .mr-audit{font-size:11px;color:var(--mut);margin-top:10px;padding-top:8px;border-top:1px dashed var(--bd)}
 .mr-select-bar{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;background:var(--bg);border:1px solid var(--bd);border-radius:8px;padding:8px 12px;margin-top:12px}
-
-/* === Imatges d'arxiu === */
 .img-toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:12px 0}
 .img-toolbar input[type=text]{flex:1;min-width:180px}
 .img-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px;margin-top:14px}
@@ -170,20 +166,16 @@ input[type=time]{padding:6px;width:auto}
 .img-actions .btn{flex:1;padding:4px 6px;font-size:12px}
 .img-import{background:var(--bg);border:1px dashed var(--bd);border-radius:10px;padding:14px;margin-top:12px}
 .img-import textarea{width:100%;min-height:140px;font:13px/1.4 ui-monospace,monospace}
-
-/* === Crèdits === */
 .cred-list{display:grid;grid-template-columns:1fr;gap:6px;margin-top:12px}
 .cred-row{background:var(--bg);border:1px solid var(--bd);border-radius:8px;padding:10px 12px;display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center}
 .cred-row.dragging{opacity:.35}
 .cred-row.drop-target{background:rgba(180,71,31,.10);box-shadow:inset 0 -2px 0 var(--ac)}
-.cred-num{font:600 12px/1 ui-monospace,monospace;color:var(--mut);min-width:24px;text-align:right}
 .cred-main{font-size:14px}
 .cred-sub{font-size:11px;color:var(--mut)}
 .cred-preview{font:13px/1.5 ui-monospace,monospace;white-space:pre-wrap;background:var(--bg);border:1px solid var(--bd);border-radius:8px;padding:14px;margin-top:12px;max-height:520px;overflow:auto}
 .cred-frase-bar{display:flex;gap:8px;align-items:center;background:rgba(180,71,31,.06);border:1px solid var(--bd);border-radius:8px;padding:8px 12px;margin-bottom:12px;flex-wrap:wrap}
 .cred-frase-bar label{font-size:12px;color:var(--mut);font-weight:600;white-space:nowrap}
 .cred-frase-bar input{flex:1;min-width:220px}
-
 @media (max-width:640px){
   .bud-head,.bud-row{grid-template-columns:24px 1fr 90px 32px}
   .bud-head .hide-s,.bud-row .hide-s{display:none}
@@ -227,10 +219,8 @@ input[type=time]{padding:6px;width:auto}
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script>
-// =============================================
 const SUPABASE_URL = 'https://edmppcurmxlbjeiigacw.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_RIXMNmjl2gvoJjnPVFgi8Q_fkMXYe3x';
-// =============================================
 
 const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 const $ = s => document.querySelector(s);
@@ -309,27 +299,23 @@ const timers = {};
 let activeAudioCleanup = null;
 const peopleNames = () => people.map(p => typeof p === 'string' ? p : p.name);
 
-// ==== DRETS MUSICALS ====
 let musicRights = [];
 let currentMR = null;
 let editingMR = false;
 let seleccioMR = new Set();
 const ANNO_ACTUAL = new Date().getFullYear();
 
-// ==== IMATGES D'ARXIU ====
 let imageRights = [];
 let currentImg = null;
 let editingImg = false;
 let seleccioImg = new Set();
 let filtreImg = { text: '', cobertura: 'totes', estat: 'tots', tipus: 'tots' };
 
-// ==== CRÈDITS ====
 let credits = [];
 let currentCredit = null;
 let editingCredit = false;
-let creditFrase = 'Fotografies i material d\'arxiu cortesia de:';
+let creditFrase = 'Fotografies i material d\'arxiu:';
 
-// --- save / savePeople ---
 function save(s) {
   if (!s || !s.id) return;
   clearTimeout(timers[s.id]);
@@ -348,7 +334,6 @@ async function saveCreditFrase() {
   if (r.error) console.error('Error guardant frase:', r.error);
 }
 
-// --- càrrega de dades ---
 async function carregaBlocks() {
   const { data, error } = await db.from('blocks').select('day');
   if (error) { console.warn(error.message); return; }
@@ -376,7 +361,6 @@ async function carregaCredits() {
   credits = (data || []).sort((a,b)=>(a.ordre||0)-(b.ordre||0));
 }
 
-// --- navegació ---
 const nm = e => e.split('@')[0];
 const others = id => Object.entries(peers).filter(([k, v]) => k !== me && v.some(x => x.sec === id)).map(([k]) => nm(k));
 function goto(id) { cur = id; render(); if (pch) pch.track({ sec: id }); }
@@ -425,7 +409,6 @@ function render() {
   if (cur === 'credits') return renderCredits();
   const s = cur_();
   if (!s) { app.textContent = 'Encara no hi ha seccions.'; return; }
-
   app.append(el('div', { class: 'row', style: 'margin:0 0 14px' }, el('button', { class: 'btn', textContent: editing ? "Acabar d'editar" : 'Editar', onclick: () => { editing = !editing; render(); } })));
   const c = el('div', { class: 'card' });
   if (editing) {
@@ -436,14 +419,11 @@ function render() {
     if (s.notes) c.append(el('div', { class: 'notes', textContent: s.notes }));
   }
   app.append(c);
-
   if (isOverviewSec(s)) app.append(renderOverview());
   else if (isBudgetSec(s)) { if (!s.budget || !s.budget.length) { s.budget = JSON.parse(JSON.stringify(PARTIDES_INICIALS)); save(s); } app.append(renderBudget(s)); }
   else if (/^gui[oó]$/i.test(s.name)) app.append(renderDocsUI());
   else app.append(renderTasks(s));
-
   if (!isOverviewSec(s)) app.append(renderFiles(s));
-
   if (editing) {
     const pc = el('div', { class: 'card' }, el('h3', { textContent: "Persones de l'equip" }));
     people.forEach((p, i) => {
@@ -464,7 +444,7 @@ function render() {
     ]));
   }
 }
-// ==================== DRETS MUSICALS ====================
+
 function calcularDiagnosticoLegal(c) {
   const anyG = Number(c.ano_grabacion) || 0;
   const anyM = Number(c.ano_muerte_autor) || 0;
@@ -472,29 +452,18 @@ function calcularDiagnosticoLegal(c) {
   const ovE = c.override_europa || '';
   const ovM = c.override_mundial || '';
   const ovS = c.override_sgae || '';
-
-  if (anyG > 0 && anyG <= (ANNO_ACTUAL - 70)) {
-    out.estat_master_europa = { ok: true, text: '🟢 DOMINI PÚBLIC A EUROPA (Cost 0€)', base: 'Gravació de fa més de 70 anys (≤ ' + (ANNO_ACTUAL-70) + ')' };
-  } else {
-    out.estat_master_europa = { ok: false, text: '🔴 MÀSTER COMERCIAL / PROTEGIT', base: anyG ? 'Gravació posterior a ' + (ANNO_ACTUAL-70) : 'Any de gravació no informat' };
-  }
-  if (anyG > 0 && anyG < 1923) {
-    out.estat_master_mundial = { ok: true, text: '🟢 DOMINI PÚBLIC MUNDIAL (Cost 0€)', base: 'Anterior a 1923 (Music Modernization Act)' };
-  } else {
-    out.estat_master_mundial = { ok: false, text: '🔴 REQUEREIX CONTRACTE COMERCIAL MUNDIAL', base: anyG ? 'Posterior a 1922' : 'Any de gravació no informat' };
-  }
-  if (anyM > 0 && anyM <= (ANNO_ACTUAL - 80)) {
-    out.estat_composicio_sgae = { ok: true, text: '🟢 COMPOSICIÓ EN DOMINI PÚBLIC', base: 'Autor mort fa més de 80 anys (≤ ' + (ANNO_ACTUAL-80) + ')' };
-  } else {
-    out.estat_composicio_sgae = { ok: false, text: '🔴 COMPOSICIÓ PROTEGIDA (SGAE)', base: anyM ? 'Autor mort després de ' + (ANNO_ACTUAL-80) : 'Any de defunció no informat' };
-  }
+  if (anyG > 0 && anyG <= (ANNO_ACTUAL - 70)) out.estat_master_europa = { ok: true, text: '🟢 DOMINI PÚBLIC A EUROPA (Cost 0€)', base: 'Gravació de fa més de 70 anys (≤ ' + (ANNO_ACTUAL-70) + ')' };
+  else out.estat_master_europa = { ok: false, text: '🔴 MÀSTER COMERCIAL / PROTEGIT', base: anyG ? 'Gravació posterior a ' + (ANNO_ACTUAL-70) : 'Any de gravació no informat' };
+  if (anyG > 0 && anyG < 1923) out.estat_master_mundial = { ok: true, text: '🟢 DOMINI PÚBLIC MUNDIAL (Cost 0€)', base: 'Anterior a 1923' };
+  else out.estat_master_mundial = { ok: false, text: '🔴 REQUEREIX CONTRACTE COMERCIAL MUNDIAL', base: anyG ? 'Posterior a 1922' : 'Any de gravació no informat' };
+  if (anyM > 0 && anyM <= (ANNO_ACTUAL - 80)) out.estat_composicio_sgae = { ok: true, text: '🟢 COMPOSICIÓ EN DOMINI PÚBLIC', base: 'Autor mort fa més de 80 anys (≤ ' + (ANNO_ACTUAL-80) + ')' };
+  else out.estat_composicio_sgae = { ok: false, text: '🔴 COMPOSICIÓ PROTEGIDA (SGAE)', base: anyM ? 'Autor mort després de ' + (ANNO_ACTUAL-80) : 'Any de defunció no informat' };
   if (ovE === 'ok') out.estat_master_europa = { ok: true, text: '🟢 DOMINI PÚBLIC A EUROPA (manual)', base: c.override_nota || 'Override' };
   if (ovE === 'ko') out.estat_master_europa = { ok: false, text: '🔴 MÀSTER PROTEGIT (manual)', base: c.override_nota || 'Override' };
   if (ovM === 'ok') out.estat_master_mundial = { ok: true, text: '🟢 DOMINI PÚBLIC MUNDIAL (manual)', base: c.override_nota || 'Override' };
   if (ovM === 'ko') out.estat_master_mundial = { ok: false, text: '🔴 CONTRACTE COMERCIAL (manual)', base: c.override_nota || 'Override' };
   if (ovS === 'ok') out.estat_composicio_sgae = { ok: true, text: '🟢 COMPOSICIÓ LLIURE (manual)', base: c.override_nota || 'Override' };
   if (ovS === 'ko') out.estat_composicio_sgae = { ok: false, text: '🔴 COMPOSICIÓ PROTEGIDA (manual)', base: c.override_nota || 'Override' };
-
   const masterOk = out.estat_master_mundial.ok || out.estat_master_europa.ok;
   const sgaeOk = out.estat_composicio_sgae.ok;
   if (out.estat_master_mundial.ok && sgaeOk) out.accio_requerida = '✅ APTE: Integrar directament al muntatge.';
@@ -502,7 +471,6 @@ function calcularDiagnosticoLegal(c) {
   else if (sgaeOk && !masterOk) out.accio_requerida = '⚠️ ATENCIÓ: Partitura lliure, però cal negociar el màster.';
   else out.accio_requerida = '❌ NEGOCIACIÓ COMERCIAL: Cal pressupost de Màster i Editorial.';
   if (c.override_nota && (ovE || ovM || ovS)) out.accio_requerida += '\n📝 Override: ' + c.override_nota;
-
   if (out.estat_master_mundial.ok && sgaeOk) out.color = 'ok';
   else if (!out.estat_master_europa.ok && !sgaeOk) out.color = 'ko';
   else out.color = 'warn';
@@ -517,16 +485,12 @@ function textInforme(c) {
   const linia = '===========================================================';
   const liniaCurta = '-----------------------------------------------------------';
   return [
-    linia,
-    'BADALONA COMUNICACIÓ · CONTROL DE DRETS MUSICALS',
-    'Informe de cadena de drets (Chain of Title)',
-    linia,
+    linia, 'BADALONA COMUNICACIÓ · CONTROL DE DRETS MUSICALS',
+    'Informe de cadena de drets (Chain of Title)', linia,
     'Referència interna: ' + (c.referencia || '—'),
     'Data de generació: ' + dataGen + ' a les ' + horaGen,
     'Generat per: ' + (me || '—'),
-    '',
-    'DADES DE L\'OBRA',
-    liniaCurta,
+    '', 'DADES DE L\'OBRA', liniaCurta,
     'Títol: "' + (c.titulo || '—') + '"',
     'Intèrpret/Versió: ' + (c.interprete || '—'),
     'Any de gravació (màster): ' + (c.ano_grabacion || '—'),
@@ -534,30 +498,21 @@ function textInforme(c) {
     'Any de defunció de l\'autor: ' + (c.ano_muerte_autor || '—'),
     'Origen de l\'arxiu: ' + (c.link_descarga || '—'),
     c.partida_presupuesto ? 'Cost previst: ' + Number(c.partida_presupuesto).toLocaleString('ca-ES') + ' €' : 'Cost previst: 0 €',
-    '',
-    'DIAGNÒSTIC JURÍDIC AUTOMÀTIC (Any ' + ANNO_ACTUAL + ')',
-    liniaCurta,
+    '', 'DIAGNÒSTIC JURÍDIC AUTOMÀTIC (Any ' + ANNO_ACTUAL + ')', liniaCurta,
     '[MÀSTER · EUROPA]   ' + d.estat_master_europa.text,
     '                    Criteri: ' + d.estat_master_europa.base,
     '[MÀSTER · MÓN]      ' + d.estat_master_mundial.text,
     '                    Criteri: ' + d.estat_master_mundial.base,
     '[PARTITURA · SGAE]  ' + d.estat_composicio_sgae.text,
     '                    Criteri: ' + d.estat_composicio_sgae.base,
-    '',
-    'ACCIÓ RECOMANADA PER A PRODUCCIÓ',
-    liniaCurta,
-    d.accio_requerida,
-    '',
+    '', 'ACCIÓ RECOMANADA PER A PRODUCCIÓ', liniaCurta,
+    d.accio_requerida, '',
     c.notas ? 'NOTES INTERNES\n' + liniaCurta + '\n' + c.notas + '\n' : '',
-    'SIGNATURA',
-    liniaCurta,
+    'SIGNATURA', liniaCurta,
     'Tècnic de producció: ______________________________',
-    'Data: ____ / ____ / ________',
-    '',
-    linia,
-    'Document generat automàticament per l\'eina de gestió',
-    'de producció del documental "Darrere el drac".',
-    linia
+    'Data: ____ / ____ / ________', '',
+    linia, 'Document generat automàticament per l\'eina de gestió',
+    'de producció del documental "Darrere el drac".', linia
   ].filter(x => x !== '').join('\n');
 }
 
@@ -580,10 +535,8 @@ function textInformeAgregat(cancions) {
     'Documental "Darrere el drac"', linia,
     'Data: ' + dataGen, 'Generat per: ' + me, 'Total cançons: ' + cancions.length, '',
     'RESUM EXECUTIU', liniaCurta,
-    '✅ Aptes: ' + aptes,
-    '⚠️ Només SGAE: ' + sgae,
-    '⚠️ Només màster: ' + master,
-    '❌ Negociació completa: ' + negociar,
+    '✅ Aptes: ' + aptes, '⚠️ Només SGAE: ' + sgae,
+    '⚠️ Només màster: ' + master, '❌ Negociació completa: ' + negociar,
     'Cost total previst: ' + costTotal.toLocaleString('ca-ES') + ' €', '',
     'REFERÈNCIES', liniaCurta
   ];
@@ -774,7 +727,6 @@ function renderDrets() {
     }
     app.append(card); return;
   }
-
   const c = currentMR;
   const d = calcularDiagnosticoLegal(c);
   const card = el('div', { class: 'card' });
@@ -792,7 +744,6 @@ function renderDrets() {
   card.append(top);
   card.append(el('h2', { textContent: c.titulo || 'Nova cançó', style: 'margin:0 0 10px' }));
   if (c.referencia) card.append(el('div', { class: 'ref', style: 'margin-bottom:10px', textContent: '📎 ' + c.referencia }));
-
   const form = el('div', { class: 'mr-form' });
   const camp = (label, key, type, ph) => {
     const l = el('label');
@@ -817,7 +768,6 @@ function renderDrets() {
   ta.addEventListener('input', () => c.notas = ta.value);
   lN.append(ta); form.append(lN);
   card.append(form);
-
   if (editingMR) {
     const ov = el('div', { class: 'mr-override' });
     ov.append(el('h4', { textContent: '⚖️ Override manual' }));
@@ -842,7 +792,6 @@ function renderDrets() {
     lN2.append(iN); grid.append(lN2);
     ov.append(grid); card.append(ov);
   }
-
   const diag = el('div', { class: 'mr-diag' });
   diag.append(el('h4', { textContent: 'Diagnòstic automàtic (any ' + ANNO_ACTUAL + ')' }));
   [['Màster UE', d.estat_master_europa], ['Màster mundial', d.estat_master_mundial], ['Partitura/SGAE', d.estat_composicio_sgae]].forEach(([t, st]) => {
@@ -854,7 +803,6 @@ function renderDrets() {
   diag.append(el('p', { style: 'margin-top:8px' }, el('strong', { textContent: 'Acció:' })));
   diag.append(el('p', { style: 'white-space:pre-wrap', textContent: d.accio_requerida }));
   card.append(diag);
-
   card.append(el('h3', { style: 'margin-top:16px', textContent: 'Informe Chain of Title' }));
   card.append(el('div', { class: 'mr-report', textContent: textInforme(c) }));
   if (c.id) {
@@ -866,18 +814,14 @@ function renderDrets() {
   app.append(card);
 }
 
-// ==================== IMATGES D'ARXIU ====================
 function classificaCobertura(cobertura, override) {
   const ov = (override || '').trim();
   if (ov === 'ok') return { estat: 'ok', text: '🟢 DOMINI PÚBLIC (override)', short: 'LLIURE' };
   if (ov === 'warn') return { estat: 'warn', text: '🟡 CC (override)', short: 'CC' };
   if (ov === 'ko') return { estat: 'ko', text: '🔴 PROTEGIT (override)', short: 'PROTEGIT' };
   if (ov === 'unk') return { estat: 'unk', text: '⚪ DESCONEGUT (override)', short: 'DESCONEGUT' };
-
   const c = (cobertura || '').toLowerCase().trim();
   if (!c) return { estat: 'unk', text: '⚪ DESCONEGUT', short: 'DESCONEGUT' };
-
-  // Domini públic explícit
   if (/publicdomain\/(mark|zero|certification)/i.test(cobertura) ||
       /\b(pdm 1\.0|cc0 1\.0|cc-0|cc 0|cczero)\b/i.test(c) ||
       /\b(domini públic|public domain|dominio público|gemeinfrei|domaine public)\b/i.test(c) ||
@@ -885,11 +829,9 @@ function classificaCobertura(cobertura, override) {
       /no copyright|sense drets|sin derechos|no rights reserved/i.test(c)) {
     return { estat: 'ok', text: '🟢 DOMINI PÚBLIC / LLIURE', short: 'LLIURE' };
   }
-  // Creative Commons amb atribució
   if (/\b(cc[-\s]?by|creative commons|atribució|attribution)\b/i.test(c)) {
     return { estat: 'warn', text: '🟡 CREATIVE COMMONS (cal atribució)', short: 'CC' };
   }
-  // Protegit
   if (/\b(copyright|©|tots els drets|all rights reserved|protegit|amb drets|sota drets)\b/i.test(c)) {
     return { estat: 'ko', text: '🔴 PROTEGIT (requereix llicència)', short: 'PROTEGIT' };
   }
@@ -966,7 +908,6 @@ async function esborraImatge(img) {
   seleccioImg.delete(img.id); currentImg = null; editingImg = false; render();
 }
 
-// --- Importació CSV/TSV ---
 function parsejaCSV(text) {
   const firstLine = text.split(/\r?\n/)[0] || '';
   let sep = ',';
@@ -993,7 +934,7 @@ function normalitzaCapcalera(h) {
   if (/cobert|derech|right|copyright|llicencia|licencia|license/.test(n)) return 'cobertura';
   if (/any|ano|year|data|date|fecha/.test(n)) return 'any_data';
   if (/tipus|tipo|type/.test(n)) return 'tipus';
-  if (/autor|author|fotograf|photograph/.test(n)) return 'autor';
+  if (/autor|author|fotograf|photograph|atribu/.test(n)) return 'autor';
   if (/notes|notas|observa/.test(n)) return 'notes';
   if (/etiquet|tag/.test(n)) return 'etiquetes';
   if (/estat|estado|status/.test(n)) return 'estat_intern';
@@ -1021,7 +962,6 @@ async function importaImatges(text) {
   render();
 }
 
-// --- Informe de cobertures (annex explicatiu) ---
 const ANNEX_COBERTURES = [
 '================================================================',
 'GUIA DE COBERTURES LEGALS PER A IMATGES D\'ARXIU',
@@ -1076,30 +1016,25 @@ function textInformeImatge(img) {
     linia, 'BADALONA COMUNICACIÓ · CONTROL DE DRETS D\'IMATGE',
     'Informe de cadena de drets (Chain of Title)', linia,
     'Data: ' + avui.toLocaleDateString('ca-ES', { day: '2-digit', month: 'long', year: 'numeric' }),
-    'Generat per: ' + me,
-    '',
+    'Generat per: ' + me, '',
     'DADES DE LA IMATGE', liniaCurta,
     'Títol: "' + (img.titol || '—') + '"',
     'Autor/Fotògraf: ' + (img.autor || '—'),
     'Any/Data: ' + (img.any_data || '—'),
     'Tipus: ' + (img.tipus || '—'),
     'Enllaç de procedència: ' + (img.link_procedencia || '—'),
-    'Estat intern: ' + (img.estat_intern || 'pendent'),
-    '',
+    'Estat intern: ' + (img.estat_intern || 'pendent'), '',
     'COBERTURA DECLARADA', liniaCurta,
-    img.cobertura || '(no informat)',
-    '',
+    img.cobertura || '(no informat)', '',
     'DIAGNÒSTIC', liniaCurta,
     'Classificació: ' + c.text,
     img.override_cobertura ? 'Override aplicat: ' + img.override_cobertura + (img.override_nota ? ' — ' + img.override_nota : '') : '',
     img.etiquetes ? 'Etiquetes: ' + img.etiquetes : '',
     img.notes ? 'Notes: ' + img.notes : '',
-    img.vincle_tasca ? 'Vincle amb producció: ' + img.vincle_tasca : '',
-    '',
+    img.vincle_tasca ? 'Vincle amb producció: ' + img.vincle_tasca : '', '',
     'SIGNATURA', liniaCurta,
     'Tècnic de producció: ______________________________',
-    'Data: ____ / ____ / ________',
-    '',
+    'Data: ____ / ____ / ________', '',
     linia, 'Document generat automàticament per l\'eina de gestió',
     'de producció del documental "Darrere el drac".', linia
   ].filter(x => x !== '').join('\n');
@@ -1179,7 +1114,6 @@ function renderImatges() {
       ])
     ]));
     card.append(el('div', { class: 'badge', style: 'margin-top:6px', textContent: 'Catàleg de drets d\'imatge. Total: ' + imageRights.length + ' registres.' }));
-
     const filtres = el('div', { class: 'img-toolbar' });
     const inp = el('input', { type: 'text', value: filtreImg.text, placeholder: '🔍 Cercar per títol, autor, notes, etiquetes...' });
     inp.addEventListener('input', () => { filtreImg.text = inp.value; render(); });
@@ -1197,12 +1131,10 @@ function renderImatges() {
     const selT = el('select', { onchange: e => { filtreImg.tipus = e.target.value; render(); } }, [el('option', { value: 'tots', textContent: 'Tipus: tots', selected: filtreImg.tipus === 'tots' })].concat(TIPUS_IMG.map(t => el('option', { value: t, textContent: t, selected: filtreImg.tipus === t }))));
     filtres.append(selT);
     card.append(filtres);
-
     const llistaFiltrada = filtraImatges();
     if (!llistaFiltrada.length) {
       card.append(el('div', { class: 'agenda-empty', textContent: imageRights.length ? 'Cap imatge amb aquest filtre.' : 'Cap imatge encara. Prem "+ Nova imatge" o "📥 Importar".' }));
     } else {
-      // Barra de selecció
       if (seleccioImg.size > 0 || llistaFiltrada.length > 0) {
         const bar = el('div', { class: 'mr-select-bar' });
         const n = seleccioImg.size;
@@ -1219,7 +1151,6 @@ function renderImatges() {
         bar.append(btns);
         card.append(bar);
       }
-
       const grid = el('div', { class: 'img-grid' });
       llistaFiltrada.forEach(img => {
         const c = classificaCobertura(img.cobertura, img.override_cobertura);
@@ -1251,8 +1182,6 @@ function renderImatges() {
     app.append(card);
     return;
   }
-
-  // --- FITXA ---
   const img = currentImg;
   const c = classificaCobertura(img.cobertura, img.override_cobertura);
   const card = el('div', { class: 'card' });
@@ -1268,11 +1197,9 @@ function renderImatges() {
   ].filter(Boolean)));
   card.append(top);
   card.append(el('h2', { textContent: img.titol || 'Nova imatge', style: 'margin:0 0 10px' }));
-
   if (esURLImatge(img.link_procedencia)) {
     card.append(el('img', { src: img.link_procedencia, style: 'max-width:100%;max-height:340px;border-radius:8px;margin-bottom:12px', loading: 'lazy' }));
   }
-
   const form = el('div', { class: 'mr-form' });
   const camp = (label, key, type, ph) => {
     const l = el('label');
@@ -1288,35 +1215,29 @@ function renderImatges() {
   form.append(camp('Any / Data', 'any_data', 'text', '1920, c. 1898, s/d...'));
   form.append(camp('Etiquetes', 'etiquetes', 'text', 'separades per comes'));
   form.append(camp('Vincle amb producció', 'vincle_tasca', 'text', 'escena 3, entrevista Joan...'));
-
   const lT = el('label');
   lT.append(el('span', { textContent: 'Tipus' }));
   const selT = el('select', { onchange: e => img.tipus = e.target.value }, [el('option', { value: '', textContent: '—' })].concat(TIPUS_IMG.map(t => el('option', { value: t, textContent: t, selected: img.tipus === t }))));
   selT.disabled = !editingImg;
   lT.append(selT); form.append(lT);
-
   const lE = el('label');
   lE.append(el('span', { textContent: 'Estat intern' }));
   const selE = el('select', { onchange: e => img.estat_intern = e.target.value }, ESTATS_INTERNS.map(([k,l]) => el('option', { value: k, textContent: l, selected: (img.estat_intern||'pendent') === k })));
   selE.disabled = !editingImg;
   lE.append(selE); form.append(lE);
-
   const lC = el('label', { class: 'full' });
   lC.append(el('span', { textContent: 'Cobertura (text original)' }));
   const taC = el('textarea', { value: img.cobertura || '', placeholder: 'Enganxa aquí el text de la cobertura que apareix a la font...' });
   taC.disabled = !editingImg;
   taC.addEventListener('input', () => { img.cobertura = taC.value; });
   lC.append(taC); form.append(lC);
-
   const lN = el('label', { class: 'full' });
   lN.append(el('span', { textContent: 'Notes' }));
   const taN = el('textarea', { value: img.notes || '' });
   taN.disabled = !editingImg;
   taN.addEventListener('input', () => img.notes = taN.value);
   lN.append(taN); form.append(lN);
-
   card.append(form);
-
   if (editingImg) {
     const ov = el('div', { class: 'mr-override' });
     ov.append(el('h4', { textContent: '⚖️ Override manual de cobertura' }));
@@ -1338,23 +1259,19 @@ function renderImatges() {
     lN2.append(iN); grid.append(lN2);
     ov.append(grid); card.append(ov);
   }
-
   const diag = el('div', { class: 'mr-diag' });
   diag.append(el('h4', { textContent: 'Classificació de cobertura' }));
   diag.append(el('p', { style: 'font-size:16px' }, el('strong', { textContent: c.text })));
   if (img.override_cobertura) diag.append(el('p', { class: 'badge', textContent: '⚠️ Override aplicat' + (img.override_nota ? ' (' + img.override_nota + ')' : '') }));
   card.append(diag);
-
   card.append(el('h3', { style: 'margin-top:16px', textContent: 'Informe Chain of Title' }));
   card.append(el('div', { class: 'mr-report', textContent: textInformeImatge(img) }));
-
   if (img.id) {
     const parts = [];
     if (img.created_by) parts.push('Creat per ' + img.created_by);
     if (img.updated_by) parts.push('Modificat per ' + img.updated_by);
     if (parts.length) card.append(el('div', { class: 'mr-audit', textContent: '🔍 ' + parts.join(' · ') }));
   }
-
   app.append(card);
 }
 
@@ -1362,9 +1279,9 @@ function mostraImportador() {
   const app = $('#app');
   const card = el('div', { class: 'card' });
   card.append(el('h2', { textContent: '📥 Importar imatges des d\'Excel' }));
-  card.append(el('div', { class: 'badge', textContent: 'Enganxa aquí les files del teu Excel (amb la fila de capçalera). Detecto automàticament les columnes: títol, link procedència, cobertura, any, tipus, autor, notes, etiquetes.' }));
+  card.append(el('div', { class: 'badge', textContent: 'Enganxa aquí les files del teu Excel (amb la fila de capçalera). Detecto automàticament les columnes: títol, link procedència, cobertura/llicència, any, tipus, autor/atribució, notes, etiquetes.' }));
   const box = el('div', { class: 'img-import' });
-  const ta = el('textarea', { placeholder: 'títol\tlink procedència\tcobertura\tany\ttipus\tautor\tnotes\nLi-Chang\thttps://...\tDomini públic\t1922\tfoto\tAnònim\t...' });
+  const ta = el('textarea', { placeholder: 'TITOL\tLINK\tLLICENCIA\tATRIBUCIO\nLi-Chang\thttps://...\tDomini públic\tAnònim' });
   box.append(ta);
   card.append(box);
   const row = el('div', { class: 'row' });
@@ -1375,22 +1292,99 @@ function mostraImportador() {
   app.append(card);
 }
 
-// ==================== CRÈDITS ====================
+function textCreditsFinals() {
+  if (!credits.length) return creditFrase + '\n\n(sense crèdits)';
+  const arxius = new Set();
+  credits.forEach(c => { const a = (c.arxiu || '').trim(); if (a) arxius.add(a); });
+  const arxiusOrdenats = Array.from(arxius).sort((a, b) => a.localeCompare(b, 'ca'));
+  const autors = new Set();
+  credits.forEach(c => {
+    const atr = (c.atribucio || '').trim();
+    if (!atr) return;
+    if (/^an[òo]nim$/i.test(atr)) return;
+    atr.split(/\s*,\s*/).forEach(a => {
+      const net = a.trim();
+      if (net && !/^an[òo]nim$/i.test(net)) autors.add(net);
+    });
+  });
+  const arxiusSet = new Set(arxiusOrdenats.map(a => a.toLowerCase()));
+  const autorsFiltrats = Array.from(autors).filter(a => !arxiusSet.has(a.toLowerCase())).sort((a, b) => a.localeCompare(b, 'ca'));
+  const llista = arxiusOrdenats.concat(autorsFiltrats);
+  const linies = [];
+  linies.push(creditFrase);
+  linies.push('');
+  llista.forEach(a => linies.push('  ' + a));
+  return linies.join('\n');
+}
+
+function extrauArxiu(url, llicencia) {
+  const llic = (llicencia || '').toLowerCase();
+  if (/prelinger/i.test(llic)) return 'Prelinger Archives';
+  if (/eye filmmuseum/i.test(llic)) return 'Eye Filmmuseum';
+  if (/national archives/i.test(llic)) return 'National Archives';
+  if (/musée albert-kahn|musee albert-kahn/i.test(llic)) return 'Musée Albert-Kahn';
+  if (!url) return '';
+  try {
+    const u = new URL(url);
+    const h = u.hostname.replace(/^www\./, '');
+    const map = {
+      'commons.wikimedia.org': 'Wikimedia Commons',
+      'upload.wikimedia.org': 'Wikimedia Commons',
+      'archive.org': 'Internet Archive',
+      'bne.es': 'Biblioteca Nacional de España',
+      'bdh.bne.es': 'Biblioteca Digital Hispánica (BNE)',
+      'europeana.eu': 'Europeana',
+      'loc.gov': 'Library of Congress',
+      'flickr.com': 'Flickr Commons',
+      'youtube.com': 'YouTube',
+      'vimeo.com': 'Vimeo'
+    };
+    for (const k in map) if (h.includes(k)) return map[k];
+    return h;
+  } catch(e) { return ''; }
+}
+
+function textCreditsInforme() {
+  const linia = '===========================================================';
+  const liniaCurta = '-----------------------------------------------------------';
+  const avui = new Date();
+  const out = [
+    linia, 'BADALONA COMUNICACIÓ · INFORME COMPLET DE CRÈDITS',
+    'Documental "Darrere el drac"', linia,
+    'Data: ' + avui.toLocaleDateString('ca-ES'),
+    'Generat per: ' + me,
+    'Total crèdits: ' + credits.length,
+    'Frase global: "' + creditFrase + '"', '',
+    'DOCUMENT FINAL DE CRÈDITS (per a la pantalla)', liniaCurta,
+    textCreditsFinals(), '',
+    'DETALL INTERN', liniaCurta
+  ];
+  credits.forEach((c, i) => {
+    out.push((i+1) + '. ' + (c.arxiu || '—'));
+    out.push('   Atribució: ' + (c.atribucio || '—'));
+    out.push('   Tipus: ' + (c.tipus || 'imatge'));
+    if (c.titol) out.push('   Títol: ' + c.titol);
+    if (c.any_text) out.push('   Any: ' + c.any_text);
+    if (c.frase) out.push('   Frase pròpia: ' + c.frase);
+    if (c.nota) out.push('   Nota: ' + c.nota);
+    out.push('');
+  });
+  out.push(linia);
+  return out.join('\n');
+}
+
 function renderCredits() {
   const app = $('#app'); app.innerHTML = '';
-
   if (!currentCredit) {
     const card = el('div', { class: 'card' });
     card.append(el('div', { class: 'row', style: 'justify-content:space-between;align-items:center;margin:0' }, [
       el('h2', { textContent: '📜 Crèdits del documental', style: 'margin:0' }),
       el('div', { class: 'row', style: 'margin:0' }, [
-        el('button', { class: 'btn', textContent: '🔄 Autogenerar', title: 'Autogenerar crèdits des de música i imatges', onclick: () => autoGeneraCredits() }),
+        el('button', { class: 'btn', textContent: '🔄 Autogenerar', onclick: () => autoGeneraCredits() }),
         el('button', { class: 'btn p', textContent: '+ Nou crèdit', onclick: () => nouCredit() })
       ])
     ]));
     card.append(el('div', { class: 'badge', style: 'margin-top:6px', textContent: 'Llista de crèdits que apareixeran al final del documental.' }));
-
-    // Frase global
     const fraseBar = el('div', { class: 'cred-frase-bar' });
     fraseBar.append(el('label', { textContent: 'Frase global:' }));
     const inpF = el('input', { type: 'text', value: creditFrase });
@@ -1398,7 +1392,6 @@ function renderCredits() {
     inpF.addEventListener('change', () => saveCreditFrase());
     fraseBar.append(inpF);
     card.append(fraseBar);
-
     if (!credits.length) {
       card.append(el('div', { class: 'agenda-empty', textContent: 'Cap crèdit encara. Prem "🔄 Autogenerar" per crear-los a partir dels registres de música i imatges.' }));
     } else {
@@ -1406,7 +1399,7 @@ function renderCredits() {
       credits.forEach((cr, idx) => {
         const row = el('div', { class: 'cred-row' });
         row.setAttribute('draggable', 'true');
-        const handle = el('span', { class: 'drag-handle', textContent: '⋮⋮', title: 'Arrossega per reordenar' });
+        const handle = el('span', { class: 'drag-handle', textContent: '⋮⋮' });
         row.append(handle);
         const main = el('div');
         main.append(el('div', { class: 'cred-main', textContent: (idx+1) + '. ' + (cr.arxiu || '(sense arxiu)') + (cr.atribucio ? ' — ' + cr.atribucio : '') + (cr.any_text ? ' (' + cr.any_text + ')' : '') }));
@@ -1432,17 +1425,12 @@ function renderCredits() {
           const [it] = credits.splice(from, 1);
           credits.splice(idx, 0, it);
           credits.forEach((c,i) => c.ordre = i);
-          // Desa els canvis
-          for (const c of credits) {
-            await db.from('credits').update({ ordre: c.ordre }).eq('id', c.id);
-          }
+          for (const c of credits) { await db.from('credits').update({ ordre: c.ordre }).eq('id', c.id); }
           render();
         });
         list.append(row);
       });
       card.append(list);
-
-      // Preview i exports
       card.append(el('h3', { style: 'margin-top:18px', textContent: 'Vista prèvia del document de crèdits' }));
       card.append(el('div', { class: 'cred-preview', textContent: textCreditsFinals() }));
       const row = el('div', { class: 'row' });
@@ -1456,8 +1444,6 @@ function renderCredits() {
     app.append(card);
     return;
   }
-
-  // --- FITXA d'un crèdit ---
   const cr = currentCredit;
   const card = el('div', { class: 'card' });
   const top = el('div', { class: 'row', style: 'justify-content:space-between;align-items:center;margin:0 0 12px' });
@@ -1465,7 +1451,6 @@ function renderCredits() {
   top.append(el('button', { class: 'btn p', textContent: '💾 Desar', onclick: async () => { await desaCredit(cr); render(); } }));
   card.append(top);
   card.append(el('h2', { textContent: cr.arxiu || 'Nou crèdit' }));
-
   const form = el('div', { class: 'mr-form' });
   const camp = (label, key, ph) => {
     const l = el('label');
@@ -1475,7 +1460,7 @@ function renderCredits() {
     l.append(inp); return l;
   };
   form.append(camp('Arxiu base', 'arxiu', 'Biblioteca Nacional de España'));
-  form.append(camp('Atribució (autor)', 'atribucio', 'Anònim, Josep Maria Sagarra...'));
+  form.append(camp('Atribució (autor)', 'atribucio', 'Anònim, Georges Méliès...'));
   form.append(camp('Títol (opcional)', 'titol'));
   form.append(camp('Any (opcional)', 'any_text', '1922'));
   const lT = el('label');
@@ -1485,7 +1470,7 @@ function renderCredits() {
   ].map(([v,l]) => el('option', { value: v, textContent: l, selected: (cr.tipus || 'imatge') === v }))));
   form.append(lT);
   const lF = el('label', { class: 'full' });
-  lF.append(el('span', { textContent: 'Frase pròpia (opcional; si buida s\'aplica la global)' }));
+  lF.append(el('span', { textContent: 'Frase pròpia (opcional)' }));
   const iF = el('input', { type: 'text', value: cr.frase || '', placeholder: 'Deixa buit per usar la frase global' });
   iF.addEventListener('input', () => cr.frase = iF.value);
   lF.append(iF); form.append(lF);
@@ -1495,7 +1480,6 @@ function renderCredits() {
   taN.addEventListener('input', () => cr.nota = taN.value);
   lN.append(taN); form.append(lN);
   card.append(form);
-
   card.append(el('div', { class: 'mr-diag', style: 'margin-top:14px' }, [
     el('h4', { textContent: 'Aparició al document' }),
     el('p', { textContent: 'Aquesta línia sortirà així al document final de crèdits:' }),
@@ -1537,10 +1521,8 @@ async function desaCredit(cr) {
 async function autoGeneraCredits() {
   const existents = new Set(credits.map(c => (c.arxiu||'').toLowerCase() + '|' + (c.atribucio||'').toLowerCase()));
   const nous = [];
-
-  // Des de música: agafem les que tinguin autor o font (link)
   musicRights.forEach(m => {
-    const arxiu = extrauArxiu(m.link_descarga) || 'Arxiu musical';
+    const arxiu = extrauArxiu(m.link_descarga, m.referencia) || 'Arxiu musical';
     const atrib = m.autor || 'Anònim';
     const key = arxiu.toLowerCase() + '|' + atrib.toLowerCase();
     if (existents.has(key)) return;
@@ -1556,10 +1538,8 @@ async function autoGeneraCredits() {
       created_by: me, updated_by: me
     });
   });
-
-  // Des d'imatges: només les aprovades
   imageRights.filter(i => (i.estat_intern || '') === 'aprovada').forEach(img => {
-    const arxiu = extrauArxiu(img.link_procedencia) || 'Arxiu d\'imatge';
+    const arxiu = extrauArxiu(img.link_procedencia, img.cobertura) || 'Arxiu d\'imatge';
     const atrib = img.autor || 'Anònim';
     const key = arxiu.toLowerCase() + '|' + atrib.toLowerCase();
     if (existents.has(key)) return;
@@ -1575,8 +1555,7 @@ async function autoGeneraCredits() {
       created_by: me, updated_by: me
     });
   });
-
-  if (!nous.length) { alert('No hi ha res nou per afegir. O bé les imatges no estan marcades com "Aprovada".'); return; }
+  if (!nous.length) { alert('No hi ha res nou per afegir. Assegura\'t que les imatges estan marcades com "Aprovada".'); return; }
   if (!confirm('Afegir ' + nous.length + ' crèdits nous a partir de música i imatges aprovades?')) return;
   const r = await db.from('credits').insert(nous).select();
   if (r.error) { alert('Error: ' + r.error.message); return; }
@@ -1585,89 +1564,21 @@ async function autoGeneraCredits() {
   render();
 }
 
-function extrauArxiu(url) {
-  if (!url) return '';
-  try {
-    const u = new URL(url);
-    const h = u.hostname.replace(/^www\./, '');
-    const map = {
-      'commons.wikimedia.org': 'Wikimedia Commons',
-      'archive.org': 'Internet Archive',
-      'bne.es': 'Biblioteca Nacional de España',
-      'bdh.bne.es': 'Biblioteca Digital Hispánica (BNE)',
-      'europeana.eu': 'Europeana',
-      'loc.gov': 'Library of Congress',
-      'flickr.com': 'Flickr Commons',
-      'youtube.com': 'YouTube',
-      'vimeo.com': 'Vimeo'
-    };
-    for (const k in map) if (h.includes(k)) return map[k];
-    return h;
-  } catch(e) { return ''; }
-}
-
-function textCreditsFinals() {
-  if (!credits.length) return creditFrase + '\n\n(sense crèdits)';
-  const linies = credits.map((c, i) => {
-    const frase = c.frase || '';
-    const base = (c.arxiu || '') + (c.atribucio ? ' — ' + c.atribucio : '') + (c.any_text ? ' (' + c.any_text + ')' : '');
-    return '  ' + (i+1) + '. ' + (frase ? frase + ' ' + base : base);
-  });
-  return creditFrase + '\n\n' + linies.join('\n');
-}
-
-function textCreditsInforme() {
-  const linia = '===========================================================';
-  const liniaCurta = '-----------------------------------------------------------';
-  const avui = new Date();
-  const out = [
-    linia, 'BADALONA COMUNICACIÓ · INFORME COMPLET DE CRÈDITS',
-    'Documental "Darrere el drac"', linia,
-    'Data: ' + avui.toLocaleDateString('ca-ES'),
-    'Generat per: ' + me,
-    'Total crèdits: ' + credits.length,
-    'Frase global: "' + creditFrase + '"',
-    '',
-    'DOCUMENT FINAL DE CRÈDITS (per a la pantalla)', liniaCurta,
-    textCreditsFinals(),
-    '',
-    'DETALL INTERN', liniaCurta
-  ];
-  credits.forEach((c, i) => {
-    out.push((i+1) + '. ' + (c.arxiu || '—'));
-    out.push('   Atribució: ' + (c.atribucio || '—'));
-    out.push('   Tipus: ' + (c.tipus || 'imatge'));
-    if (c.titol) out.push('   Títol: ' + c.titol);
-    if (c.any_text) out.push('   Any: ' + c.any_text);
-    if (c.frase) out.push('   Frase pròpia: ' + c.frase);
-    if (c.nota) out.push('   Nota: ' + c.nota);
-    out.push('');
-  });
-  out.push(linia);
-  return out.join('\n');
-}
-// ==================== TASQUES ====================
 function renderTasks(s) {
   const t = el('div', { class: 'card' }, el('h3', { textContent: 'Tasques' }));
   (s.tasks || []).forEach((k, i) => {
     const row = el('div', { class: 'task' + (k.done ? ' done' : '') });
     row.append(el('input', { type: 'checkbox', checked: k.done, onchange: e => { k.done = e.target.checked; save(s); render(); } }));
     if (editing) {
-      row.append(el('input', { type: 'text', value: k.t, style: 'flex:1;min-width:180px', placeholder: 'Descripció de la tasca', oninput: e => { k.t = e.target.value; save(s); } }));
+      row.append(el('input', { type: 'text', value: k.t, style: 'flex:1;min-width:180px', placeholder: 'Descripció', oninput: e => { k.t = e.target.value; save(s); } }));
       row.append(sel(k));
       row.append(el('span', { class: 'badge', textContent: 'Inici:' }));
-      row.append(el('input', { type: 'date', value: k.d || '', oninput: e => {
-        if (e.target.value && blockedDays[e.target.value]) { alert('🔒 Dia bloquejat.'); e.target.value=''; k.d=''; return; }
-        k.d = e.target.value; save(s);
-      } }));
+      row.append(el('input', { type: 'date', value: k.d || '', oninput: e => { if (e.target.value && blockedDays[e.target.value]) { alert('🔒 Dia bloquejat.'); e.target.value=''; k.d=''; return; } k.d = e.target.value; save(s); } }));
       row.append(el('span', { class: 'badge', textContent: 'Fi:' }));
-      row.append(el('input', { type: 'date', value: k.df || '', oninput: e => {
-        if (e.target.value && blockedDays[e.target.value]) { alert('🔒 Dia bloquejat.'); e.target.value=''; k.df=''; return; }
-        k.df = e.target.value; save(s);
-      } }));
+      row.append(el('input', { type: 'date', value: k.df || '', oninput: e => { if (e.target.value && blockedDays[e.target.value]) { alert('🔒 Dia bloquejat.'); e.target.value=''; k.df=''; return; } k.df = e.target.value; save(s); } }));
       row.append(el('input', { type: 'time', value: k.h || '', oninput: e => { k.h = e.target.value; save(s); } }));
       row.append(el('button', { class: 'x', textContent: '×', onclick: () => { s.tasks.splice(i, 1); save(s); render(); } }));
-      row.append(el('textarea', { value: k.n || '', placeholder: 'Notes de la tasca', style: 'width:100%;min-height:50px;font-size:13px;margin-top:4px', oninput: e => { k.n = e.target.value; save(s); } }));
+      row.append(el('textarea', { value: k.n || '', placeholder: 'Notes', style: 'width:100%;min-height:50px;font-size:13px;margin-top:4px', oninput: e => { k.n = e.target.value; save(s); } }));
       const checks = el('div', { class: 'people-checks', style: 'width:100%' });
       checks.append(el('span', { class: 'badge', textContent: 'Assignar a:' }));
       peopleNames().forEach(n => {
@@ -1697,7 +1608,7 @@ function renderTasks(s) {
       const persons = tasquesPersones(k);
       if (persons.length) row.append(el('span', { class: 'pp', textContent: '👤 ' + persons.join(', ') }));
       if (k.n) row.append(el('div', { class: 'task-notes', textContent: '📒 ' + k.n }));
-      if (persons.length) row.append(el('button', { class: 'btn email', textContent: '📧 Enviar convocatòria', onclick: () => enviaConvocatoria(k, s) }));
+      if (persons.length) row.append(el('button', { class: 'btn email', textContent: '📧 Convocatòria', onclick: () => enviaConvocatoria(k, s) }));
     }
     t.append(row);
   });
@@ -1739,7 +1650,6 @@ async function enviaConvocatoria(k, s) {
   } catch (e) { alert('Error inesperat: ' + e.message); }
 }
 
-// ==================== PRESSUPOST ====================
 function mouPartidaA(s, from, to) {
   if (from === to) return;
   if (from < 0 || from >= s.budget.length) return;
@@ -1756,7 +1666,6 @@ function renderBudget(s) {
   s.budget.forEach((p, i) => { if (typeof p.pos !== 'number') { p.pos = i; calDesar = true; } });
   s.budget.sort((a, b) => (a.pos || 0) - (b.pos || 0));
   if (calDesar) save(s);
-
   const wrap = el('div', { class: 'card' });
   wrap.append(el('div', { class: 'row', style: 'justify-content:space-between;margin:0 0 8px;align-items:center' }, [
     el('h3', { textContent: 'Full de pressupost', style: 'margin:0' }),
@@ -1770,10 +1679,8 @@ function renderBudget(s) {
       editing ? el('button', { class: 'btn', textContent: '+ Nova partida', onclick: () => { s.budget.push({ c:'', cat:'Altres', p:0, st:'pendent', exp:[], pos: s.budget.length }); save(s); render(); } }) : ''
     ].filter(Boolean))
   ].filter(Boolean)));
-
   if (!s.budget.length) { wrap.append(el('div', { class: 'badge', textContent: 'Cap partida.' })); return wrap; }
   if (editing) wrap.append(el('div', { class: 'badge', style: 'margin-bottom:8px', textContent: '💡 Arrossega el ⋮⋮ per reordenar.' }));
-
   const list = el('div', { class: 'bud-list' });
   list.append(el('div', { class: 'bud-head' }, [
     el('div'), el('div', { textContent: 'Concepte' }),
@@ -1783,12 +1690,10 @@ function renderBudget(s) {
     el('div', { class: 'hide-s', textContent: 'Estat' }),
     el('div')
   ]));
-
   s.budget.forEach((p, idx) => {
     const open = !!openBud[idx];
     const real = realOf(p);
     const row = el('div', { class: 'bud-row' + (open ? ' open' : '') });
-
     const cellCaret = el('div', { class: 'bc-caret' });
     if (editing) {
       const handle = el('span', { class: 'drag-handle', textContent: '⋮⋮', draggable: 'true' });
@@ -1798,7 +1703,6 @@ function renderBudget(s) {
     }
     cellCaret.append(el('button', { class: 'caret' + (open ? ' open' : ''), textContent: '▶', onclick: () => { openBud[idx] = !openBud[idx]; render(); } }));
     row.append(cellCaret);
-
     if (editing) {
       row.append(el('div', {}, el('input', { type: 'text', value: p.c, oninput: e => { p.c = e.target.value; save(s); } })));
       row.append(el('div', { class: 'hide-s' }, el('select', { onchange: e => { p.cat = e.target.value; save(s); } }, CATS.map(c => el('option', { value: c, textContent: c, selected: (p.cat || 'Altres') === c })))));
@@ -1815,7 +1719,6 @@ function renderBudget(s) {
       row.append(el('div', { class: 'hide-s' }, el('span', { class: 'st-pill ' + stClass(p.st), textContent: stLabel(p.st) })));
     }
     row.append(el('div', { class: 'bc-x' }, editing ? el('button', { class: 'x', textContent: '×', onclick: () => { if (confirm('Eliminar?')) { s.budget.splice(idx, 1); s.budget.forEach((q,i)=>q.pos=i); save(s); render(); } } }) : ''));
-
     if (editing) {
       row.addEventListener('dragover', (ev) => { ev.preventDefault(); row.classList.add('drop-target'); });
       row.addEventListener('dragleave', () => row.classList.remove('drop-target'));
@@ -1825,9 +1728,7 @@ function renderBudget(s) {
         if (!isNaN(from)) mouPartidaA(s, from, idx);
       });
     }
-
     list.append(row);
-
     if (open) {
       const box = el('div', { class: 'exp-box' });
       (p.exp || []).forEach((e, ei) => {
@@ -1844,13 +1745,12 @@ function renderBudget(s) {
         }
         box.append(item);
       });
-      if (!(p.exp || []).length) box.append(el('div', { class: 'badge', textContent: 'Cap despesa apuntada.' }));
+      if (!(p.exp || []).length) box.append(el('div', { class: 'badge', textContent: 'Cap despesa.' }));
       if (editing) box.append(el('button', { class: 'btn s', textContent: '+ Afegir despesa', onclick: () => { p.exp = p.exp || []; p.exp.push({ d:'', t:'', a:0 }); save(s); render(); } }));
       list.append(box);
     }
   });
   wrap.append(list);
-
   const totalP = s.budget.reduce((a, p) => a + (Number(p.p) || 0), 0);
   const totalR = s.budget.reduce((a, p) => a + realOf(p), 0);
   const diff = totalR - totalP;
@@ -1864,7 +1764,6 @@ function renderBudget(s) {
   return wrap;
 }
 
-// ==================== DOCUMENTS (amb àudio + timestamps) ====================
 function renderDocsUI() { if (currentDoc) return renderDocEditor(); return renderDocsList(); }
 
 function renderDocsList() {
@@ -1874,11 +1773,9 @@ function renderDocsList() {
     el('button', { class: 'btn p', textContent: '+ Nou document', onclick: () => nouDocument() })
   ]));
   if (!docs.length) { card.append(el('div', { class: 'badge', textContent: 'Cap document encara.' })); return card; }
-
   const grouped = {};
   FOLDERS.forEach(f => grouped[f] = []);
   docs.forEach(d => { const folder = FOLDERS.includes(d.folder) ? d.folder : 'Altres'; if (!grouped[folder]) grouped[folder] = []; grouped[folder].push(d); });
-
   Object.keys(grouped).forEach(folder => {
     const list = grouped[folder];
     if (!list.length) return;
@@ -1914,9 +1811,7 @@ function renderDocEditor() {
   rightB.append(el('button', { class: 'btn p', textContent: '📄 PDF', onclick: () => descarregaPDF(d) }));
   bar.append(rightB);
   card.append(bar);
-
   card.append(el('input', { type: 'text', value: d.title || 'Sense títol', placeholder: 'Títol', style: 'font-size:20px;font-weight:700;font-family:Georgia,serif;margin-bottom:10px', oninput: e => { d.title = e.target.value; saveDoc(d); } }));
-
   let audioEl = null;
   if (d.audio_path) {
     const box = el('div', { class: 'audio-box' });
@@ -1929,7 +1824,6 @@ function renderDocEditor() {
       audioEl.src = data.signedUrl;
     })();
   }
-
   const tb = el('div', { class: 'rich-toolbar' });
   [['B','bold'],['I','italic'],['U','underline'],['S','strikeThrough'],['H1','formatBlock','h1'],['H2','formatBlock','h2'],['¶','formatBlock','p'],['•','insertUnorderedList'],['1.','insertOrderedList'],['"','formatBlock','blockquote'],['🔗','createLink'],['↶','undo'],['↷','redo']].forEach(([l, cmd, v]) => {
     tb.append(el('button', { textContent: l, onclick: (e) => { e.preventDefault(); document.execCommand(cmd, false, v || null); saveEditorContent(d); } }));
@@ -1939,7 +1833,6 @@ function renderDocEditor() {
     tb.append(el('button', { textContent: '▶️', onclick: (e) => { e.preventDefault(); if (!audioEl || !audioEl.src) return; if (audioEl.paused) audioEl.play(); else audioEl.pause(); } }));
   }
   card.append(tb);
-
   const ed = el('div', { class: 'rich-editor', contentEditable: 'true' });
   ed.innerHTML = d.content || '';
   ed.addEventListener('input', () => { d.content = ed.innerHTML; saveDoc(d); });
@@ -2045,7 +1938,6 @@ function dataRelativa(isoStr) {
   return d.toLocaleDateString('ca-ES');
 }
 
-// ==================== FITXERS ====================
 function fileKind(mime, name) {
   if (!mime && name) mime = name.split('.').pop().toLowerCase();
   if (typeof mime === 'string') {
@@ -2083,7 +1975,6 @@ function renderFiles(s) {
   });
   card.append(grid); return card;
 }
-
 async function pujaFitxer(s) {
   const input = el('input', { type: 'file', style: 'display:none' });
   input.addEventListener('change', async () => {
@@ -2111,7 +2002,6 @@ async function obreFitxer(f) {
   if (error) { alert('Error: ' + error.message); return; }
   window.open(data.signedUrl, '_blank');
 }
-
 async function transcriuAudio(f, s, ev) {
   if (!confirm('Transcriure amb IA?')) return;
   const btn = ev && ev.target ? ev.target : null;
@@ -2149,7 +2039,6 @@ async function transcriuAudio(f, s, ev) {
   finally { if (btn) { btn.disabled = false; btn.textContent = '🎤 Transcriure'; } }
 }
 
-// ==================== VISIÓ GENERAL ====================
 function renderOverview() {
   const wrap = el('div');
   const today = iso(new Date());
@@ -2159,7 +2048,6 @@ function renderOverview() {
   const properes = all.filter(x => !x.k.d || x.k.d >= today);
   const entrevistes = properes.filter(x => (x.k.k || '') === 'Entrevista').slice(0, 8);
   const altres = properes.filter(x => (x.k.k || '') !== 'Entrevista').slice(0, 20);
-
   const c1 = el('div', { class: 'card' }, el('h3', { textContent: '🎤 Properes entrevistes' }));
   if (!entrevistes.length) c1.append(el('div', { class: 'agenda-empty', textContent: 'Cap.' }));
   entrevistes.forEach(({ k, sec }) => {
@@ -2170,7 +2058,6 @@ function renderOverview() {
     ]));
   });
   wrap.append(c1);
-
   const c2 = el('div', { class: 'card' }, el('h3', { textContent: '📅 Properes tasques' }));
   if (!altres.length) c2.append(el('div', { class: 'agenda-empty', textContent: 'Cap.' }));
   altres.forEach(({ k, sec }) => {
@@ -2181,7 +2068,6 @@ function renderOverview() {
     ]));
   });
   wrap.append(c2);
-
   const bsec = secs.find(x => isBudgetSec(x));
   const c3 = el('div', { class: 'card', style: 'cursor:pointer', onclick: () => { if (bsec) goto(bsec.id); } },
     el('div', { class: 'row', style: 'justify-content:space-between;margin:0 0 10px' }, [el('h3', { textContent: '💰 Pressupost', style: 'margin:0' }), el('div', { class: 'badge', textContent: 'Veure →' })]));
@@ -2197,7 +2083,6 @@ function renderOverview() {
   return wrap;
 }
 
-// ==================== GANTT ====================
 function renderGantt() {
   const app = $('#app'); app.innerHTML = '';
   const tasques = [];
@@ -2209,7 +2094,6 @@ function renderGantt() {
   }));
   if (!tasques.length) { app.append(el('div', { class: 'card' }, el('div', { class: 'badge', textContent: 'Cap tasca amb data.' }))); return; }
   tasques.sort((a, b) => a.inici.localeCompare(b.inici));
-
   const avuiStr = avuiISO();
   let primera = new Date(tasques[0].inici + 'T00:00:00');
   let ultima = new Date(tasques[tasques.length - 1].fi + 'T00:00:00');
@@ -2220,11 +2104,9 @@ function renderGantt() {
   const dies = []; const cur = new Date(inici);
   while (cur <= fi) { dies.push(new Date(cur)); cur.setDate(cur.getDate() + 1); }
   const total = dies.length;
-
   const wrap = el('div', { class: 'card' });
   wrap.append(el('h2', { textContent: '📊 Diagrama de Gantt' }));
   const gantt = el('div', { class: 'gantt', style: 'grid-template-columns:240px repeat(' + total + ',minmax(24px,1fr))' });
-
   let mesA = -1, cntMes = 0; const mesCells = [];
   dies.forEach((d, idx) => {
     if (d.getMonth() !== mesA) { if (cntMes > 0) mesCells.push({ span: cntMes, text: mesos[mesA] + ' ' + dies[idx-1].getFullYear() }); mesA = d.getMonth(); cntMes = 1; } else cntMes++;
@@ -2238,7 +2120,6 @@ function renderGantt() {
     const td = iso(d) === avuiStr;
     gantt.append(el('div', { class: 'gantt-head' + (wkd ? ' weekend' : '') + (td ? ' today' : ''), textContent: String(d.getDate()) }));
   });
-
   tasques.forEach(({ tasca, seccio, inici, fi, auto }) => {
     gantt.append(el('div', { class: 'gantt-label', title: seccio.name, textContent: tasca.t || '(sense títol)' }));
     const si = dies.findIndex(d => iso(d) === inici);
@@ -2255,12 +2136,10 @@ function renderGantt() {
       gantt.append(c);
     }
   });
-
   const scroll = el('div', { class: 'gantt-wrap' }); scroll.append(gantt); wrap.append(scroll);
   app.append(wrap);
 }
 
-// ==================== CALENDARI ====================
 function renderCal() {
   const app = $('#app'); app.innerHTML = '';
   const by = {}; secs.forEach(s => (s.tasks || []).forEach(k => { if (k.d) (by[k.d] = by[k.d] || []).push({ k, s }); }));
@@ -2287,7 +2166,6 @@ function renderCal() {
   app.append(el('div', { class: 'row' }, KINDS.map((n, i) => el('span', { class: 'chip k' + i, textContent: n }))));
 }
 
-// ==================== CERCADOR ====================
 function inicialitzaCercador() {
   const input = $('#search-input'), results = $('#search-results');
   if (!input || !results) return;
@@ -2298,7 +2176,6 @@ function inicialitzaCercador() {
   });
   document.addEventListener('click', (e) => { if (!e.target.closest('.search-wrap')) results.classList.remove('open'); });
 }
-
 function cercaGlobal(q) {
   const r = { tasques: [], documents: [], fitxers: [], drets: [], imatges: [], credits: [] };
   secs.forEach(s => (s.tasks || []).forEach(k => {
@@ -2326,7 +2203,6 @@ function cercaGlobal(q) {
   });
   return r;
 }
-
 function mostraResultats(r) {
   const box = $('#search-results'); box.innerHTML = '';
   const total = r.tasques.length + r.documents.length + r.fitxers.length + r.drets.length + r.imatges.length + r.credits.length;
@@ -2351,7 +2227,6 @@ function mostraResultats(r) {
   box.classList.add('open');
 }
 
-// ==================== INICI ====================
 async function start(user) {
   me = user.email;
   $('#login').hidden = true; $('#ui').hidden = false;
