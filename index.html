@@ -166,6 +166,8 @@ input[type=time]{padding:6px;width:auto}
 .img-actions .btn{flex:1;padding:4px 6px;font-size:12px}
 .img-import{background:var(--bg);border:1px dashed var(--bd);border-radius:10px;padding:14px;margin-top:12px}
 .img-import textarea{width:100%;min-height:140px;font:13px/1.4 ui-monospace,monospace}
+.img-pill{display:inline-block;font-size:11px;padding:2px 8px;border-radius:999px;color:#fff}
+.img-pill.ok{background:#2e9e5b}.img-pill.warn{background:#c47b1f}.img-pill.ko{background:#c0392b}.img-pill.unk{background:#a39c8f}
 .cred-list{display:grid;grid-template-columns:1fr;gap:6px;margin-top:12px}
 .cred-row{background:var(--bg);border:1px solid var(--bd);border-radius:8px;padding:10px 12px;display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center}
 .cred-row.dragging{opacity:.35}
@@ -314,7 +316,8 @@ let filtreImg = { text: '', cobertura: 'totes', estat: 'tots', tipus: 'tots' };
 let credits = [];
 let currentCredit = null;
 let editingCredit = false;
-let creditFrase = 'Fotografies i material d\'arxiu:';
+let creditFraseImatges = 'Fotografies i material d\'arxiu cortesia de:';
+let creditFraseMusica = 'Música cortesia de:';
 
 function save(s) {
   if (!s || !s.id) return;
@@ -330,8 +333,8 @@ async function savePeople() {
   if (r.error) { console.error('Error guardant people:', r.error); alert('Error: ' + r.error.message); }
 }
 async function saveCreditFrase() {
-  const r = await db.from('settings').upsert({ id: 1, credit_frase: creditFrase });
-  if (r.error) console.error('Error guardant frase:', r.error);
+  const r = await db.from('settings').upsert({ id: 1, credit_frase_imatges: creditFraseImatges, credit_frase_musica: creditFraseMusica });
+  if (r.error) console.error('Error guardant frases:', r.error);
 }
 
 async function carregaBlocks() {
@@ -489,7 +492,6 @@ function textInforme(c) {
     'Informe de cadena de drets (Chain of Title)', linia,
     'Referència interna: ' + (c.referencia || '—'),
     'Data de generació: ' + dataGen + ' a les ' + horaGen,
-    'Generat per: ' + (me || '—'),
     '', 'DADES DE L\'OBRA', liniaCurta,
     'Títol: "' + (c.titulo || '—') + '"',
     'Intèrpret/Versió: ' + (c.interprete || '—'),
@@ -533,7 +535,7 @@ function textInformeAgregat(cancions) {
   const cap = [
     linia, 'BADALONA COMUNICACIÓ · INFORME AGREGAT DE DRETS MUSICALS',
     'Documental "Darrere el drac"', linia,
-    'Data: ' + dataGen, 'Generat per: ' + me, 'Total cançons: ' + cancions.length, '',
+    'Data: ' + dataGen, 'Total cançons: ' + cancions.length, '',
     'RESUM EXECUTIU', liniaCurta,
     '✅ Aptes: ' + aptes, '⚠️ Només SGAE: ' + sgae,
     '⚠️ Només màster: ' + master, '❌ Negociació completa: ' + negociar,
@@ -570,7 +572,7 @@ function textResumAgregat(cancions) {
   const out = [
     linia, 'BADALONA COMUNICACIÓ · RESUM DE DRETS MUSICALS',
     'Documental "Darrere el drac"', linia,
-    'Data: ' + avui.toLocaleDateString('ca-ES'), 'Generat per: ' + me,
+    'Data: ' + avui.toLocaleDateString('ca-ES'),
     'Total cançons: ' + cancions.length, '',
     'RESUM EXECUTIU', liniaCurta,
     '✅ Aptes: ' + aptes, '⚠️ Només SGAE: ' + sgae,
@@ -1016,7 +1018,7 @@ function textInformeImatge(img) {
     linia, 'BADALONA COMUNICACIÓ · CONTROL DE DRETS D\'IMATGE',
     'Informe de cadena de drets (Chain of Title)', linia,
     'Data: ' + avui.toLocaleDateString('ca-ES', { day: '2-digit', month: 'long', year: 'numeric' }),
-    'Generat per: ' + me, '',
+    '',
     'DADES DE LA IMATGE', liniaCurta,
     'Títol: "' + (img.titol || '—') + '"',
     'Autor/Fotògraf: ' + (img.autor || '—'),
@@ -1046,26 +1048,80 @@ function textInformeImatgesAgregat(imgs) {
   const avui = new Date();
   const cnt = { ok:0, warn:0, ko:0, unk:0 };
   imgs.forEach(i => { const c = classificaCobertura(i.cobertura, i.override_cobertura).estat; cnt[c] = (cnt[c]||0)+1; });
-  const cap = [
-    linia, 'BADALONA COMUNICACIÓ · INFORME AGREGAT DE DRETS D\'IMATGE',
-    'Documental "Darrere el drac"', linia,
-    'Data: ' + avui.toLocaleDateString('ca-ES'), 'Generat per: ' + me,
-    'Total imatges: ' + imgs.length, '',
-    'RESUM EXECUTIU', liniaCurta,
-    '🟢 Lliures: ' + cnt.ok,
-    '🟡 CC (atribució): ' + cnt.warn,
-    '🔴 Protegides: ' + cnt.ko,
-    '⚪ Desconegudes: ' + cnt.unk, '',
-    'LLISTAT DE REFERÈNCIES', liniaCurta
-  ];
+
+  const procedencia = {};
+  imgs.forEach(i => {
+    const arxiu = extrauArxiu(i.link_procedencia, i.cobertura) || 'Desconegut';
+    procedencia[arxiu] = (procedencia[arxiu] || 0) + 1;
+  });
+  const procedenciaOrdenada = Object.entries(procedencia).sort((a, b) => b[1] - a[1]);
+
+  const out = [];
+
+  out.push(linia);
+  out.push('BADALONA COMUNICACIÓ · INFORME AGREGAT DE DRETS D\'IMATGE');
+  out.push('Documental "Darrere el drac"');
+  out.push(linia);
+  out.push('Data: ' + avui.toLocaleDateString('ca-ES', { day: '2-digit', month: 'long', year: 'numeric' }));
+  out.push('Total imatges: ' + imgs.length);
+  out.push('');
+
+  out.push('ÍNDEX');
+  out.push(liniaCurta);
+  out.push('  1. Resum executiu');
+  out.push('  2. Guia de cobertures legals');
+  out.push('  3. Resum per procedència');
+  out.push('  4. Llistat de referències');
+  out.push('  5. Fitxes individuals (' + imgs.length + ')');
+  out.push('');
+
+  out.push('1. RESUM EXECUTIU');
+  out.push(liniaCurta);
+  out.push('🟢 Lliures: ' + cnt.ok);
+  out.push('🟡 CC (atribució): ' + cnt.warn);
+  out.push('🔴 Protegides: ' + cnt.ko);
+  out.push('⚪ Desconegudes: ' + cnt.unk);
+  out.push('');
+
+  out.push('2. GUIA DE COBERTURES LEGALS');
+  out.push(liniaCurta);
+  out.push(ANNEX_COBERTURES);
+  out.push('');
+
+  out.push('3. RESUM PER PROCEDÈNCIA');
+  out.push(liniaCurta);
+  out.push('Distribució de les imatges segons el seu arxiu d\'origen:');
+  out.push('');
+  procedenciaOrdenada.forEach(([arxiu, n]) => {
+    const punts = '.'.repeat(Math.max(2, 40 - arxiu.length));
+    out.push('  ' + arxiu + ' ' + punts + ' ' + n + (n === 1 ? ' imatge' : ' imatges'));
+  });
+  out.push('');
+  out.push('  Total: ' + imgs.length + ' imatges.');
+  if (cnt.unk === 0) {
+    out.push('  Totes les imatges amb llicència coneguda són de domini públic o equivalent (CC0 / PDM 1.0).');
+  }
+  out.push('');
+
+  out.push('4. LLISTAT DE REFERÈNCIES');
+  out.push(liniaCurta);
   imgs.forEach((img, i) => {
     const c = classificaCobertura(img.cobertura, img.override_cobertura);
-    cap.push(String(i+1).padStart(3,' ') + '. ' + (img.titol || '—') + '  (' + (img.any_data || '—') + ')  →  ' + c.short);
+    out.push(String(i+1).padStart(3,' ') + '. ' + (img.titol || '—') + '  (' + (img.any_data || '—') + ')  →  ' + c.short);
   });
-  cap.push('');
-  const fitxes = imgs.map((img,i) => '\n\n╔══════════════════════════════════════════════════════════╗\n║ FITXA ' + String(i+1).padStart(3,'0') + ' / ' + String(imgs.length).padStart(3,'0') + '\n╚══════════════════════════════════════════════════════════╝\n' + textInformeImatge(img));
-  cap.push(ANNEX_COBERTURES);
-  return cap.concat(fitxes).join('\n');
+  out.push('');
+
+  out.push('5. FITXES INDIVIDUALS');
+  out.push(liniaCurta);
+  imgs.forEach((img, i) => {
+    out.push('');
+    out.push('╔══════════════════════════════════════════════════════════╗');
+    out.push('║ FITXA ' + String(i+1).padStart(3,'0') + ' / ' + String(imgs.length).padStart(3,'0'));
+    out.push('╚══════════════════════════════════════════════════════════╝');
+    out.push(textInformeImatge(img));
+  });
+
+  return out.join('\n');
 }
 
 function textResumImatges(imgs) {
@@ -1080,10 +1136,17 @@ function textResumImatges(imgs) {
     const e = i.estat_intern || 'pendent';
     perEstat[e] = (perEstat[e]||0)+1;
   });
+  const procedencia = {};
+  imgs.forEach(i => {
+    const arxiu = extrauArxiu(i.link_procedencia, i.cobertura) || 'Desconegut';
+    procedencia[arxiu] = (procedencia[arxiu] || 0) + 1;
+  });
+  const procedenciaOrdenada = Object.entries(procedencia).sort((a, b) => b[1] - a[1]);
+
   const out = [
     linia, 'BADALONA COMUNICACIÓ · RESUM DE DRETS D\'IMATGE',
     'Documental "Darrere el drac"', linia,
-    'Data: ' + avui.toLocaleDateString('ca-ES'), 'Generat per: ' + me,
+    'Data: ' + avui.toLocaleDateString('ca-ES'),
     'Total imatges: ' + imgs.length, '',
     'RESUM PER COBERTURA', liniaCurta,
     '🟢 Lliures: ' + cnt.ok,
@@ -1093,7 +1156,14 @@ function textResumImatges(imgs) {
     'RESUM PER ESTAT INTERN', liniaCurta
   ];
   ESTATS_INTERNS.forEach(([k,l]) => { if (perEstat[k]) out.push(l + ': ' + perEstat[k]); });
-  out.push(''); out.push('LLISTAT', liniaCurta);
+  out.push('');
+  out.push('RESUM PER PROCEDÈNCIA'); out.push(liniaCurta);
+  procedenciaOrdenada.forEach(([arxiu, n]) => {
+    const punts = '.'.repeat(Math.max(2, 40 - arxiu.length));
+    out.push('  ' + arxiu + ' ' + punts + ' ' + n + (n === 1 ? ' imatge' : ' imatges'));
+  });
+  out.push('');
+  out.push('LLISTAT', liniaCurta);
   imgs.forEach((img,i) => {
     const c = classificaCobertura(img.cobertura, img.override_cobertura);
     out.push(String(i+1).padStart(3,' ') + '. ' + (img.titol || '—') + '  (' + (img.any_data || '—') + ')  →  ' + c.short);
@@ -1293,28 +1363,59 @@ function mostraImportador() {
 }
 
 function textCreditsFinals() {
-  if (!credits.length) return creditFrase + '\n\n(sense crèdits)';
-  const arxius = new Set();
-  credits.forEach(c => { const a = (c.arxiu || '').trim(); if (a) arxius.add(a); });
-  const arxiusOrdenats = Array.from(arxius).sort((a, b) => a.localeCompare(b, 'ca'));
-  const autors = new Set();
-  credits.forEach(c => {
-    const atr = (c.atribucio || '').trim();
-    if (!atr) return;
-    if (/^an[òo]nim$/i.test(atr)) return;
-    atr.split(/\s*,\s*/).forEach(a => {
-      const net = a.trim();
-      if (net && !/^an[òo]nim$/i.test(net)) autors.add(net);
+  const blocs = [];
+  const imatgesAprovades = credits.filter(c => c.tipus === 'imatge');
+  if (imatgesAprovades.length) {
+    const arxius = new Set();
+    const autors = new Set();
+    imatgesAprovades.forEach(c => {
+      const a = (c.arxiu || '').trim();
+      if (a) arxius.add(a);
+      const atr = (c.atribucio || '').trim();
+      if (atr && !/^an[òo]nim$/i.test(atr)) {
+        atr.split(/\s*,\s*/).forEach(x => {
+          const net = x.trim();
+          if (net && !/^an[òo]nim$/i.test(net)) autors.add(net);
+        });
+      }
     });
-  });
-  const arxiusSet = new Set(arxiusOrdenats.map(a => a.toLowerCase()));
-  const autorsFiltrats = Array.from(autors).filter(a => !arxiusSet.has(a.toLowerCase())).sort((a, b) => a.localeCompare(b, 'ca'));
-  const llista = arxiusOrdenats.concat(autorsFiltrats);
-  const linies = [];
-  linies.push(creditFrase);
-  linies.push('');
-  llista.forEach(a => linies.push('  ' + a));
-  return linies.join('\n');
+    const arxiusOrdenats = Array.from(arxius).sort((a, b) => a.localeCompare(b, 'ca'));
+    const arxiusSet = new Set(arxiusOrdenats.map(a => a.toLowerCase()));
+    const autorsFiltrats = Array.from(autors).filter(a => !arxiusSet.has(a.toLowerCase())).sort((a, b) => a.localeCompare(b, 'ca'));
+    const llista = arxiusOrdenats.concat(autorsFiltrats);
+    const bloc = [];
+    bloc.push(creditFraseImatges);
+    bloc.push('');
+    llista.forEach(a => bloc.push('  ' + a));
+    blocs.push(bloc.join('\n'));
+  }
+  const musicaAprovada = credits.filter(c => c.tipus === 'musica');
+  if (musicaAprovada.length) {
+    const arxius = new Set();
+    const autors = new Set();
+    musicaAprovada.forEach(c => {
+      const a = (c.arxiu || '').trim();
+      if (a) arxius.add(a);
+      const atr = (c.atribucio || '').trim();
+      if (atr && !/^an[òo]nim$/i.test(atr)) {
+        atr.split(/\s*,\s*/).forEach(x => {
+          const net = x.trim();
+          if (net && !/^an[òo]nim$/i.test(net)) autors.add(net);
+        });
+      }
+    });
+    const arxiusOrdenats = Array.from(arxius).sort((a, b) => a.localeCompare(b, 'ca'));
+    const arxiusSet = new Set(arxiusOrdenats.map(a => a.toLowerCase()));
+    const autorsFiltrats = Array.from(autors).filter(a => !arxiusSet.has(a.toLowerCase())).sort((a, b) => a.localeCompare(b, 'ca'));
+    const llista = arxiusOrdenats.concat(autorsFiltrats);
+    const bloc = [];
+    bloc.push(creditFraseMusica);
+    bloc.push('');
+    llista.forEach(a => bloc.push('  ' + a));
+    blocs.push(bloc.join('\n'));
+  }
+  if (!blocs.length) return '(sense crèdits)';
+  return blocs.join('\n\n\n');
 }
 
 function extrauArxiu(url, llicencia) {
@@ -1352,9 +1453,9 @@ function textCreditsInforme() {
     linia, 'BADALONA COMUNICACIÓ · INFORME COMPLET DE CRÈDITS',
     'Documental "Darrere el drac"', linia,
     'Data: ' + avui.toLocaleDateString('ca-ES'),
-    'Generat per: ' + me,
     'Total crèdits: ' + credits.length,
-    'Frase global: "' + creditFrase + '"', '',
+    'Frase imatges: "' + creditFraseImatges + '"',
+    'Frase música: "' + creditFraseMusica + '"', '',
     'DOCUMENT FINAL DE CRÈDITS (per a la pantalla)', liniaCurta,
     textCreditsFinals(), '',
     'DETALL INTERN', liniaCurta
@@ -1385,12 +1486,21 @@ function renderCredits() {
       ])
     ]));
     card.append(el('div', { class: 'badge', style: 'margin-top:6px', textContent: 'Llista de crèdits que apareixeran al final del documental.' }));
-    const fraseBar = el('div', { class: 'cred-frase-bar' });
-    fraseBar.append(el('label', { textContent: 'Frase global:' }));
-    const inpF = el('input', { type: 'text', value: creditFrase });
-    inpF.addEventListener('input', () => { creditFrase = inpF.value; });
-    inpF.addEventListener('change', () => saveCreditFrase());
-    fraseBar.append(inpF);
+    const fraseBar = el('div', { class: 'cred-frase-bar', style: 'flex-direction:column;align-items:stretch;gap:6px' });
+    const row1 = el('div', { style: 'display:flex;gap:8px;align-items:center' });
+    row1.append(el('label', { textContent: 'Frase imatges:', style: 'min-width:120px' }));
+    const inpF1 = el('input', { type: 'text', value: creditFraseImatges, style: 'flex:1' });
+    inpF1.addEventListener('input', () => { creditFraseImatges = inpF1.value; });
+    inpF1.addEventListener('change', () => saveCreditFrase());
+    row1.append(inpF1);
+    fraseBar.append(row1);
+    const row2 = el('div', { style: 'display:flex;gap:8px;align-items:center' });
+    row2.append(el('label', { textContent: 'Frase música:', style: 'min-width:120px' }));
+    const inpF2 = el('input', { type: 'text', value: creditFraseMusica, style: 'flex:1' });
+    inpF2.addEventListener('input', () => { creditFraseMusica = inpF2.value; });
+    inpF2.addEventListener('change', () => saveCreditFrase());
+    row2.append(inpF2);
+    fraseBar.append(row2);
     card.append(fraseBar);
     if (!credits.length) {
       card.append(el('div', { class: 'agenda-empty', textContent: 'Cap crèdit encara. Prem "🔄 Autogenerar" per crear-los a partir dels registres de música i imatges.' }));
@@ -1402,8 +1512,8 @@ function renderCredits() {
         const handle = el('span', { class: 'drag-handle', textContent: '⋮⋮' });
         row.append(handle);
         const main = el('div');
-        main.append(el('div', { class: 'cred-main', textContent: (idx+1) + '. ' + (cr.arxiu || '(sense arxiu)') + (cr.atribucio ? ' — ' + cr.atribucio : '') + (cr.any_text ? ' (' + cr.any_text + ')' : '') }));
-        main.append(el('div', { class: 'cred-sub', textContent: [cr.tipus, cr.titol, cr.nota].filter(Boolean).join(' · ') }));
+        main.append(el('div', { class: 'cred-main', textContent: (idx+1) + '. [' + (cr.tipus || 'imatge') + '] ' + (cr.arxiu || '(sense arxiu)') + (cr.atribucio ? ' — ' + cr.atribucio : '') + (cr.any_text ? ' (' + cr.any_text + ')' : '') }));
+        main.append(el('div', { class: 'cred-sub', textContent: [cr.titol, cr.nota].filter(Boolean).join(' · ') }));
         row.append(main);
         const actions = el('div', { class: 'row', style: 'margin:0' });
         actions.append(el('button', { class: 'btn s', textContent: '✏️', onclick: () => { currentCredit = JSON.parse(JSON.stringify(cr)); editingCredit = true; render(); } }));
@@ -1519,12 +1629,14 @@ async function desaCredit(cr) {
 }
 
 async function autoGeneraCredits() {
-  const existents = new Set(credits.map(c => (c.arxiu||'').toLowerCase() + '|' + (c.atribucio||'').toLowerCase()));
+  const existents = new Set(credits.map(c => (c.tipus||'') + '|' + (c.arxiu||'').toLowerCase() + '|' + (c.atribucio||'').toLowerCase()));
   const nous = [];
   musicRights.forEach(m => {
+    const d = calcularDiagnosticoLegal(m);
+    if (d.color !== 'ok') return;
     const arxiu = extrauArxiu(m.link_descarga, m.referencia) || 'Arxiu musical';
     const atrib = m.autor || 'Anònim';
-    const key = arxiu.toLowerCase() + '|' + atrib.toLowerCase();
+    const key = 'musica|' + arxiu.toLowerCase() + '|' + atrib.toLowerCase();
     if (existents.has(key)) return;
     existents.add(key);
     nous.push({
@@ -1538,10 +1650,13 @@ async function autoGeneraCredits() {
       created_by: me, updated_by: me
     });
   });
-  imageRights.filter(i => (i.estat_intern || '') === 'aprovada').forEach(img => {
+  imageRights.forEach(img => {
+    if ((img.estat_intern || '') !== 'aprovada') return;
+    const c = classificaCobertura(img.cobertura, img.override_cobertura);
+    if (c.estat !== 'ok') return;
     const arxiu = extrauArxiu(img.link_procedencia, img.cobertura) || 'Arxiu d\'imatge';
     const atrib = img.autor || 'Anònim';
-    const key = arxiu.toLowerCase() + '|' + atrib.toLowerCase();
+    const key = 'imatge|' + arxiu.toLowerCase() + '|' + atrib.toLowerCase();
     if (existents.has(key)) return;
     existents.add(key);
     nous.push({
@@ -1555,8 +1670,13 @@ async function autoGeneraCredits() {
       created_by: me, updated_by: me
     });
   });
-  if (!nous.length) { alert('No hi ha res nou per afegir. Assegura\'t que les imatges estan marcades com "Aprovada".'); return; }
-  if (!confirm('Afegir ' + nous.length + ' crèdits nous a partir de música i imatges aprovades?')) return;
+  if (!nous.length) {
+    alert('No hi ha res nou per afegir.\n\nAssegura\'t que:\n- Les imatges tenen estat "Aprovada" i cobertura verda.\n- Les músiques tenen diagnòstic verd (apte).');
+    return;
+  }
+  if (!confirm('Afegir ' + nous.length + ' crèdits nous?\n\n' +
+    nous.filter(n => n.tipus === 'imatge').length + ' d\'imatges\n' +
+    nous.filter(n => n.tipus === 'musica').length + ' de música')) return;
   const r = await db.from('credits').insert(nous).select();
   if (r.error) { alert('Error: ' + r.error.message); return; }
   credits = credits.concat(r.data);
@@ -2233,10 +2353,11 @@ async function start(user) {
   const a = await db.from('sections').select('*').order('pos');
   if (a.error) { alert('Error carregant dades.'); return; }
   secs = a.data || [];
-  const b = await db.from('settings').select('people, credit_frase').eq('id', 1).maybeSingle();
+  const b = await db.from('settings').select('people, credit_frase_imatges, credit_frase_musica').eq('id', 1).maybeSingle();
   if (b.data) {
     if (Array.isArray(b.data.people) && b.data.people.length) people = b.data.people.map(p => typeof p === 'string' ? { name: p, email: '' } : p);
-    if (b.data.credit_frase) creditFrase = b.data.credit_frase;
+    if (b.data.credit_frase_imatges) creditFraseImatges = b.data.credit_frase_imatges;
+    if (b.data.credit_frase_musica) creditFraseMusica = b.data.credit_frase_musica;
   }
   await carregaBlocks();
   await carregaDocs();
@@ -2254,7 +2375,8 @@ async function start(user) {
     })
     .on('postgres_changes', { event: '*', schema: 'public', table: 'settings' }, p => {
       if (p.new && p.new.people) people = (Array.isArray(p.new.people) ? p.new.people : []).map(x => typeof x === 'string' ? { name: x, email: '' } : x);
-      if (p.new && p.new.credit_frase) creditFrase = p.new.credit_frase;
+      if (p.new && p.new.credit_frase_imatges) creditFraseImatges = p.new.credit_frase_imatges;
+      if (p.new && p.new.credit_frase_musica) creditFraseMusica = p.new.credit_frase_musica;
       if (!busy()) render();
     })
     .on('postgres_changes', { event: '*', schema: 'public', table: 'blocks' }, async () => { await carregaBlocks(); if (cur === 'cal' && !busy()) render(); })
