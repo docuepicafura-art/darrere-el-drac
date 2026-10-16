@@ -415,19 +415,23 @@ async function toggleBlock(day) {
 
 const busy = () => { const a = document.activeElement; return a && $('#app').contains(a) && /INPUT|TEXTAREA|SELECT/.test(a.tagName); };
 
-// --- Càlcul del pressupost de Drets Soundtrack ---
 function calculaDretsSoundtrack() {
   const bsec = secs.find(s => isBudgetSec(s));
-  if (!bsec || !bsec.budget) return { pressupostat: 0, gastat: 0, disponible: 0, pct: 0, existeix: false };
+  if (!bsec || !bsec.budget) return { pressupostat: 0, gastat: 0, disponible: 0, pct: 0, pendent: 0, pagat: 0, existeix: false };
   const partida = bsec.budget.find(p => /soundtrack/i.test(p.c || ''));
-  if (!partida) return { pressupostat: 0, gastat: 0, disponible: 0, pct: 0, existeix: false };
+  if (!partida) return { pressupostat: 0, gastat: 0, disponible: 0, pct: 0, pendent: 0, pagat: 0, existeix: false };
   const pressupostat = Number(partida.p) || 0;
-  const gastat = musicRights
-    .filter(m => ['negociada', 'pagada', 'cedida'].includes(m.adquisicio || 'cap'))
-    .reduce((a, m) => a + (Number(m.adquisicio_import) || 0), 0);
+  let pendent = 0, pagat = 0;
+  musicRights.forEach(m => {
+    const adq = m.adquisicio || 'cap';
+    const imp = Number(m.adquisicio_import) || 0;
+    if (adq === 'pagada') pagat += imp;
+    else if (adq === 'negociada' || adq === 'cedida') pendent += imp;
+  });
+  const gastat = pendent + pagat;
   const disponible = pressupostat - gastat;
   const pct = pressupostat > 0 ? Math.round((gastat / pressupostat) * 100) : 0;
-  return { pressupostat, gastat, disponible, pct, existeix: true };
+  return { pressupostat, gastat, disponible, pct, pendent, pagat, existeix: true };
 }
 
 function render() {
@@ -497,7 +501,6 @@ function calcularDiagnosticoLegal(c) {
   if (ovS === 'ok') out.estat_composicio_sgae = { ok: true, text: '🟢 COMPOSICIÓ LLIURE (manual)', base: c.override_nota || 'Override' };
   if (ovS === 'ko') out.estat_composicio_sgae = { ok: false, text: '🔴 COMPOSICIÓ PROTEGIDA (manual)', base: c.override_nota || 'Override' };
 
-  // Adquisició de drets
   const adq = c.adquisicio || 'cap';
   out.adquisicio = adq;
   out.adquisicio_ref = c.adquisicio_ref || '';
@@ -849,7 +852,6 @@ function renderDrets() {
   form.append(camp('Cost previst (€)', 'partida_presupuesto', 'number'));
   card.append(form);
 
-  // Bloc adquisició
   const adqBox = el('div', { class: 'mr-override', style: 'margin-top:16px' });
   adqBox.append(el('h4', { textContent: '💼 Adquisició de drets' }));
   const adqGrid = el('div', { class: 'mr-form' });
@@ -1140,32 +1142,35 @@ function textInformeImatge(img) {
   const linia = '===========================================================';
   const liniaCurta = '-----------------------------------------------------------';
   const avui = new Date();
+
+  const camps = [];
+  camps.push('Títol: "' + (img.titol || '—') + '"');
+  if (img.autor) camps.push('Autor/Fotògraf: ' + img.autor);
+  if (img.any_data) camps.push('Any/Data: ' + img.any_data);
+  if (img.tipus) camps.push('Tipus: ' + img.tipus);
+  if (img.link_procedencia) camps.push('Enllaç de procedència: ' + img.link_procedencia);
+  if (img.estat_intern) camps.push('Estat intern: ' + img.estat_intern);
+
+  const diag = [];
+  diag.push('Classificació: ' + c.text);
+  if (img.override_cobertura) diag.push('Override aplicat: ' + img.override_cobertura + (img.override_nota ? ' — ' + img.override_nota : ''));
+  if (img.etiquetes) diag.push('Etiquetes: ' + img.etiquetes);
+  if (img.notes) diag.push('Notes: ' + img.notes);
+  if (img.vincle_tasca) diag.push('Vincle amb producció: ' + img.vincle_tasca);
+
   return [
     linia, 'BADALONA COMUNICACIÓ · CONTROL DE DRETS D\'IMATGE',
     'Informe de cadena de drets (Chain of Title)', linia,
     'Data: ' + avui.toLocaleDateString('ca-ES', { day: '2-digit', month: 'long', year: 'numeric' }),
     '',
-    'DADES DE LA IMATGE', liniaCurta,
-    'Títol: "' + (img.titol || '—') + '"',
-    'Autor/Fotògraf: ' + (img.autor || '—'),
-    'Any/Data: ' + (img.any_data || '—'),
-    'Tipus: ' + (img.tipus || '—'),
-    'Enllaç de procedència: ' + (img.link_procedencia || '—'),
-    'Estat intern: ' + (img.estat_intern || 'pendent'), '',
+    'DADES DE LA IMATGE', liniaCurta
+  ].concat(camps).concat([
+    '',
     'COBERTURA DECLARADA', liniaCurta,
-    img.cobertura || '(no informat)', '',
-    'DIAGNÒSTIC', liniaCurta,
-    'Classificació: ' + c.text,
-    img.override_cobertura ? 'Override aplicat: ' + img.override_cobertura + (img.override_nota ? ' — ' + img.override_nota : '') : '',
-    img.etiquetes ? 'Etiquetes: ' + img.etiquetes : '',
-    img.notes ? 'Notes: ' + img.notes : '',
-    img.vincle_tasca ? 'Vincle amb producció: ' + img.vincle_tasca : '', '',
-    'SIGNATURA', liniaCurta,
-    'Tècnic de producció: ______________________________',
-    'Data: ____ / ____ / ________', '',
-    linia, 'Document generat automàticament per l\'eina de gestió',
-    'de producció del documental "Darrere el drac".', linia
-  ].filter(x => x !== '').join('\n');
+    img.cobertura || '(no informat)',
+    '',
+    'DIAGNÒSTIC', liniaCurta
+  ]).concat(diag).join('\n');
 }
 
 function textInformeImatgesAgregat(imgs) {
@@ -1913,7 +1918,6 @@ function renderBudget(s) {
   s.budget.sort((a, b) => (a.pos || 0) - (b.pos || 0));
   if (calDesar) save(s);
 
-  // Calcula el gastat de drets soundtrack per mostrar badge
   const dSoundtrack = calculaDretsSoundtrack();
 
   const wrap = el('div', { class: 'card' });
@@ -1960,14 +1964,18 @@ function renderBudget(s) {
       row.append(el('div', { class: 'bc-num' }, el('input', { type: 'number', value: p.p, min: 0, step: '0.01', style: 'text-align:right', oninput: e => { p.p = Number(e.target.value) || 0; save(s); } })));
     } else {
       const concepteCell = el('div', { textContent: p.c || '(sense nom)' });
-      if (isSoundtrack && dSoundtrack.existeix && dSoundtrack.gastat > 0) {
-        concepteCell.append(el('span', { class: 'budget-badge', textContent: '🎼 ' + eur(dSoundtrack.gastat) + ' compromesos en drets musicals' }));
+      if (isSoundtrack && dSoundtrack.existeix && dSoundtrack.pendent > 0) {
+        concepteCell.append(el('span', { class: 'budget-badge', textContent: '🎼 ' + eur(dSoundtrack.pendent) + ' pendents en drets musicals' }));
       }
       row.append(concepteCell);
       row.append(el('div', { class: 'hide-s' }, el('span', { class: 'cat-pill', textContent: p.cat || 'Altres' })));
       row.append(el('div', { class: 'bc-num', textContent: eur(p.p) }));
     }
-    row.append(el('div', { class: 'bc-num strong', textContent: eur(real) }));
+    let realMostrat = real;
+    if (isSoundtrack && dSoundtrack.existeix && dSoundtrack.pagat > 0) {
+      realMostrat = real + dSoundtrack.pagat;
+    }
+    row.append(el('div', { class: 'bc-num strong', textContent: eur(realMostrat) }));
     if (editing) {
       row.append(el('div', { class: 'hide-s' }, el('select', { onchange: e => { p.st = e.target.value; save(s); } }, STATS.map(([v, l]) => el('option', { value: v, textContent: l, selected: (p.st || 'pendent') === v })))));
     } else {
@@ -2009,12 +2017,10 @@ function renderBudget(s) {
   const totalP = s.budget.reduce((a, p) => a + (Number(p.p) || 0), 0);
   const totalR = s.budget.reduce((a, p) => a + realOf(p), 0);
   const diff = totalR - totalP;
-  const pendent = s.budget.filter(p => (p.st || 'pendent') !== 'pagat').reduce((a, p) => a + Math.max(0, (Number(p.p) || 0) - realOf(p)), 0);
   const sum = el('div', { class: 'summary', style: 'margin-top:16px;padding-top:14px;border-top:2px solid var(--bd)' });
   sum.append(el('div', { class: 'lbl', textContent: 'Total previst' }), el('div', { class: 'val big', textContent: eur(totalP) }));
   sum.append(el('div', { class: 'lbl', textContent: 'Total real' }), el('div', { class: 'val big', textContent: eur(totalR) }));
   sum.append(el('div', { class: 'lbl', textContent: 'Diferència' }), el('div', { class: 'val big ' + (diff > 0 ? 'pos' : diff < 0 ? 'neg' : ''), textContent: (diff > 0 ? '+' : '') + eur(diff) }));
-  sum.append(el('div', { class: 'lbl', textContent: 'Pendent de pagar' }), el('div', { class: 'val', textContent: eur(pendent) }));
   wrap.append(sum);
   return wrap;
 }
