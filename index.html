@@ -1130,11 +1130,7 @@ const ANNEX_COBERTURES = [
 '⚪ DESCONEGUT / PENDENT DE VERIFICAR',
 '   No hi ha informació suficient per determinar l\'estat.',
 '   Acció: NO integrar al muntatge fins a tancar la verificació.',
-'',
-'----------------------------------------------------------------',
-'Aquest annex s\'inclou automàticament a tots els informes generats',
-'per l\'eina de control de drets del documental "Darrere el drac".',
-'----------------------------------------------------------------'
+''
 ].join('\n');
 
 function textInformeImatge(img) {
@@ -1976,11 +1972,18 @@ function renderBudget(s) {
       realMostrat = real + dSoundtrack.pagat;
     }
     row.append(el('div', { class: 'bc-num strong', textContent: eur(realMostrat) }));
+
+    let estatMostrar = p.st || 'pendent';
+    if (isSoundtrack && dSoundtrack.existeix && dSoundtrack.pagat > 0) {
+      estatMostrar = 'pagat';
+    }
+
     if (editing) {
       row.append(el('div', { class: 'hide-s' }, el('select', { onchange: e => { p.st = e.target.value; save(s); } }, STATS.map(([v, l]) => el('option', { value: v, textContent: l, selected: (p.st || 'pendent') === v })))));
     } else {
-      row.append(el('div', { class: 'hide-s' }, el('span', { class: 'st-pill ' + stClass(p.st), textContent: stLabel(p.st) })));
+      row.append(el('div', { class: 'hide-s' }, el('span', { class: 'st-pill ' + stClass(estatMostrar), textContent: stLabel(estatMostrar) })));
     }
+
     row.append(el('div', { class: 'bc-x' }, editing ? el('button', { class: 'x', textContent: '×', onclick: () => { if (confirm('Eliminar?')) { s.budget.splice(idx, 1); s.budget.forEach((q,i)=>q.pos=i); save(s); render(); } } }) : ''));
     if (editing) {
       row.addEventListener('dragover', (ev) => { ev.preventDefault(); row.classList.add('drop-target'); });
@@ -2091,18 +2094,50 @@ function renderDocEditor() {
   });
   if (d.audio_path) {
     tb.append(el('button', { textContent: '⏱️', style: 'background:var(--ac);color:#fff', onclick: (e) => { e.preventDefault(); insertaTimestamp(d, audioEl); } }));
-    tb.append(el('button', { textContent: '▶️', onclick: (e) => { e.preventDefault(); if (!audioEl || !audioEl.src) return; if (audioEl.paused) audioEl.play(); else audioEl.pause(); } }));
+    tb.append(el('button', { textContent: '▶️', onclick: (e) => {
+      e.preventDefault();
+      if (!audioEl || !audioEl.src) return;
+      if (audioEl.paused) {
+        const p = audioEl.play();
+        if (p && p.catch) p.catch((err) => { if (err.name !== 'AbortError') console.warn(err); });
+      } else {
+        audioEl.pause();
+      }
+    } }));
   }
   card.append(tb);
   const ed = el('div', { class: 'rich-editor', contentEditable: 'true' });
   ed.innerHTML = d.content || '';
+
+  if (ed.querySelectorAll('.ts').length === 0 && /\[\d{1,2}:\d{2}(?::\d{2})?\]/.test(ed.textContent)) {
+    const regex = /\[(\d{1,2}:\d{2}(?::\d{2})?)\]/g;
+    let count = 0;
+    ed.innerHTML = ed.innerHTML.replace(regex, (match, time) => {
+      const parts = time.split(':').map(Number);
+      let secs = 0;
+      if (parts.length === 3) secs = parts[0]*3600 + parts[1]*60 + parts[2];
+      else secs = parts[0]*60 + parts[1];
+      count++;
+      return '<span class="ts" contenteditable="false" data-t="' + secs.toFixed(2) + '">' + match + '</span>';
+    });
+    if (count > 0) {
+      d.content = ed.innerHTML;
+      saveDoc(d);
+      console.log('Convertits automàticament ' + count + ' timestamps');
+    }
+  }
+
   ed.addEventListener('input', () => { d.content = ed.innerHTML; saveDoc(d); });
   ed.addEventListener('click', (ev) => {
     const ts = ev.target.closest && ev.target.closest('.ts');
-    if (!ts || !audioEl || !audioEl.src) return;
+    if (!ts) return;
     ev.preventDefault();
-    audioEl.currentTime = parseFloat(ts.dataset.t) || 0;
-    audioEl.play();
+    if (!audioEl || !audioEl.src) return;
+    const t = parseFloat(ts.dataset.t) || 0;
+    if (Math.abs(audioEl.currentTime - t) < 1 && !audioEl.paused) return;
+    audioEl.currentTime = t;
+    const p = audioEl.play();
+    if (p && p.catch) p.catch((err) => { if (err.name !== 'AbortError') console.warn('Play:', err); });
   });
   card.append(ed);
   card.append(el('div', { class: 'editor-save', id: 'editor-save-msg', textContent: '' }));
