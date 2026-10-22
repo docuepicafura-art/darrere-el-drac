@@ -331,8 +331,8 @@ let credits = [];
 let currentCredit = null;
 let editingCredit = false;
 let creditFraseImatges = 'Fotografies i material d\'arxiu cortesia de:';
-let creditFraseMusica = 'Música cortesia de:';
-
+let creditFraseMusica = 'Música:';
+let creditsTecnics = [];
 function save(s) {
   if (!s || !s.id) return;
   clearTimeout(timers[s.id]);
@@ -376,6 +376,11 @@ async function carregaCredits() {
   const { data, error } = await db.from('credits').select('*').order('ordre');
   if (error) { console.warn(error.message); return; }
   credits = (data || []).sort((a,b)=>(a.ordre||0)-(b.ordre||0));
+}
+async function carregaCreditsTecnics() {
+  const { data, error } = await db.from('credits_tecnics').select('*').order('ordre');
+  if (error) { console.warn('No s\'han pogut carregar els crèdits tècnics:', error.message); return; }
+  creditsTecnics = data || [];
 }
 
 const nm = e => e.split('@')[0];
@@ -943,7 +948,6 @@ function renderDrets() {
   }
   app.append(card);
 }
-
 function classificaCobertura(cobertura, override) {
   const ov = (override || '').trim();
   if (ov === 'ok') return { estat: 'ok', text: '🟢 DOMINI PÚBLIC (override)', short: 'LLIURE' };
@@ -1101,35 +1105,136 @@ const ANNEX_COBERTURES = [
 'utilitzada en aquest informe, per facilitar la revisió del dossier',
 'per part de producció i direcció.',
 '',
+'Fonts de referència: Llei de Propietat Intel·lectual espanyola (LPI),',
+'Biblioteca de la UPC, EUIPO (Oficina de Propietat Intel·lectual de',
+'la Unió Europea) i Conveni de Berna.',
+'',
+'',
 '🟢 LLIURE / DOMINI PÚBLIC',
-'   La imatge es pot utilitzar sense cap pagament ni restricció.',
-'   Inclou:',
-'   - Obres en domini públic (autors morts fa més de 80 anys a Espanya,',
-'     o més de 70 a la UE; o publicades abans de 1931 als EUA).',
-'   - Obres amb llicència CC0, PDM 1.0 o equivalent.',
-'   - Imatges explícitament alliberades pels seus autors o institucions.',
-'   - Prelinger Archives (via Internet Archive).',
-'   Acció: es pot integrar directament al muntatge.',
-'   Nota: no cobreix drets d\'imatge de persones identificables.',
+'================================================================',
+'',
+'La imatge es pot utilitzar sense cap pagament ni restricció.',
+'',
+'INCLOU:',
+'',
+'1. Obres en domini públic per expiració del termini de protecció.',
+'',
+'   A Espanya, el termini general és de:',
+'   - 80 anys post-mortem per a autors morts abans del 7 de desembre',
+'     de 1987.',
+'   - 70 anys post-mortem per a autors morts després d\'aquesta data.',
+'   A data de 2026, això vol dir que són de domini públic les obres',
+'   d\'autors morts abans del 1946.',
+'',
+'   A la Unió Europea, el termini general és de 70 anys post-mortem.',
+'',
+'   Als Estats Units, depèn de la data de publicació:',
+'   - Obres publicades abans de 1931: domini públic.',
+'   - Obres creades després de l\'1 de gener de 1978: vida + 70 anys.',
+'   - Obres anònimes o pseudònimes: 95 anys des de la publicació.',
+'',
+'2. Obres amb llicències equivalents al domini públic:',
+'   - CC0 1.0 Universal (renúncia activa i irrevocable).',
+'   - Public Domain Mark 1.0 (etiqueta de domini públic).',
+'   - Copyright-Only Dedication 1.0 US (eina retirada el 2010, però',
+'     vàlida per a obres anteriors a aquesta data).',
+'',
+'3. Material de Prelinger Archives distribuït per Internet Archive.',
+'',
+'4. Obres explícitament alliberades pels seus autors o institucions.',
+'',
+'ACCIONS PER A PRODUCCIÓ:',
+'Es pot integrar directament al muntatge.',
+'',
+'NOTES LEGALS IMPORTANTS:',
+'',
+'A) Fotografies "originals" vs "meres fotografies":',
+'   - Les fotografies originals (amb caràcter artístic) es protegeixen',
+'     durant 70/80 anys post-mortem de l\'autor.',
+'   - Les "meres fotografies" (no artístiques: documentals, de premsa,',
+'     de carnet...) només estan protegides durant 25 anys des de',
+'     l\'1 de gener de l\'any següent a la seva creació.',
+'   Això vol dir que una fotografia merament documental pot ser de',
+'   domini públic molt abans que una fotografia artística de la',
+'   mateixa època.',
+'',
+'B) Produccions cinematogràfiques i audiovisuals:',
+'   Els drets es computen per separat:',
+'   - El productor audiovisual té 50 anys des de la realització de',
+'     la producció.',
+'   - Els coautors (director, guionista...) tenen 70/80 anys',
+'     post-mortem de l\'últim coautor.',
+'   Conseqüència pràctica: un fotograma d\'una pel·lícula pot estar',
+'   en domini públic pel que fa al productor, però encara protegit',
+'   pels drets dels coautors. Cal verificar els dos còmputs.',
+'',
+'C) Digitalitzacions:',
+'   Només l\'obra original és de domini públic. Les digitalitzacions',
+'   fetes per arxius o biblioteques no generen nous drets si són',
+'   mers escaneigs mecànics. Però si una editorial ha fet una nova',
+'   edició (maquetació, traducció, notes crítiques...), aquesta',
+'   edició pot tenir nous drets. Cal comprovar la política de',
+'   l\'arxiu que ha digitalitzat la imatge.',
+'',
+'D) Drets que no són d\'autor:',
+'   Encara que una obra estigui en domini públic, poden existir:',
+'   - Drets de marca (per exemple, logotips o personatges',
+'     comercials).',
+'   - Drets de patrimoni cultural en països com Itàlia o Grècia,',
+'     que restringeixen l\'ús comercial d\'obres propietat de l\'Estat.',
+'   - Drets morals de l\'autor, que a Espanya són irrenunciables.',
+'   - Drets d\'imatge de les persones identificables a la fotografia.',
+'',
 '',
 '🟡 CREATIVE COMMONS / AMB ATRIBUCIÓ',
-'   La imatge es pot utilitzar gratuïtament, però amb condicions:',
-'   - Cal atribuir l\'autor i la font (crèdit visible o als títols).',
-'   - Algunes variants (BY-SA) obliguen a alliberar l\'obra derivada.',
-'   - Les variants BY-NC no permeten ús comercial.',
-'   Acció: es pot integrar, però caldrà afegir el crèdit corresponent.',
+'================================================================',
+'',
+'La imatge es pot utilitzar gratuïtament, però amb condicions:',
+'',
+'- Cal atribuir l\'autor i la font (crèdit visible o als títols).',
+'- Algunes variants (BY-SA) obliguen a alliberar l\'obra derivada',
+'  amb la mateixa llicència.',
+'- Les variants BY-NC no permeten ús comercial.',
+'- Les variants BY-ND no permeten obres derivades.',
+'',
+'ACCIONS PER A PRODUCCIÓ:',
+'Es pot integrar, però caldrà afegir el crèdit corresponent amb el',
+'nom de l\'autor, el títol de l\'obra, la llicència concreta i un',
+'enllaç a la font.',
+'',
 '',
 '🔴 PROTEGIT / AMB DRETS RESERVATS',
-'   La imatge NO es pot utilitzar sense autorització expressa.',
-'   Inclou:',
-'   - Obres amb copyright vigent (autor viu o mort fa menys de 70/80 anys).',
-'   - Imatges de bancs comercials (Getty, Reuters, AFP...).',
-'   - Material institucional amb "tots els drets reservats".',
-'   Acció: cal negociar una llicència o buscar una alternativa lliure.',
+'================================================================',
+'',
+'La imatge NO es pot utilitzar sense autorització expressa.',
+'',
+'INCLOU:',
+'',
+'- Obres amb copyright vigent (autor viu o mort fa menys de 70/80',
+'  anys, segons el cas).',
+'- Imatges de bancs comercials (Getty, Reuters, AFP, Bridgeman...).',
+'- Material institucional amb "tots els drets reservats".',
+'- Reproduccions d\'obres d\'art fetes per museus amb caràcter',
+'  artístic (fotografia original d\'una obra en domini públic: la',
+'  fotografia en si pot estar protegida).',
+'',
+'ACCIONS PER A PRODUCCIÓ:',
+'Cal negociar una llicència o buscar una alternativa lliure.',
+'',
 '',
 '⚪ DESCONEGUT / PENDENT DE VERIFICAR',
-'   No hi ha informació suficient per determinar l\'estat.',
-'   Acció: NO integrar al muntatge fins a tancar la verificació.',
+'================================================================',
+'',
+'No hi ha prou informació per determinar l\'estat legal.',
+'',
+'INCLOU:',
+'',
+'- Imatges sense cobertura informat.',
+'- Fonts que no especifiquen la llicència.',
+'- Casos dubtosos que requereixen consulta jurídica.',
+'',
+'ACCIONS PER A PRODUCCIÓ:',
+'NO integrar al muntatge fins a tancar la verificació.',
 ''
 ].join('\n');
 
@@ -1339,6 +1444,18 @@ function renderImatges() {
         const btns = el('div', { class: 'row', style: 'margin:0' });
         btns.append(el('button', { class: 'btn s', textContent: '✅ Totes (filtrades)', onclick: () => { llistaFiltrada.forEach(i => seleccioImg.add(i.id)); render(); } }));
         btns.append(el('button', { class: 'btn s', textContent: '⬜ Cap', onclick: () => { seleccioImg.clear(); render(); } }));
+        btns.append(el('button', { class: 'btn p s', textContent: '✅ Aprovar seleccionades', title: 'Marcar com a Aprovada totes les imatges seleccionades', onclick: async () => {
+          const sel = imatgesSeleccionades();
+          if (!sel.length) { alert('No hi ha cap imatge seleccionada.'); return; }
+          if (!confirm('Aprovar ' + sel.length + ' imatges? Aquestes sortiran als crèdits.')) return;
+          for (const img of sel) {
+            const r = await db.from('image_rights').update({ estat_intern: 'aprovada', updated_at: new Date().toISOString() }).eq('id', img.id);
+            if (!r.error) img.estat_intern = 'aprovada';
+          }
+          alert('✅ ' + sel.length + ' imatges aprovades.');
+          seleccioImg.clear();
+          render();
+        } }));
         if (n > 0) {
           btns.append(el('button', { class: 'btn s', textContent: '📋 Informe complet', onclick: () => { const s = imatgesSeleccionades(); descarregaTxt(textInformeImatgesAgregat(s), 'Informe_Imatges_' + new Date().toISOString().slice(0,10) + '_' + s.length + '.txt'); } }));
           btns.append(el('button', { class: 'btn p s', textContent: '📄 PDF complet', onclick: () => { const s = imatgesSeleccionades(); obrePdf(textInformeImatgesAgregat(s), 'Informe agregat de drets d\'imatge'); } }));
@@ -1488,9 +1605,14 @@ function mostraImportador() {
   app.innerHTML = '';
   app.append(card);
 }
-
 function textCreditsFinals() {
   const blocs = [];
+
+  // 1. Crèdits tècnics
+  const textTec = textCreditsTecnics();
+  if (textTec) blocs.push(textTec.trim());
+
+  // 2. Imatges
   const imatgesAprovades = credits.filter(c => c.tipus === 'imatge');
   if (imatgesAprovades.length) {
     const arxius = new Set();
@@ -1516,33 +1638,44 @@ function textCreditsFinals() {
     llista.forEach(a => bloc.push('  ' + a));
     blocs.push(bloc.join('\n'));
   }
+
+  // 3. Música — format: Títol — Autor — Any — Font
   const musicaAprovada = credits.filter(c => c.tipus === 'musica');
   if (musicaAprovada.length) {
-    const arxius = new Set();
-    const autors = new Set();
-    musicaAprovada.forEach(c => {
-      const a = (c.arxiu || '').trim();
-      if (a) arxius.add(a);
-      const atr = (c.atribucio || '').trim();
-      if (atr && !/^an[òo]nim$/i.test(atr)) {
-        atr.split(/\s*,\s*/).forEach(x => {
-          const net = x.trim();
-          if (net && !/^an[òo]nim$/i.test(net)) autors.add(net);
-        });
-      }
-    });
-    const arxiusOrdenats = Array.from(arxius).sort((a, b) => a.localeCompare(b, 'ca'));
-    const arxiusSet = new Set(arxiusOrdenats.map(a => a.toLowerCase()));
-    const autorsFiltrats = Array.from(autors).filter(a => !arxiusSet.has(a.toLowerCase())).sort((a, b) => a.localeCompare(b, 'ca'));
-    const llista = arxiusOrdenats.concat(autorsFiltrats);
     const bloc = [];
     bloc.push(creditFraseMusica);
     bloc.push('');
-    llista.forEach(a => bloc.push('  ' + a));
+    musicaAprovada.forEach(c => {
+      const parts = [];
+      if (c.titol) parts.push(c.titol);
+      if (c.atribucio) parts.push(c.atribucio);
+      if (c.any_text) parts.push(c.any_text);
+      if (c.arxiu) parts.push(c.arxiu);
+      if (parts.length) bloc.push('  ' + parts.join(' — '));
+    });
     blocs.push(bloc.join('\n'));
   }
+
   if (!blocs.length) return '(sense crèdits)';
   return blocs.join('\n\n\n');
+}
+
+function textCreditsTecnics() {
+  if (!creditsTecnics.length) return '';
+  const grups = {};
+  creditsTecnics.forEach(c => {
+    const cat = (c.categoria || 'Altres').trim();
+    if (!grups[cat]) grups[cat] = [];
+    grups[cat].push(c);
+  });
+  const cats = Object.keys(grups).sort();
+  const linies = [];
+  cats.forEach(cat => {
+    linies.push(cat + ':');
+    grups[cat].forEach(c => linies.push('  ' + (c.nom || '—')));
+    linies.push('');
+  });
+  return linies.join('\n').trim();
 }
 
 function extrauArxiu(url, llicencia) {
@@ -1580,17 +1713,27 @@ function textCreditsInforme() {
     linia, 'BADALONA COMUNICACIÓ · INFORME COMPLET DE CRÈDITS',
     'Documental "Darrere el drac"', linia,
     'Data: ' + avui.toLocaleDateString('ca-ES'),
-    'Total crèdits: ' + credits.length,
+    'Crèdits tècnics: ' + creditsTecnics.length,
+    'Imatges aprovades: ' + credits.filter(c => c.tipus === 'imatge').length,
+    'Cançons aprovades: ' + credits.filter(c => c.tipus === 'musica').length,
     'Frase imatges: "' + creditFraseImatges + '"',
     'Frase música: "' + creditFraseMusica + '"', '',
     'DOCUMENT FINAL DE CRÈDITS (per a la pantalla)', liniaCurta,
     textCreditsFinals(), '',
-    'DETALL INTERN', liniaCurta
+    'DETALL CRÈDITS TÈCNICS', liniaCurta
   ];
+  if (creditsTecnics.length) {
+    creditsTecnics.forEach((c, i) => {
+      out.push((i+1) + '. [' + (c.categoria || '—') + '] ' + (c.nom || '—'));
+    });
+  } else {
+    out.push('(cap crèdit tècnic)');
+  }
+  out.push('');
+  out.push('DETALL IMATGES I MÚSICA', liniaCurta);
   credits.forEach((c, i) => {
-    out.push((i+1) + '. ' + (c.arxiu || '—'));
+    out.push((i+1) + '. [' + (c.tipus || 'imatge') + '] ' + (c.arxiu || '—'));
     out.push('   Atribució: ' + (c.atribucio || '—'));
-    out.push('   Tipus: ' + (c.tipus || 'imatge'));
     if (c.titol) out.push('   Títol: ' + c.titol);
     if (c.any_text) out.push('   Any: ' + c.any_text);
     if (c.frase) out.push('   Frase pròpia: ' + c.frase);
@@ -1601,6 +1744,60 @@ function textCreditsInforme() {
   return out.join('\n');
 }
 
+function exportaCreditsDocx() {
+  const contingut = textCreditsFinals();
+  const titol = 'Crèdits · Darrere el drac';
+  const html = '<!doctype html><html><head><meta charset="utf-8"><title>' + escapeHtml(titol) + '</title><style>'
+    + 'body{font:12pt/1.6 Georgia,serif;max-width:800px;margin:40px auto;padding:0 20px;color:#1f1d1a}'
+    + 'h1{font-size:20pt;margin:0 0 4px}'
+    + 'h2{font-size:13pt;margin:0 0 20px;color:#666;font-style:italic;font-weight:400}'
+    + 'pre{font-family:inherit;font-size:12pt;white-space:pre-wrap;line-height:1.6}'
+    + '@media print{body{margin:20mm}}'
+    + '</style></head><body>'
+    + '<h1>Darrere el drac</h1>'
+    + '<h2>Crèdits · Badalona Comunicació</h2>'
+    + '<pre>' + escapeHtml(contingut) + '</pre>'
+    + '</body></html>';
+  const blob = new Blob([html], { type: 'application/msword;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'Credits_Darrere_el_drac.doc';
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+}
+
+async function importaCreditsTecnics() {
+  const text = prompt('Enganxa les files del teu Excel/CSV (amb capçalera CATEGORIA | NOM | ORDRE):', '');
+  if (!text || !text.trim()) return;
+  const files = parsejaCSV(text);
+  if (files.length < 2) { alert('Cal capçalera + almenys una fila.'); return; }
+
+  const capcalera = files[0].map(h => {
+    const n = h.toLowerCase().trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '_');
+    if (/categor|seccion/.test(n)) return 'categoria';
+    if (/nom|nombre|name/.test(n)) return 'nom';
+    if (/ordre|orden|order|pos/.test(n)) return 'ordre';
+    return null;
+  });
+
+  const dades = [];
+  for (let i = 1; i < files.length; i++) {
+    const obj = { created_by: me, updated_at: new Date().toISOString() };
+    files[i].forEach((v, j) => { const k = capcalera[j]; if (k) obj[k] = v; });
+    if (obj.nom && obj.nom.trim()) dades.push(obj);
+  }
+
+  if (!dades.length) { alert('Cap fila vàlida.'); return; }
+  if (!confirm('Importar ' + dades.length + ' línies de crèdits tècnics?')) return;
+
+  const r = await db.from('credits_tecnics').insert(dades).select();
+  if (r.error) { alert('Error important: ' + r.error.message); return; }
+  creditsTecnics = creditsTecnics.concat(r.data);
+  alert('✅ ' + r.data.length + ' línies importades.');
+  render();
+}
+
 function renderCredits() {
   const app = $('#app'); app.innerHTML = '';
   if (!currentCredit) {
@@ -1608,11 +1805,12 @@ function renderCredits() {
     card.append(el('div', { class: 'row', style: 'justify-content:space-between;align-items:center;margin:0' }, [
       el('h2', { textContent: '📜 Crèdits del documental', style: 'margin:0' }),
       el('div', { class: 'row', style: 'margin:0' }, [
-        el('button', { class: 'btn', textContent: '🔄 Autogenerar', onclick: () => autoGeneraCredits() }),
-        el('button', { class: 'btn p', textContent: '+ Nou crèdit', onclick: () => nouCredit() })
+        el('button', { class: 'btn', textContent: '🔄 Autogenerar', onclick: () => autoGeneraCredits() })
       ])
     ]));
-    card.append(el('div', { class: 'badge', style: 'margin-top:6px', textContent: 'Llista de crèdits que apareixeran al final del documental.' }));
+    card.append(el('div', { class: 'badge', style: 'margin-top:6px', textContent: 'Llista de crèdits del documental: tècnics, imatges i música.' }));
+
+    // Frases globals
     const fraseBar = el('div', { class: 'cred-frase-bar', style: 'flex-direction:column;align-items:stretch;gap:6px' });
     const row1 = el('div', { style: 'display:flex;gap:8px;align-items:center' });
     row1.append(el('label', { textContent: 'Frase imatges:', style: 'min-width:120px' }));
@@ -1629,10 +1827,63 @@ function renderCredits() {
     row2.append(inpF2);
     fraseBar.append(row2);
     card.append(fraseBar);
-    if (!credits.length) {
-      card.append(el('div', { class: 'agenda-empty', textContent: 'Cap crèdit encara. Prem "🔄 Autogenerar" per crear-los a partir dels registres de música i imatges.' }));
+
+    // BLOC CRÈDITS TÈCNICS
+    const tecCard = el('div', { style: 'margin-top:18px;padding-top:14px;border-top:2px solid var(--bd)' });
+    tecCard.append(el('h3', { textContent: '📋 Crèdits tècnics (Direcció, Guió, Muntatge...)' }));
+
+    const tecBar = el('div', { class: 'row', style: 'margin-bottom:10px' });
+    tecBar.append(el('button', { class: 'btn p', textContent: '+ Afegir línia', onclick: async () => {
+      const cat = prompt('Categoria (Direcció, Guió, Muntatge...):', 'Direcció');
+      if (!cat) return;
+      const nom = prompt('Nom:', '');
+      if (!nom) return;
+      const ordre = creditsTecnics.length;
+      const r = await db.from('credits_tecnics').insert({ categoria: cat.trim(), nom: nom.trim(), ordre, created_by: me }).select().single();
+      if (r.error) { alert('Error: ' + r.error.message); return; }
+      creditsTecnics.push(r.data);
+      render();
+    } }));
+    tecBar.append(el('button', { class: 'btn', textContent: '📥 Importar Excel/CSV', onclick: () => importaCreditsTecnics() }));
+    tecCard.append(tecBar);
+
+    if (creditsTecnics.length) {
+      const grups = {};
+      creditsTecnics.forEach(c => {
+        const cat = (c.categoria || 'Altres').trim();
+        if (!grups[cat]) grups[cat] = [];
+        grups[cat].push(c);
+      });
+      Object.keys(grups).sort().forEach(cat => {
+        const bloc = el('div', { style: 'margin-bottom:12px' });
+        bloc.append(el('div', { style: 'font-weight:700;color:var(--ac);font-size:13px;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px', textContent: cat }));
+        grups[cat].forEach(c => {
+          const row = el('div', { class: 'task', style: 'padding:4px 0' });
+          const inp = el('input', { type: 'text', value: c.nom, style: 'flex:1', onchange: async e => {
+            const r = await db.from('credits_tecnics').update({ nom: e.target.value }).eq('id', c.id);
+            if (r.error) { alert('Error: ' + r.error.message); return; }
+            c.nom = e.target.value;
+          } });
+          row.append(el('span', { textContent: '👤' }));
+          row.append(inp);
+          row.append(el('button', { class: 'x', textContent: '×', onclick: async () => {
+            if (!confirm('Esborrar aquesta línia?')) return;
+            const r = await db.from('credits_tecnics').delete().eq('id', c.id);
+            if (r.error) { alert('Error: ' + r.error.message); return; }
+            creditsTecnics = creditsTecnics.filter(x => x.id !== c.id); render();
+          } }));
+          bloc.append(row);
+        });
+        tecCard.append(bloc);
+      });
     } else {
-      const list = el('div', { class: 'cred-list' });
+      tecCard.append(el('div', { class: 'badge', textContent: 'Cap crèdit tècnic encara. Prem "+ Afegir línia" o "📥 Importar Excel/CSV".' }));
+    }
+    card.append(tecCard);
+
+    // BLOC IMATGES I MÚSICA (taula credits)
+    if (credits.length) {
+      const list = el('div', { class: 'cred-list', style: 'margin-top:18px' });
       credits.forEach((cr, idx) => {
         const row = el('div', { class: 'cred-row' });
         row.setAttribute('draggable', 'true');
@@ -1668,16 +1919,20 @@ function renderCredits() {
         list.append(row);
       });
       card.append(list);
-      card.append(el('h3', { style: 'margin-top:18px', textContent: 'Vista prèvia del document de crèdits' }));
-      card.append(el('div', { class: 'cred-preview', textContent: textCreditsFinals() }));
-      const row = el('div', { class: 'row' });
-      row.append(el('button', { class: 'btn', textContent: '📋 Copiar', onclick: async () => { try { await navigator.clipboard.writeText(textCreditsFinals()); alert('✅ Copiat'); } catch(e){ alert('Error'); } } }));
-      row.append(el('button', { class: 'btn', textContent: '📄 .txt', onclick: () => descarregaTxt(textCreditsFinals(), 'Credits_Documental.txt') }));
-      row.append(el('button', { class: 'btn p', textContent: '📄 PDF', onclick: () => obrePdf(textCreditsFinals(), 'Crèdits del documental') }));
-      row.append(el('button', { class: 'btn', textContent: '📄 Informe complet .txt', onclick: () => descarregaTxt(textCreditsInforme(), 'Credits_Informe_Complet.txt') }));
-      row.append(el('button', { class: 'btn p', textContent: '📄 Informe complet PDF', onclick: () => obrePdf(textCreditsInforme(), 'Informe complet de crèdits') }));
-      card.append(row);
     }
+
+    // PREVIEW I EXPORTS
+    card.append(el('h3', { style: 'margin-top:18px', textContent: 'Vista prèvia del document de crèdits' }));
+    card.append(el('div', { class: 'cred-preview', textContent: textCreditsFinals() }));
+    const row = el('div', { class: 'row' });
+    row.append(el('button', { class: 'btn', textContent: '📋 Copiar', onclick: async () => { try { await navigator.clipboard.writeText(textCreditsFinals()); alert('✅ Copiat'); } catch(e){ alert('Error'); } } }));
+    row.append(el('button', { class: 'btn', textContent: '📄 .txt', onclick: () => descarregaTxt(textCreditsFinals(), 'Credits_Documental.txt') }));
+    row.append(el('button', { class: 'btn p', textContent: '📄 .doc (Word editable)', onclick: () => exportaCreditsDocx() }));
+    row.append(el('button', { class: 'btn p', textContent: '📄 PDF', onclick: () => obrePdf(textCreditsFinals(), 'Crèdits del documental') }));
+    row.append(el('button', { class: 'btn', textContent: '📄 Informe complet .txt', onclick: () => descarregaTxt(textCreditsInforme(), 'Credits_Informe_Complet.txt') }));
+    row.append(el('button', { class: 'btn p', textContent: '📄 Informe complet PDF', onclick: () => obrePdf(textCreditsInforme(), 'Informe complet de crèdits') }));
+    card.append(row);
+
     app.append(card);
     return;
   }
@@ -2109,6 +2364,7 @@ function renderDocEditor() {
   const ed = el('div', { class: 'rich-editor', contentEditable: 'true' });
   ed.innerHTML = d.content || '';
 
+  // Conversió automàtica de TCs en text pla [00:12] a spans .ts
   if (ed.querySelectorAll('.ts').length === 0 && /\[\d{1,2}:\d{2}(?::\d{2})?\]/.test(ed.textContent)) {
     const regex = /\[(\d{1,2}:\d{2}(?::\d{2})?)\]/g;
     let count = 0;
@@ -2473,7 +2729,7 @@ function inicialitzaCercador() {
   document.addEventListener('click', (e) => { if (!e.target.closest('.search-wrap')) results.classList.remove('open'); });
 }
 function cercaGlobal(q) {
-  const r = { tasques: [], documents: [], fitxers: [], drets: [], imatges: [], credits: [] };
+  const r = { tasques: [], documents: [], fitxers: [], drets: [], imatges: [], credits: [], tecnics: [] };
   secs.forEach(s => (s.tasks || []).forEach(k => {
     const blob = [k.t, k.k, k.n, tasquesPersones(k).join(' ')].filter(Boolean).join(' ').toLowerCase();
     if (blob.includes(q)) r.tasques.push({ tasca: k, seccio: s });
@@ -2497,11 +2753,15 @@ function cercaGlobal(q) {
     const blob = [c.arxiu, c.atribucio, c.titol, c.nota].filter(Boolean).join(' ').toLowerCase();
     if (blob.includes(q)) r.credits.push(c);
   });
+  creditsTecnics.forEach(c => {
+    const blob = [c.categoria, c.nom].filter(Boolean).join(' ').toLowerCase();
+    if (blob.includes(q)) r.tecnics.push(c);
+  });
   return r;
 }
 function mostraResultats(r) {
   const box = $('#search-results'); box.innerHTML = '';
-  const total = r.tasques.length + r.documents.length + r.fitxers.length + r.drets.length + r.imatges.length + r.credits.length;
+  const total = r.tasques.length + r.documents.length + r.fitxers.length + r.drets.length + r.imatges.length + r.credits.length + r.tecnics.length;
   if (!total) { box.append(el('div', { class: 'search-empty', textContent: 'Cap resultat.' })); box.classList.add('open'); return; }
   const addGrup = (titol, items, clickFn, labelFn) => {
     if (!items.length) return;
@@ -2514,9 +2774,10 @@ function mostraResultats(r) {
       ]));
     });
   };
+  addGrup('📋 Crèdits tècnics', r.tecnics, (c) => goto('credits'), (c) => ({ title: c.nom || '(sense nom)', meta: c.categoria || '—' }));
   addGrup('🎼 Drets musicals', r.drets, (c) => { currentMR = c; editingMR = false; goto('drets'); }, (c) => ({ title: c.titulo || '(sense títol)', meta: [c.referencia, c.interprete, c.ano_grabacion].filter(Boolean).join(' · ') }));
   addGrup('🖼️ Imatges', r.imatges, (i) => { currentImg = i; editingImg = false; goto('imatges'); }, (i) => ({ title: i.titol || '(sense títol)', meta: [i.any_data, i.tipus, i.autor].filter(Boolean).join(' · ') }));
-  addGrup('📜 Crèdits', r.credits, (c) => { currentCredit = c; editingCredit = true; goto('credits'); }, (c) => ({ title: c.arxiu || '(sense arxiu)', meta: [c.atribucio, c.tipus].filter(Boolean).join(' · ') }));
+  addGrup('📜 Crèdits arxiu', r.credits, (c) => { currentCredit = c; editingCredit = true; goto('credits'); }, (c) => ({ title: c.arxiu || '(sense arxiu)', meta: [c.atribucio, c.tipus].filter(Boolean).join(' · ') }));
   addGrup('📋 Tasques', r.tasques, (x) => goto(x.seccio.id), (x) => ({ title: x.tasca.t || '(sense títol)', meta: [x.seccio.name, x.tasca.d ? fmt(x.tasca.d) : 'Sense data'].filter(Boolean).join(' · ') }));
   addGrup('📚 Documents', r.documents, (d) => { currentDoc = d; goto(secs.find(x => /^gui[oó]$/i.test(x.name))?.id || 'cal'); }, (d) => ({ title: d.title || 'Sense títol', meta: d.folder }));
   addGrup('📎 Fitxers', r.fitxers, (x) => goto(x.seccio.id), (x) => ({ title: x.fitxer.name, meta: x.seccio.name }));
@@ -2540,6 +2801,7 @@ async function start(user) {
   await carregaMusicRights();
   await carregaImageRights();
   await carregaCredits();
+  await carregaCreditsTecnics();
   cur = 'cal'; render();
   inicialitzaCercador();
   db.channel('canvis')
@@ -2559,6 +2821,7 @@ async function start(user) {
     .on('postgres_changes', { event: '*', schema: 'public', table: 'music_rights' }, async () => { await carregaMusicRights(); if (cur === 'drets' && !busy()) render(); })
     .on('postgres_changes', { event: '*', schema: 'public', table: 'image_rights' }, async () => { await carregaImageRights(); if (cur === 'imatges' && !busy()) render(); })
     .on('postgres_changes', { event: '*', schema: 'public', table: 'credits' }, async () => { await carregaCredits(); if (cur === 'credits' && !busy()) render(); })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'credits_tecnics' }, async () => { await carregaCreditsTecnics(); if (cur === 'credits' && !busy()) render(); })
     .subscribe();
   pch = db.channel('presencia', { config: { presence: { key: me } } });
   pch.on('presence', { event: 'sync' }, () => { peers = pch.presenceState(); paintNav(); })
