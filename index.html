@@ -775,10 +775,9 @@ function renderBudget(s) {
               const tipusCalc = calculaTipusJornada(j.hores, j.es_laborable);
 
               // Data
-              const inpData = el('input', { type: 'date', value: j.data || '' });
+                           const inpData = el('input', { type: 'date', value: j.data || '' });
               inpData.disabled = !editing;
               inpData.addEventListener('change', () => {
-                if (blockedDays[inpData.value]) { alert('🔒 Dia bloquejat.'); inpData.value = j.data; return; }
                 j.data = inpData.value; save(s); render();
               });
               jrow.append(el('div', {}, inpData));
