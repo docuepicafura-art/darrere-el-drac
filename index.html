@@ -660,9 +660,9 @@ function renderBudget(s) {
       if (isSoundtrack && dSoundtrack.existeix && dSoundtrack.pendent > 0) {
         concepteCell.append(el('span', { class: 'budget-badge', textContent: '🎼 ' + eur(dSoundtrack.pendent) + ' pendents en drets musicals' }));
       }
-      if (p.admet_jornades && (p.jornades || []).length) {
+          if (p.admet_jornades && (p.jornades || []).length) {
         const pend = pendentJornadesOf(p);
-        if (pend > 0) concepteCell.append(el('span', { class: 'budget-badge', textContent: '🎬 ' + eur(pend) + ' pendents' }));
+        if (pend > 0) concepteCell.append(el('span', { class: 'budget-badge', textContent: '🎬 ' + eur(pend) + ' pendents de cobrar' }));
       }
       row.append(concepteCell);
       row.append(el('div', { class: 'hide-s' }, el('span', { class: 'cat-pill', textContent: p.cat || 'Altres' })));
@@ -696,7 +696,48 @@ function renderBudget(s) {
       });
     }
     list.append(row);
+    // NOU: Resum de mesos a la pantalla inicial (només pendents)
+    if (p.admet_jornades && (p.jornades || []).length) {
+      const grupsResum = agrupaJornadesPerMes(p.jornades);
+      const keysResum = ordenaMesos(Object.keys(grupsResum));
+      
+      const mesosAmbPendent = keysResum.filter(mk => pendentMes(grupsResum[mk]) > 0);
+      
+      if (mesosAmbPendent.length > 0) {
+        const sublinia = el('div', { style: 'padding:6px 10px 6px 46px;font-size:12px;background:rgba(122,90,166,.03)' });
+        
+        mesosAmbPendent.forEach(mk => {
+          const arr = grupsResum[mk];
+          const pendent = pendentMes(arr);
+          const total = totalMes(arr);
+          const numJornades = arr.length;
+          
+          const liniaMes = el('div', { style: 'display:flex;align-items:center;gap:8px;padding:3px 0;border-bottom:1px dashed var(--bd)' });
+          
+          liniaMes.append(el('span', { style: 'font-weight:600;min-width:120px;text-transform:capitalize', textContent: nomMes(mk) }));
+          liniaMes.append(el('span', { style: 'font-size:11px;color:var(--mut);min-width:60px', textContent: '(' + numJornades + ' jornada' + (numJornades === 1 ? '' : 'es') + ')' }));
+          liniaMes.append(el('span', { style: 'font-variant-numeric:tabular-nums;min-width:80px;text-align:right', textContent: eur(total) }));
+          liniaMes.append(el('span', { style: 'font-variant-numeric:tabular-nums;min-width:100px;text-align:right;color:var(--warn);font-weight:600', textContent: '🟡 ' + eur(pendent) + ' pendent' }));
+          
+          if (editing) {
+            liniaMes.append(el('button', { class: 'btn s', textContent: '✅ Cobrar totes', onclick: async () => {
+              if (!confirm('Marcar com a cobrades les ' + arr.filter(j => !j.cobrat).length + ' jornades pendents de ' + nomMes(mk) + '?')) return;
+              arr.forEach(j => { if (!j.cobrat) j.cobrat = true; });
+              save(s); render();
+            } }));
+          } else {
+            liniaMes.append(el('span', { style: 'min-width:110px' }));
+          }
+          
+          sublinia.append(liniaMes);
+        });
+        
+        const subWrap = el('div', { style: 'background:rgba(122,90,166,.03);border-bottom:1px solid var(--bd)' }, sublinia);
+        list.append(subWrap);
+      }
+    }
 
+    if (open) {
     if (open) {
       const box = el('div', { class: 'exp-box' });
       (p.exp || []).forEach((e, ei) => {
