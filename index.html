@@ -190,6 +190,29 @@ input[type=time]{padding:6px;width:auto}
 .budget-indicator .b-pct{font-size:11px;color:var(--mut);margin-top:4px;text-align:right}
 .budget-indicator .b-alert{color:var(--err);font-weight:700;font-size:13px;margin-top:6px}
 .budget-badge{display:inline-block;font-size:10px;padding:2px 8px;border-radius:999px;background:rgba(180,71,31,.12);color:var(--ac);margin-left:8px;font-weight:600;white-space:nowrap}
+
+/* ───────── JORNADES ESPECIALS ───────── */
+.jorn-box{padding:12px 14px;background:rgba(122,90,166,.05);border-top:1px dashed var(--bd);border-bottom:1px solid var(--bd)}
+.jorn-title{margin:0 0 8px;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--mut)}
+.jorn-summary{display:flex;gap:16px;flex-wrap:wrap;font-size:13px;margin-bottom:10px;padding:8px 10px;background:var(--bg);border-radius:8px;border:1px solid var(--bd)}
+.jorn-summary .jorn-cobrat{color:var(--ok);font-weight:600}
+.jorn-summary .jorn-pendent{color:var(--warn);font-weight:600}
+.jorn-mes-head{display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--bg);border:1px solid var(--bd);border-radius:8px;cursor:pointer;font-size:14px;margin-top:6px;user-select:none}
+.jorn-mes-head:hover{background:rgba(180,71,31,.06)}
+.jorn-mes-head.open{background:rgba(180,71,31,.10);border-color:var(--ac)}
+.jorn-caret{font-size:10px;color:var(--mut);width:12px}
+.jorn-mes-nom{font-weight:700;flex:1;text-transform:capitalize}
+.jorn-mes-count{font-size:11px;color:var(--mut)}
+.jorn-mes-total{font-variant-numeric:tabular-nums;font-weight:700}
+.jorn-mes-cobrat{font-size:11px;color:var(--mut);font-variant-numeric:tabular-nums}
+.jorn-taula{margin:8px 0 4px 16px}
+.jorn-row{display:grid;grid-template-columns:130px 70px 130px 55px 1fr 90px 50px 30px;gap:6px;align-items:center;padding:4px 0;border-bottom:1px solid var(--bd);font-size:13px}
+.jorn-head{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--mut);font-weight:600;border-bottom:2px solid var(--bd)}
+.jorn-row.done .jorn-num,.jorn-row.done select,.jorn-row.done input:not([type=checkbox]){opacity:.6}
+.jorn-num{text-align:right;font-variant-numeric:tabular-nums;font-weight:600}
+.jorn-chip{background:#7a5aa6 !important;border-left:3px solid #4a2f7a}
+.gantt-bar-jornada{background:#7a5aa6;outline:2px solid #4a2f7a;outline-offset:-2px}
+
 @media (max-width:640px){
   .bud-head,.bud-row{grid-template-columns:24px 1fr 90px 32px}
   .bud-head .hide-s,.bud-row .hide-s{display:none}
@@ -201,6 +224,8 @@ input[type=time]{padding:6px;width:auto}
   .mr-item{grid-template-columns:auto 1fr}
   .mr-item > div:last-child{grid-column:1/-1}
   .budget-indicator .b-stats{flex-direction:column;gap:4px}
+  .jorn-row{grid-template-columns:1fr 1fr;gap:4px}
+  .jorn-head{display:none}
 }
 </style>
 </head>
@@ -249,7 +274,6 @@ const stLabel = s => ({ pendent: 'Pendent', aprovat: 'Aprovat', pagat: 'Pagat' }
 const fmt = d => d.split('-').reverse().slice(0, 2).join('/');
 const iso = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
 const eur = n => (Number(n) || 0).toLocaleString('ca-ES', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) + ' €';
-const realOf = p => (p.exp || []).reduce((a, e) => a + (Number(e.a) || 0), 0);
 const isBudgetSec = s => /pressupost/i.test(s.name);
 const isOverviewSec = s => /visi[oó]\s*general/i.test(s.name);
 const dias = ['diumenge','dilluns','dimarts','dimecres','dijous','divendres','dissabte'];
@@ -259,6 +283,12 @@ const humanSize = b => { if (!b) return '0 B'; const u = ['B','KB','MB','GB']; c
 const escapeHtml = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 const MS_DIA = 86400000;
 const avuiISO = () => iso(new Date());
+
+// ─── Jornades especials: constants ───
+const PREUS_JORNADA = { mitja: 71.05, sencera: 131.95, mitja_i_mitja: 203.00 };
+const ETIQ_JORNADA  = { mitja: '½ producció especial', sencera: '1 producció especial', mitja_i_mitja: '1½ producció especial' };
+const ETIQ_CURTA    = { mitja: '½', sencera: '1', mitja_i_mitja: '1½' };
+const PARTIDES_AMB_JORNADES = /direcci[oó]|gui[oó]/i;
 
 let blockedDays = {};
 let docs = [];
@@ -278,29 +308,60 @@ const rangTasca = k => {
   return null;
 };
 
+// ─── Jornades especials: helpers ───
+const importJornada = j => (PREUS_JORNADA[j.tipus] || 0) * (Number(j.persones) || 0);
+const mesDeJornada  = j => (j.data || '').slice(0, 7);
+const nomMes = key => {
+  if (!key || key.length < 7) return '(sense data)';
+  const [y, m] = key.split('-').map(Number);
+  return mesos[m - 1] + ' ' + y;
+};
+const ordenaMesos = keys => keys.slice().sort();
+function agrupaJornadesPerMes(jornades) {
+  const grups = {};
+  (jornades || []).forEach(j => {
+    const k = mesDeJornada(j) || 'sense-data';
+    (grups[k] = grups[k] || []).push(j);
+  });
+  Object.values(grups).forEach(arr => arr.sort((a, b) => (a.data || '').localeCompare(b.data || '')));
+  return grups;
+}
+const totalMes   = arr => arr.reduce((a, j) => a + importJornada(j), 0);
+const cobratMes  = arr => arr.filter(j => j.cobrat).reduce((a, j) => a + importJornada(j), 0);
+const pendentMes = arr => arr.filter(j => !j.cobrat).reduce((a, j) => a + importJornada(j), 0);
+const pendentJornadesOf = p =>
+  (p.jornades || []).filter(j => !j.cobrat).reduce((a, j) => a + importJornada(j), 0);
+
+const realOf = p => {
+  const despeses = (p.exp || []).reduce((a, e) => a + (Number(e.a) || 0), 0);
+  const jornadesCobrades = (p.jornades || []).filter(j => j.cobrat)
+    .reduce((a, j) => a + importJornada(j), 0);
+  return despeses + jornadesCobrades;
+};
+
 const PARTIDES_INICIALS = [
-  {c:"Direcció",cat:"Personal intern",p:0,st:"pendent",exp:[]},
-  {c:"Guió",cat:"Personal intern",p:4000,st:"pendent",exp:[]},
-  {c:"Direcció de fotografia",cat:"Personal intern",p:0,st:"pendent",exp:[]},
-  {c:"Operador càmera / il·luminació / so",cat:"Personal intern",p:5500,st:"pendent",exp:[]},
-  {c:"Producció",cat:"Fixer extern",p:1500,st:"pendent",exp:[]},
-  {c:"Romanent",cat:"Altres",p:1000,st:"pendent",exp:[]},
-  {c:"Muntatge i etalonatge",cat:"Personal intern",p:0,st:"pendent",exp:[]},
-  {c:"Postproducció i grafisme",cat:"Personal intern",p:0,st:"pendent",exp:[]},
-  {c:"Postproducció so",cat:"Personal extern",p:1500,st:"pendent",exp:[]},
-  {c:"Composició BSO",cat:"Personal extern",p:3250,st:"pendent",exp:[]},
-  {c:"Drets imatges arxiu",cat:"Altres",p:7000,st:"pendent",exp:[]},
-  {c:"Drets Soundtrack",cat:"Altres",p:3000,st:"pendent",exp:[]},
-  {c:"Rodatge en localitzacions",cat:"Altres",p:6000,st:"pendent",exp:[]},
-  {c:"Material tècnic",cat:"Altres",p:5000,st:"pendent",exp:[]},
-  {c:"Subtitulació",cat:"Empresa externa",p:3000,st:"pendent",exp:[]},
-  {c:"Veus (veu + màgia)",cat:"Personal extern",p:750,st:"pendent",exp:[]},
-  {c:"Veus (veu animacions)",cat:"Personal extern",p:250,st:"pendent",exp:[]},
-  {c:"Il·lustracions",cat:"Personal extern",p:4500,st:"pendent",exp:[]},
-  {c:"Animació",cat:"Empresa externa",p:3250,st:"pendent",exp:[]},
-  {c:"Distribució i comunicació (interna)",cat:"Contractació interna",p:10200,st:"pendent",exp:[]},
-  {c:"Distribució i comunicació (empreses)",cat:"Empresa externa",p:4500,st:"pendent",exp:[]},
-  {c:"Dietes i desplaçaments",cat:"Altres",p:2500,st:"pendent",exp:[]}
+  {c:"Direcció",cat:"Personal intern",p:0,st:"pendent",exp:[],jornades:[],admet_jornades:true},
+  {c:"Guió",cat:"Personal intern",p:4000,st:"pendent",exp:[],jornades:[],admet_jornades:true},
+  {c:"Direcció de fotografia",cat:"Personal intern",p:0,st:"pendent",exp:[],jornades:[],admet_jornades:false},
+  {c:"Operador càmera / il·luminació / so",cat:"Personal intern",p:5500,st:"pendent",exp:[],jornades:[],admet_jornades:false},
+  {c:"Producció",cat:"Fixer extern",p:1500,st:"pendent",exp:[],jornades:[],admet_jornades:false},
+  {c:"Romanent",cat:"Altres",p:1000,st:"pendent",exp:[],jornades:[],admet_jornades:false},
+  {c:"Muntatge i etalonatge",cat:"Personal intern",p:0,st:"pendent",exp:[],jornades:[],admet_jornades:false},
+  {c:"Postproducció i grafisme",cat:"Personal intern",p:0,st:"pendent",exp:[],jornades:[],admet_jornades:false},
+  {c:"Postproducció so",cat:"Personal extern",p:1500,st:"pendent",exp:[],jornades:[],admet_jornades:false},
+  {c:"Composició BSO",cat:"Personal extern",p:3250,st:"pendent",exp:[],jornades:[],admet_jornades:false},
+  {c:"Drets imatges arxiu",cat:"Altres",p:7000,st:"pendent",exp:[],jornades:[],admet_jornades:false},
+  {c:"Drets Soundtrack",cat:"Altres",p:3000,st:"pendent",exp:[],jornades:[],admet_jornades:false},
+  {c:"Rodatge en localitzacions",cat:"Altres",p:6000,st:"pendent",exp:[],jornades:[],admet_jornades:false},
+  {c:"Material tècnic",cat:"Altres",p:5000,st:"pendent",exp:[],jornades:[],admet_jornades:false},
+  {c:"Subtitulació",cat:"Empresa externa",p:3000,st:"pendent",exp:[],jornades:[],admet_jornades:false},
+  {c:"Veus (veu + màgia)",cat:"Personal extern",p:750,st:"pendent",exp:[],jornades:[],admet_jornades:false},
+  {c:"Veus (veu animacions)",cat:"Personal extern",p:250,st:"pendent",exp:[],jornades:[],admet_jornades:false},
+  {c:"Il·lustracions",cat:"Personal extern",p:4500,st:"pendent",exp:[],jornades:[],admet_jornades:false},
+  {c:"Animació",cat:"Empresa externa",p:3250,st:"pendent",exp:[],jornades:[],admet_jornades:false},
+  {c:"Distribució i comunicació (interna)",cat:"Contractació interna",p:10200,st:"pendent",exp:[],jornades:[],admet_jornades:false},
+  {c:"Distribució i comunicació (empreses)",cat:"Empresa externa",p:4500,st:"pendent",exp:[],jornades:[],admet_jornades:false},
+  {c:"Dietes i desplaçaments",cat:"Altres",p:2500,st:"pendent",exp:[],jornades:[],admet_jornades:false}
 ];
 
 let secs = [], people = [
@@ -310,7 +371,7 @@ let secs = [], people = [
   {name:'Javi', email:''},
   {name:'Diego', email:''}
 ], cur = 'cal', editing = false, me = '', peers = {}, pch = null;
-let openBud = {}, cal = (() => { const n = new Date(); return { y: n.getFullYear(), m: n.getMonth() }; })();
+let openBud = {}, openMes = {}, cal = (() => { const n = new Date(); return { y: n.getFullYear(), m: n.getMonth() }; })();
 const timers = {};
 let activeAudioCleanup = null;
 const peopleNames = () => people.map(p => typeof p === 'string' ? p : p.name);
@@ -333,6 +394,7 @@ let editingCredit = false;
 let creditFraseImatges = 'Fotografies i material d\'arxiu cortesia de:';
 let creditFraseMusica = 'Música:';
 let creditsTecnics = [];
+
 function save(s) {
   if (!s || !s.id) return;
   clearTimeout(timers[s.id]);
@@ -419,7 +481,6 @@ async function toggleBlock(day) {
 }
 
 const busy = () => { const a = document.activeElement; return a && $('#app').contains(a) && /INPUT|TEXTAREA|SELECT/.test(a.tagName); };
-
 function calculaDretsSoundtrack() {
   const bsec = secs.find(s => isBudgetSec(s));
   if (!bsec || !bsec.budget) return { pressupostat: 0, gastat: 0, disponible: 0, pct: 0, pendent: 0, pagat: 0, existeix: false };
@@ -1605,14 +1666,12 @@ function mostraImportador() {
   app.innerHTML = '';
   app.append(card);
 }
+
 function textCreditsFinals() {
   const blocs = [];
-
-  // 1. Crèdits tècnics
   const textTec = textCreditsTecnics();
   if (textTec) blocs.push(textTec.trim());
 
-  // 2. Imatges
   const imatgesAprovades = credits.filter(c => c.tipus === 'imatge');
   if (imatgesAprovades.length) {
     const arxius = new Set();
@@ -1639,7 +1698,6 @@ function textCreditsFinals() {
     blocs.push(bloc.join('\n'));
   }
 
-  // 3. Música — format: Títol — Autor — Any — Font
   const musicaAprovada = credits.filter(c => c.tipus === 'musica');
   if (musicaAprovada.length) {
     const bloc = [];
@@ -1810,7 +1868,6 @@ function renderCredits() {
     ]));
     card.append(el('div', { class: 'badge', style: 'margin-top:6px', textContent: 'Llista de crèdits del documental: tècnics, imatges i música.' }));
 
-    // Frases globals
     const fraseBar = el('div', { class: 'cred-frase-bar', style: 'flex-direction:column;align-items:stretch;gap:6px' });
     const row1 = el('div', { style: 'display:flex;gap:8px;align-items:center' });
     row1.append(el('label', { textContent: 'Frase imatges:', style: 'min-width:120px' }));
@@ -1828,7 +1885,6 @@ function renderCredits() {
     fraseBar.append(row2);
     card.append(fraseBar);
 
-    // BLOC CRÈDITS TÈCNICS
     const tecCard = el('div', { style: 'margin-top:18px;padding-top:14px;border-top:2px solid var(--bd)' });
     tecCard.append(el('h3', { textContent: '📋 Crèdits tècnics (Direcció, Guió, Muntatge...)' }));
 
@@ -1881,7 +1937,6 @@ function renderCredits() {
     }
     card.append(tecCard);
 
-    // BLOC IMATGES I MÚSICA (taula credits)
     if (credits.length) {
       const list = el('div', { class: 'cred-list', style: 'margin-top:18px' });
       credits.forEach((cr, idx) => {
@@ -1921,7 +1976,6 @@ function renderCredits() {
       card.append(list);
     }
 
-    // PREVIEW I EXPORTS
     card.append(el('h3', { style: 'margin-top:18px', textContent: 'Vista prèvia del document de crèdits' }));
     card.append(el('div', { class: 'cred-preview', textContent: textCreditsFinals() }));
     const row = el('div', { class: 'row' });
@@ -2066,6 +2120,194 @@ async function autoGeneraCredits() {
   render();
 }
 
+function renderOverview() {
+  const wrap = el('div');
+  const today = iso(new Date());
+  const all = [];
+  secs.forEach(sec => (sec.tasks || []).forEach(k => { if (!k.done && k.t && k.t.trim()) all.push({ k, sec }); }));
+  all.sort((a, b) => ((a.k.d || '9999') + (a.k.h || '')).localeCompare((b.k.d || '9999') + (b.k.h || '')));
+  const properes = all.filter(x => !x.k.d || x.k.d >= today);
+  const entrevistes = properes.filter(x => (x.k.k || '') === 'Entrevista').slice(0, 8);
+  const altres = properes.filter(x => (x.k.k || '') !== 'Entrevista').slice(0, 20);
+  const c1 = el('div', { class: 'card' }, el('h3', { textContent: '🎤 Properes entrevistes' }));
+  if (!entrevistes.length) c1.append(el('div', { class: 'agenda-empty', textContent: 'Cap.' }));
+  entrevistes.forEach(({ k, sec }) => {
+    c1.append(el('div', { class: 'agenda-item', onclick: () => goto(sec.id) }, [
+      el('div', { class: 'agenda-when' }, [el('div', { textContent: k.d ? (diaLabel(k.d) + ' ' + fmt(k.d)) : 'Sense data' }), k.h ? el('div', { class: 'hr', textContent: k.h }) : '']),
+      el('div', {}, [el('div', { class: 'agenda-title', textContent: k.t || '(sense títol)' }), el('div', { class: 'agenda-who', textContent: sec.name })]),
+      el('div', { class: 'agenda-who', textContent: tasquesPersones(k).join(', ') })
+    ]));
+  });
+  wrap.append(c1);
+  const c2 = el('div', { class: 'card' }, el('h3', { textContent: '📅 Properes tasques' }));
+  if (!altres.length) c2.append(el('div', { class: 'agenda-empty', textContent: 'Cap.' }));
+  altres.forEach(({ k, sec }) => {
+    c2.append(el('div', { class: 'agenda-item', onclick: () => goto(sec.id) }, [
+      el('div', { class: 'agenda-when' }, [el('div', { textContent: k.d ? fmt(k.d) : 'Sense data' }), k.h ? el('div', { class: 'hr', textContent: k.h }) : '']),
+      el('div', {}, [el('div', { class: 'agenda-title', textContent: k.t || '(sense títol)' }), el('div', { class: 'agenda-who', textContent: sec.name })]),
+      el('div', { class: 'agenda-chip k' + ki(k), textContent: k.k || 'Altres' })
+    ]));
+  });
+  wrap.append(c2);
+  const bsec = secs.find(x => isBudgetSec(x));
+  const c3 = el('div', { class: 'card', style: 'cursor:pointer', onclick: () => { if (bsec) goto(bsec.id); } },
+    el('div', { class: 'row', style: 'justify-content:space-between;margin:0 0 10px' }, [el('h3', { textContent: '💰 Pressupost', style: 'margin:0' }), el('div', { class: 'badge', textContent: 'Veure →' })]));
+  if (bsec && bsec.budget && bsec.budget.length) {
+    const tp = bsec.budget.reduce((a, p) => a + (Number(p.p) || 0), 0);
+    const tr = bsec.budget.reduce((a, p) => a + realOf(p), 0);
+    const sum = el('div', { class: 'summary' });
+    sum.append(el('div', { class: 'lbl', textContent: 'Previst' }), el('div', { class: 'val big', textContent: eur(tp) }));
+    sum.append(el('div', { class: 'lbl', textContent: 'Real' }), el('div', { class: 'val big', textContent: eur(tr) }));
+    c3.append(sum);
+  } else c3.append(el('div', { class: 'agenda-empty', textContent: 'Sense pressupost.' }));
+  wrap.append(c3);
+  return wrap;
+}
+
+function renderGantt() {
+  const app = $('#app'); app.innerHTML = '';
+  const tasques = [];
+  secs.forEach(s => (s.tasks || []).forEach(k => {
+    if (!k.t || !k.t.trim()) return;
+    const r = rangTasca(k);
+    if (!r) return;
+    tasques.push({ tasca: k, seccio: s, inici: r.inici, fi: r.fi, auto: r.auto, esJornada: false });
+  }));
+  // Jornades especials
+  secs.forEach(s => {
+    const bsec = isBudgetSec(s) ? s : null;
+    if (!bsec || !bsec.budget) return;
+    bsec.budget.forEach(p => {
+      (p.jornades || []).forEach(j => {
+        if (!j.data) return;
+        tasques.push({
+          tasca: {
+            t: '🎬 ' + (j.concepte || p.c || 'Jornada') + ' · ' + ETIQ_CURTA[j.tipus] + ' × ' + j.persones + 'p',
+            k: 'Producció',
+            done: !!j.cobrat,
+            h: ''
+          },
+          seccio: bsec,
+          inici: j.data,
+          fi: j.data,
+          auto: false,
+          esJornada: true
+        });
+      });
+    });
+  });
+
+  if (!tasques.length) { app.append(el('div', { class: 'card' }, el('div', { class: 'badge', textContent: 'Cap tasca amb data.' }))); return; }
+  tasques.sort((a, b) => a.inici.localeCompare(b.inici));
+
+  const avuiStr = avuiISO();
+  let primera = new Date(tasques[0].inici + 'T00:00:00');
+  let ultima = new Date(tasques[tasques.length - 1].fi + 'T00:00:00');
+  if (avuiStr < iso(primera)) primera = new Date(avuiStr + 'T00:00:00');
+  if (avuiStr > iso(ultima)) ultima = new Date(avuiStr + 'T00:00:00');
+  const inici = new Date(primera); inici.setDate(inici.getDate() - 2);
+  const fi = new Date(ultima); fi.setDate(fi.getDate() + 2);
+  const dies = []; const cur = new Date(inici);
+  while (cur <= fi) { dies.push(new Date(cur)); cur.setDate(cur.getDate() + 1); }
+  const total = dies.length;
+
+  const wrap = el('div', { class: 'card' });
+  wrap.append(el('h2', { textContent: '📊 Diagrama de Gantt' }));
+  const gantt = el('div', { class: 'gantt', style: 'grid-template-columns:240px repeat(' + total + ',minmax(24px,1fr))' });
+
+  let mesA = -1, cntMes = 0; const mesCells = [];
+  dies.forEach((d, idx) => {
+    if (d.getMonth() !== mesA) { if (cntMes > 0) mesCells.push({ span: cntMes, text: mesos[mesA] + ' ' + dies[idx-1].getFullYear() }); mesA = d.getMonth(); cntMes = 1; } else cntMes++;
+  });
+  if (cntMes > 0) mesCells.push({ span: cntMes, text: mesos[mesA] + ' ' + dies[dies.length-1].getFullYear() });
+
+  gantt.append(el('div', { class: 'gantt-head' }));
+  mesCells.forEach(m => gantt.append(el('div', { class: 'gantt-head month', style: 'grid-column:span ' + m.span, textContent: m.text })));
+  gantt.append(el('div', { class: 'gantt-head', textContent: 'Tasca' }));
+  dies.forEach(d => {
+    const wkd = d.getDay() === 0 || d.getDay() === 6;
+    const td = iso(d) === avuiStr;
+    gantt.append(el('div', { class: 'gantt-head' + (wkd ? ' weekend' : '') + (td ? ' today' : ''), textContent: String(d.getDate()) }));
+  });
+
+  tasques.forEach(({ tasca, seccio, inici, fi, auto, esJornada }) => {
+    gantt.append(el('div', { class: 'gantt-label', title: seccio.name, textContent: tasca.t || '(sense títol)' }));
+    const si = dies.findIndex(d => iso(d) === inici);
+    const ei = dies.findIndex(d => iso(d) === fi);
+    const span = ei - si + 1;
+    for (let i = 0; i < total; i++) {
+      const d = dies[i];
+      const c = el('div', { class: 'gantt-cell' });
+      if (iso(d) === avuiStr) c.classList.add('gantt-today');
+      if (i === si && span > 0) {
+        const bClass = 'gantt-bar' + (tasca.done ? ' done' : '') + (auto ? ' auto' : '')
+                       + (esJornada ? ' gantt-bar-jornada' : ' k' + ki(tasca));
+        c.append(el('div', { class: bClass, style: 'left:0;width:calc(100% * ' + span + ' + ' + (span-1) + 'px)', textContent: tasca.t || '', onclick: () => goto(seccio.id) }));
+      }
+      gantt.append(c);
+    }
+  });
+
+  const scroll = el('div', { class: 'gantt-wrap' }); scroll.append(gantt); wrap.append(scroll);
+  app.append(wrap);
+}
+
+function renderCal() {
+  const app = $('#app'); app.innerHTML = '';
+  const by = {};
+  secs.forEach(s => (s.tasks || []).forEach(k => { if (k.d) (by[k.d] = by[k.d] || []).push({ k, s }); }));
+  // Jornades especials
+  secs.forEach(s => {
+    const bsec = isBudgetSec(s) ? s : null;
+    if (!bsec || !bsec.budget) return;
+    bsec.budget.forEach(p => {
+      (p.jornades || []).forEach(j => {
+        if (!j.data) return;
+        by[j.data] = by[j.data] || [];
+        by[j.data].push({ j, p, s: bsec, esJornada: true });
+      });
+    });
+  });
+
+  const avuiStr = avuiISO();
+  app.append(el('div', { class: 'row', style: 'align-items:center;justify-content:space-between;margin:0 0 12px' }, [
+    el('button', { class: 'btn', textContent: '←', onclick: () => { cal.m--; if (cal.m < 0) { cal.m = 11; cal.y--; } render(); } }),
+    el('strong', { textContent: new Date(cal.y, cal.m, 1).toLocaleDateString('ca', { month: 'long', year: 'numeric' }) }),
+    el('button', { class: 'btn', textContent: '→', onclick: () => { cal.m++; if (cal.m > 11) { cal.m = 0; cal.y++; } render(); } })
+  ]));
+
+  const g = el('div', { class: 'cal' });
+  ['Dl','Dt','Dc','Dj','Dv','Ds','Dg'].forEach(d => g.append(el('div', { class: 'wd', textContent: d })));
+  const off = (new Date(cal.y, cal.m, 1).getDay() + 6) % 7, dim = new Date(cal.y, cal.m + 1, 0).getDate();
+  for (let i = 0; i < off; i++) g.append(el('div', { class: 'cell e' }));
+
+  for (let d = 1; d <= dim; d++) {
+    const key = cal.y + '-' + String(cal.m + 1).padStart(2,'0') + '-' + String(d).padStart(2,'0');
+    const isB = !!blockedDays[key]; const isT = key === avuiStr;
+    const c = el('div', { class: 'cell' + (isB ? ' blocked' : '') + (isT ? ' today' : '') });
+    c.append(el('div', { class: 'dn', textContent: d }));
+    c.append(el('span', { class: 'lock', textContent: isB ? '🔒' : '🔓', onclick: () => toggleBlock(key) }));
+
+    (by[key] || []).forEach(item => {
+      if (item.esJornada) {
+        const { j, p, s } = item;
+        const label = '🎬 ' + ETIQ_CURTA[j.tipus] + ' ' + (j.concepte || p.c || 'Jornada') + ' (' + j.persones + 'p)';
+        c.append(el('div', {
+          class: 'chip jorn-chip' + (j.cobrat ? ' done' : ''),
+          title: ETIQ_JORNADA[j.tipus] + ' × ' + j.persones + ' persones = ' + eur(importJornada(j)),
+          textContent: label,
+          onclick: () => goto(s.id)
+        }));
+      } else {
+        const { k, s } = item;
+        c.append(el('div', { class: 'chip k' + ki(k) + (k.done ? ' done' : ''), textContent: (k.h ? k.h + ' ' : '') + (k.t || ''), onclick: () => goto(s.id) }));
+      }
+    });
+    g.append(c);
+  }
+  app.append(g);
+  app.append(el('div', { class: 'row' }, KINDS.map((n, i) => el('span', { class: 'chip k' + i, textContent: n }))));
+}
 function renderTasks(s) {
   const t = el('div', { class: 'card' }, el('h3', { textContent: 'Tasques' }));
   (s.tasks || []).forEach((k, i) => {
@@ -2162,127 +2404,6 @@ function mouPartidaA(s, from, to) {
   save(s); render();
 }
 
-function renderBudget(s) {
-  s.budget = s.budget || [];
-  let calDesar = false;
-  s.budget.forEach((p, i) => { if (typeof p.pos !== 'number') { p.pos = i; calDesar = true; } });
-  s.budget.sort((a, b) => (a.pos || 0) - (b.pos || 0));
-  if (calDesar) save(s);
-
-  const dSoundtrack = calculaDretsSoundtrack();
-
-  const wrap = el('div', { class: 'card' });
-  wrap.append(el('div', { class: 'row', style: 'justify-content:space-between;margin:0 0 8px;align-items:center' }, [
-    el('h3', { textContent: 'Full de pressupost', style: 'margin:0' }),
-    el('div', { class: 'row', style: 'margin:0' }, [
-      editing ? el('button', { class: 'btn s', textContent: '📥 Recarregar', onclick: () => {
-        if (!confirm('Sobreescriure amb les 21 partides inicials?')) return;
-        s.budget = JSON.parse(JSON.stringify(PARTIDES_INICIALS));
-        s.budget.forEach((p, i) => p.pos = i);
-        save(s); render();
-      } }) : '',
-      editing ? el('button', { class: 'btn', textContent: '+ Nova partida', onclick: () => { s.budget.push({ c:'', cat:'Altres', p:0, st:'pendent', exp:[], pos: s.budget.length }); save(s); render(); } }) : ''
-    ].filter(Boolean))
-  ].filter(Boolean)));
-  if (!s.budget.length) { wrap.append(el('div', { class: 'badge', textContent: 'Cap partida.' })); return wrap; }
-  if (editing) wrap.append(el('div', { class: 'badge', style: 'margin-bottom:8px', textContent: '💡 Arrossega el ⋮⋮ per reordenar.' }));
-  const list = el('div', { class: 'bud-list' });
-  list.append(el('div', { class: 'bud-head' }, [
-    el('div'), el('div', { textContent: 'Concepte' }),
-    el('div', { class: 'hide-s', textContent: 'Tipus' }),
-    el('div', { class: 'bc-num', textContent: 'Previst' }),
-    el('div', { class: 'bc-num', textContent: 'Real' }),
-    el('div', { class: 'hide-s', textContent: 'Estat' }),
-    el('div')
-  ]));
-  s.budget.forEach((p, idx) => {
-    const open = !!openBud[idx];
-    const real = realOf(p);
-    const isSoundtrack = /soundtrack/i.test(p.c || '');
-    const row = el('div', { class: 'bud-row' + (open ? ' open' : '') });
-    const cellCaret = el('div', { class: 'bc-caret' });
-    if (editing) {
-      const handle = el('span', { class: 'drag-handle', textContent: '⋮⋮', draggable: 'true' });
-      handle.addEventListener('dragstart', (ev) => { ev.dataTransfer.setData('text/plain', String(idx)); ev.dataTransfer.effectAllowed = 'move'; row.classList.add('dragging'); });
-      handle.addEventListener('dragend', () => row.classList.remove('dragging'));
-      cellCaret.append(handle);
-    }
-    cellCaret.append(el('button', { class: 'caret' + (open ? ' open' : ''), textContent: '▶', onclick: () => { openBud[idx] = !openBud[idx]; render(); } }));
-    row.append(cellCaret);
-    if (editing) {
-      row.append(el('div', {}, el('input', { type: 'text', value: p.c, oninput: e => { p.c = e.target.value; save(s); } })));
-      row.append(el('div', { class: 'hide-s' }, el('select', { onchange: e => { p.cat = e.target.value; save(s); } }, CATS.map(c => el('option', { value: c, textContent: c, selected: (p.cat || 'Altres') === c })))));
-      row.append(el('div', { class: 'bc-num' }, el('input', { type: 'number', value: p.p, min: 0, step: '0.01', style: 'text-align:right', oninput: e => { p.p = Number(e.target.value) || 0; save(s); } })));
-    } else {
-      const concepteCell = el('div', { textContent: p.c || '(sense nom)' });
-      if (isSoundtrack && dSoundtrack.existeix && dSoundtrack.pendent > 0) {
-        concepteCell.append(el('span', { class: 'budget-badge', textContent: '🎼 ' + eur(dSoundtrack.pendent) + ' pendents en drets musicals' }));
-      }
-      row.append(concepteCell);
-      row.append(el('div', { class: 'hide-s' }, el('span', { class: 'cat-pill', textContent: p.cat || 'Altres' })));
-      row.append(el('div', { class: 'bc-num', textContent: eur(p.p) }));
-    }
-    let realMostrat = real;
-    if (isSoundtrack && dSoundtrack.existeix && dSoundtrack.pagat > 0) {
-      realMostrat = real + dSoundtrack.pagat;
-    }
-    row.append(el('div', { class: 'bc-num strong', textContent: eur(realMostrat) }));
-
-    let estatMostrar = p.st || 'pendent';
-    if (isSoundtrack && dSoundtrack.existeix && dSoundtrack.pagat > 0) {
-      estatMostrar = 'pagat';
-    }
-
-    if (editing) {
-      row.append(el('div', { class: 'hide-s' }, el('select', { onchange: e => { p.st = e.target.value; save(s); } }, STATS.map(([v, l]) => el('option', { value: v, textContent: l, selected: (p.st || 'pendent') === v })))));
-    } else {
-      row.append(el('div', { class: 'hide-s' }, el('span', { class: 'st-pill ' + stClass(estatMostrar), textContent: stLabel(estatMostrar) })));
-    }
-
-    row.append(el('div', { class: 'bc-x' }, editing ? el('button', { class: 'x', textContent: '×', onclick: () => { if (confirm('Eliminar?')) { s.budget.splice(idx, 1); s.budget.forEach((q,i)=>q.pos=i); save(s); render(); } } }) : ''));
-    if (editing) {
-      row.addEventListener('dragover', (ev) => { ev.preventDefault(); row.classList.add('drop-target'); });
-      row.addEventListener('dragleave', () => row.classList.remove('drop-target'));
-      row.addEventListener('drop', (ev) => {
-        ev.preventDefault(); row.classList.remove('drop-target');
-        const from = parseInt(ev.dataTransfer.getData('text/plain'), 10);
-        if (!isNaN(from)) mouPartidaA(s, from, idx);
-      });
-    }
-    list.append(row);
-    if (open) {
-      const box = el('div', { class: 'exp-box' });
-      (p.exp || []).forEach((e, ei) => {
-        const item = el('div', { class: 'exp-item' });
-        if (editing) {
-          item.append(el('input', { type: 'date', class: 'd', value: e.d || '', oninput: ev => { e.d = ev.target.value; save(s); } }));
-          item.append(el('input', { type: 'text', class: 't', value: e.t || '', oninput: ev => { e.t = ev.target.value; save(s); } }));
-          item.append(el('input', { type: 'number', class: 'a', value: e.a || 0, oninput: ev => { e.a = Number(ev.target.value) || 0; save(s); } }));
-          item.append(el('button', { class: 'x', textContent: '×', onclick: () => { p.exp.splice(ei, 1); save(s); render(); } }));
-        } else {
-          item.append(el('span', { class: 'exp-date', textContent: e.d ? fmt(e.d) : '—' }));
-          item.append(el('span', { class: 'exp-name', textContent: e.t || '(sense concepte)' }));
-          item.append(el('span', { class: 'exp-amt', textContent: eur(e.a) }));
-        }
-        box.append(item);
-      });
-      if (!(p.exp || []).length) box.append(el('div', { class: 'badge', textContent: 'Cap despesa.' }));
-      if (editing) box.append(el('button', { class: 'btn s', textContent: '+ Afegir despesa', onclick: () => { p.exp = p.exp || []; p.exp.push({ d:'', t:'', a:0 }); save(s); render(); } }));
-      list.append(box);
-    }
-  });
-  wrap.append(list);
-  const totalP = s.budget.reduce((a, p) => a + (Number(p.p) || 0), 0);
-  const totalR = s.budget.reduce((a, p) => a + realOf(p), 0);
-  const diff = totalR - totalP;
-  const sum = el('div', { class: 'summary', style: 'margin-top:16px;padding-top:14px;border-top:2px solid var(--bd)' });
-  sum.append(el('div', { class: 'lbl', textContent: 'Total previst' }), el('div', { class: 'val big', textContent: eur(totalP) }));
-  sum.append(el('div', { class: 'lbl', textContent: 'Total real' }), el('div', { class: 'val big', textContent: eur(totalR) }));
-  sum.append(el('div', { class: 'lbl', textContent: 'Diferència' }), el('div', { class: 'val big ' + (diff > 0 ? 'pos' : diff < 0 ? 'neg' : ''), textContent: (diff > 0 ? '+' : '') + eur(diff) }));
-  wrap.append(sum);
-  return wrap;
-}
-
 function renderDocsUI() { if (currentDoc) return renderDocEditor(); return renderDocsList(); }
 
 function renderDocsList() {
@@ -2364,7 +2485,6 @@ function renderDocEditor() {
   const ed = el('div', { class: 'rich-editor', contentEditable: 'true' });
   ed.innerHTML = d.content || '';
 
-  // Conversió automàtica de TCs en text pla [00:12] a spans .ts
   if (ed.querySelectorAll('.ts').length === 0 && /\[\d{1,2}:\d{2}(?::\d{2})?\]/.test(ed.textContent)) {
     const regex = /\[(\d{1,2}:\d{2}(?::\d{2})?)\]/g;
     let count = 0;
@@ -2590,134 +2710,6 @@ async function transcriuAudio(f, s, ev) {
   } catch (e) { alert('Error: ' + e.message); }
   finally { if (btn) { btn.disabled = false; btn.textContent = '🎤 Transcriure'; } }
 }
-
-function renderOverview() {
-  const wrap = el('div');
-  const today = iso(new Date());
-  const all = [];
-  secs.forEach(sec => (sec.tasks || []).forEach(k => { if (!k.done && k.t && k.t.trim()) all.push({ k, sec }); }));
-  all.sort((a, b) => ((a.k.d || '9999') + (a.k.h || '')).localeCompare((b.k.d || '9999') + (b.k.h || '')));
-  const properes = all.filter(x => !x.k.d || x.k.d >= today);
-  const entrevistes = properes.filter(x => (x.k.k || '') === 'Entrevista').slice(0, 8);
-  const altres = properes.filter(x => (x.k.k || '') !== 'Entrevista').slice(0, 20);
-  const c1 = el('div', { class: 'card' }, el('h3', { textContent: '🎤 Properes entrevistes' }));
-  if (!entrevistes.length) c1.append(el('div', { class: 'agenda-empty', textContent: 'Cap.' }));
-  entrevistes.forEach(({ k, sec }) => {
-    c1.append(el('div', { class: 'agenda-item', onclick: () => goto(sec.id) }, [
-      el('div', { class: 'agenda-when' }, [el('div', { textContent: k.d ? (diaLabel(k.d) + ' ' + fmt(k.d)) : 'Sense data' }), k.h ? el('div', { class: 'hr', textContent: k.h }) : '']),
-      el('div', {}, [el('div', { class: 'agenda-title', textContent: k.t || '(sense títol)' }), el('div', { class: 'agenda-who', textContent: sec.name })]),
-      el('div', { class: 'agenda-who', textContent: tasquesPersones(k).join(', ') })
-    ]));
-  });
-  wrap.append(c1);
-  const c2 = el('div', { class: 'card' }, el('h3', { textContent: '📅 Properes tasques' }));
-  if (!altres.length) c2.append(el('div', { class: 'agenda-empty', textContent: 'Cap.' }));
-  altres.forEach(({ k, sec }) => {
-    c2.append(el('div', { class: 'agenda-item', onclick: () => goto(sec.id) }, [
-      el('div', { class: 'agenda-when' }, [el('div', { textContent: k.d ? fmt(k.d) : 'Sense data' }), k.h ? el('div', { class: 'hr', textContent: k.h }) : '']),
-      el('div', {}, [el('div', { class: 'agenda-title', textContent: k.t || '(sense títol)' }), el('div', { class: 'agenda-who', textContent: sec.name })]),
-      el('div', { class: 'agenda-chip k' + ki(k), textContent: k.k || 'Altres' })
-    ]));
-  });
-  wrap.append(c2);
-  const bsec = secs.find(x => isBudgetSec(x));
-  const c3 = el('div', { class: 'card', style: 'cursor:pointer', onclick: () => { if (bsec) goto(bsec.id); } },
-    el('div', { class: 'row', style: 'justify-content:space-between;margin:0 0 10px' }, [el('h3', { textContent: '💰 Pressupost', style: 'margin:0' }), el('div', { class: 'badge', textContent: 'Veure →' })]));
-  if (bsec && bsec.budget && bsec.budget.length) {
-    const tp = bsec.budget.reduce((a, p) => a + (Number(p.p) || 0), 0);
-    const tr = bsec.budget.reduce((a, p) => a + realOf(p), 0);
-    const sum = el('div', { class: 'summary' });
-    sum.append(el('div', { class: 'lbl', textContent: 'Previst' }), el('div', { class: 'val big', textContent: eur(tp) }));
-    sum.append(el('div', { class: 'lbl', textContent: 'Real' }), el('div', { class: 'val big', textContent: eur(tr) }));
-    c3.append(sum);
-  } else c3.append(el('div', { class: 'agenda-empty', textContent: 'Sense pressupost.' }));
-  wrap.append(c3);
-  return wrap;
-}
-
-function renderGantt() {
-  const app = $('#app'); app.innerHTML = '';
-  const tasques = [];
-  secs.forEach(s => (s.tasks || []).forEach(k => {
-    if (!k.t || !k.t.trim()) return;
-    const r = rangTasca(k);
-    if (!r) return;
-    tasques.push({ tasca: k, seccio: s, inici: r.inici, fi: r.fi, auto: r.auto });
-  }));
-  if (!tasques.length) { app.append(el('div', { class: 'card' }, el('div', { class: 'badge', textContent: 'Cap tasca amb data.' }))); return; }
-  tasques.sort((a, b) => a.inici.localeCompare(b.inici));
-  const avuiStr = avuiISO();
-  let primera = new Date(tasques[0].inici + 'T00:00:00');
-  let ultima = new Date(tasques[tasques.length - 1].fi + 'T00:00:00');
-  if (avuiStr < iso(primera)) primera = new Date(avuiStr + 'T00:00:00');
-  if (avuiStr > iso(ultima)) ultima = new Date(avuiStr + 'T00:00:00');
-  const inici = new Date(primera); inici.setDate(inici.getDate() - 2);
-  const fi = new Date(ultima); fi.setDate(fi.getDate() + 2);
-  const dies = []; const cur = new Date(inici);
-  while (cur <= fi) { dies.push(new Date(cur)); cur.setDate(cur.getDate() + 1); }
-  const total = dies.length;
-  const wrap = el('div', { class: 'card' });
-  wrap.append(el('h2', { textContent: '📊 Diagrama de Gantt' }));
-  const gantt = el('div', { class: 'gantt', style: 'grid-template-columns:240px repeat(' + total + ',minmax(24px,1fr))' });
-  let mesA = -1, cntMes = 0; const mesCells = [];
-  dies.forEach((d, idx) => {
-    if (d.getMonth() !== mesA) { if (cntMes > 0) mesCells.push({ span: cntMes, text: mesos[mesA] + ' ' + dies[idx-1].getFullYear() }); mesA = d.getMonth(); cntMes = 1; } else cntMes++;
-  });
-  if (cntMes > 0) mesCells.push({ span: cntMes, text: mesos[mesA] + ' ' + dies[dies.length-1].getFullYear() });
-  gantt.append(el('div', { class: 'gantt-head' }));
-  mesCells.forEach(m => gantt.append(el('div', { class: 'gantt-head month', style: 'grid-column:span ' + m.span, textContent: m.text })));
-  gantt.append(el('div', { class: 'gantt-head', textContent: 'Tasca' }));
-  dies.forEach(d => {
-    const wkd = d.getDay() === 0 || d.getDay() === 6;
-    const td = iso(d) === avuiStr;
-    gantt.append(el('div', { class: 'gantt-head' + (wkd ? ' weekend' : '') + (td ? ' today' : ''), textContent: String(d.getDate()) }));
-  });
-  tasques.forEach(({ tasca, seccio, inici, fi, auto }) => {
-    gantt.append(el('div', { class: 'gantt-label', title: seccio.name, textContent: tasca.t || '(sense títol)' }));
-    const si = dies.findIndex(d => iso(d) === inici);
-    const ei = dies.findIndex(d => iso(d) === fi);
-    const span = ei - si + 1;
-    for (let i = 0; i < total; i++) {
-      const d = dies[i];
-      const c = el('div', { class: 'gantt-cell' });
-      if (iso(d) === avuiStr) c.classList.add('gantt-today');
-      if (i === si && span > 0) {
-        const bClass = 'gantt-bar' + (tasca.done ? ' done' : '') + (auto ? ' auto' : '') + ' k' + ki(tasca);
-        c.append(el('div', { class: bClass, style: 'left:0;width:calc(100% * ' + span + ' + ' + (span-1) + 'px)', textContent: tasca.t || '', onclick: () => goto(seccio.id) }));
-      }
-      gantt.append(c);
-    }
-  });
-  const scroll = el('div', { class: 'gantt-wrap' }); scroll.append(gantt); wrap.append(scroll);
-  app.append(wrap);
-}
-
-function renderCal() {
-  const app = $('#app'); app.innerHTML = '';
-  const by = {}; secs.forEach(s => (s.tasks || []).forEach(k => { if (k.d) (by[k.d] = by[k.d] || []).push({ k, s }); }));
-  const avuiStr = avuiISO();
-  app.append(el('div', { class: 'row', style: 'align-items:center;justify-content:space-between;margin:0 0 12px' }, [
-    el('button', { class: 'btn', textContent: '←', onclick: () => { cal.m--; if (cal.m < 0) { cal.m = 11; cal.y--; } render(); } }),
-    el('strong', { textContent: new Date(cal.y, cal.m, 1).toLocaleDateString('ca', { month: 'long', year: 'numeric' }) }),
-    el('button', { class: 'btn', textContent: '→', onclick: () => { cal.m++; if (cal.m > 11) { cal.m = 0; cal.y++; } render(); } })
-  ]));
-  const g = el('div', { class: 'cal' });
-  ['Dl','Dt','Dc','Dj','Dv','Ds','Dg'].forEach(d => g.append(el('div', { class: 'wd', textContent: d })));
-  const off = (new Date(cal.y, cal.m, 1).getDay() + 6) % 7, dim = new Date(cal.y, cal.m + 1, 0).getDate();
-  for (let i = 0; i < off; i++) g.append(el('div', { class: 'cell e' }));
-  for (let d = 1; d <= dim; d++) {
-    const key = cal.y + '-' + String(cal.m + 1).padStart(2,'0') + '-' + String(d).padStart(2,'0');
-    const isB = !!blockedDays[key]; const isT = key === avuiStr;
-    const c = el('div', { class: 'cell' + (isB ? ' blocked' : '') + (isT ? ' today' : '') });
-    c.append(el('div', { class: 'dn', textContent: d }));
-    c.append(el('span', { class: 'lock', textContent: isB ? '🔒' : '🔓', onclick: () => toggleBlock(key) }));
-    (by[key] || []).forEach(({ k, s }) => c.append(el('div', { class: 'chip k' + ki(k) + (k.done ? ' done' : ''), textContent: (k.h ? k.h + ' ' : '') + (k.t || ''), onclick: () => goto(s.id) })));
-    g.append(c);
-  }
-  app.append(g);
-  app.append(el('div', { class: 'row' }, KINDS.map((n, i) => el('span', { class: 'chip k' + i, textContent: n }))));
-}
-
 function inicialitzaCercador() {
   const input = $('#search-input'), results = $('#search-results');
   if (!input || !results) return;
