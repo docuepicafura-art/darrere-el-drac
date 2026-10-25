@@ -206,7 +206,7 @@ input[type=time]{padding:6px;width:auto}
 .jorn-mes-total{font-variant-numeric:tabular-nums;font-weight:700}
 .jorn-mes-cobrat{font-size:11px;color:var(--mut);font-variant-numeric:tabular-nums}
 .jorn-taula{margin:8px 0 4px 16px}
-.jorn-row{display:grid;grid-template-columns:130px 60px 190px 160px 1fr 90px 50px 90px 50px 30px;gap:6px;align-items:center;padding:4px 0;border-bottom:1px solid var(--bd);font-size:13px}
+.jorn-row{display:grid;grid-template-columns:130px 60px 110px 160px 1fr 90px 50px 90px 50px 30px;gap:6px;align-items:center;padding:4px 0;border-bottom:1px solid var(--bd);font-size:13px}
 .jorn-head{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--mut);font-weight:600;border-bottom:2px solid var(--bd)}
 .jorn-row.done .jorn-num{color:var(--tx) !important;opacity:1 !important}
 .jorn-num{text-align:right;font-variant-numeric:tabular-nums;font-weight:600}
@@ -285,9 +285,26 @@ const MS_DIA = 86400000;
 const avuiISO = () => iso(new Date());
 
 const PREUS_JORNADA = { mitja: 71.05, sencera: 131.95, mitja_i_mitja: 203.00 };
-const ETIQ_JORNADA  = { mitja: '½ producció especial', sencera: '1 producció especial', mitja_i_mitja: '1½ producció especial' };
+const ETIQ_JORNADA  = { mitja: '½ jornada especial', sencera: '1 jornada especial', mitja_i_mitja: '1½ jornada especial' };
 const ETIQ_CURTA    = { mitja: '½', sencera: '1', mitja_i_mitja: '1½' };
 const PARTIDES_AMB_JORNADES = /direcci[oó]|gui[oó]/i;
+
+// NOVA FUNCIÓ: Calcula el tipus segons les hores i si és laborable o no (segons taula)
+const calculaTipusJornada = (hores, esLaborable) => {
+  const h = Number(hores) || 0;
+  if (h <= 0) return null;
+
+  if (esLaborable) {
+    if (h >= 1.5 && h <= 3.75) return 'mitja';
+    if (h >= 5 && h <= 7.5) return 'sencera';
+    if (h >= 9 && h <= 12) return 'mitja_i_mitja';
+  } else {
+    if (h > 0 && h <= 3.75) return 'mitja';
+    if (h > 3.75 && h <= 7.5) return 'sencera';
+    if (h > 7.5 && h <= 12) return 'mitja_i_mitja';
+  }
+  return 'fora_de_rang';
+};
 
 let blockedDays = {};
 let docs = [];
@@ -308,10 +325,13 @@ const rangTasca = k => {
 };
 
 const importJornada = j => {
-  const preu = PREUS_JORNADA[j.tipus] || 0;
+  const tipusCalculat = calculaTipusJornada(j.hores, j.es_laborable);
+  if (!tipusCalculat || tipusCalculat === 'fora_de_rang') return 0;
+  const preu = PREUS_JORNADA[tipusCalculat] || 0;
   const nPers = Array.isArray(j.persones_noms) ? j.persones_noms.length : (Number(j.persones) || 0);
   return preu * nPers;
 };
+
 const mesDeJornada  = j => (j.data || '').slice(0, 7);
 const nomMes = key => {
   if (!key || key.length < 7) return '(sense data)';
@@ -564,6 +584,10 @@ function renderBudget(s) {
         delete j.persones;
         calDesar = true;
       }
+      if (typeof j.es_laborable !== 'boolean') {
+        j.es_laborable = true; // Valor per defecte per a jornades antigues
+        calDesar = true;
+      }
     });
     if (typeof p.admet_jornades !== 'boolean') {
       p.admet_jornades = PARTIDES_AMB_JORNADES.test(p.c || '');
@@ -732,10 +756,11 @@ function renderBudget(s) {
 
           if (obert) {
             const taula = el('div', { class: 'jorn-taula' });
+            // ACTUALITZAT: Nova capçalera amb "Laborable?"
             taula.append(el('div', { class: 'jorn-row jorn-head' }, [
               el('div', { textContent: 'Data' }),
               el('div', { textContent: 'Hores' }),
-              el('div', { textContent: 'Tipus' }),
+              el('div', { textContent: 'Laborable?' }),
               el('div', { textContent: 'Persones' }),
               el('div', { textContent: 'Concepte' }),
               el('div', { class: 'jorn-num', textContent: 'Preu unit.' }),
@@ -747,7 +772,9 @@ function renderBudget(s) {
 
             arr.forEach(j => {
               const jrow = el('div', { class: 'jorn-row' + (j.cobrat ? ' done' : '') });
+              const tipusCalc = calculaTipusJornada(j.hores, j.es_laborable);
 
+              // Data
               const inpData = el('input', { type: 'date', value: j.data || '' });
               inpData.disabled = !editing;
               inpData.addEventListener('change', () => {
@@ -756,18 +783,22 @@ function renderBudget(s) {
               });
               jrow.append(el('div', {}, inpData));
 
-              const inpH = el('input', { type: 'number', value: j.hores || 0, min: 0, step: 0.5, style: 'width:70px' });
+              // Hores
+              const inpH = el('input', { type: 'number', value: j.hores || 0, min: 0, step: 0.25, style: 'width:70px' });
               inpH.disabled = !editing;
               inpH.addEventListener('input', () => { j.hores = Number(inpH.value) || 0; save(s); });
               jrow.append(el('div', {}, inpH));
 
-              const selT = el('select', { style: 'min-width:150px' }, Object.keys(PREUS_JORNADA).map(k =>
-                el('option', { value: k, textContent: ETIQ_JORNADA[k] + ' (' + eur(PREUS_JORNADA[k]) + ')', selected: j.tipus === k })
-              ));
-              selT.disabled = !editing;
-              selT.addEventListener('change', () => { j.tipus = selT.value; save(s); render(); });
-              jrow.append(el('div', {}, selT));
+              // LABORABLE o NO (Selector)
+              const selLab = el('select', { style: 'min-width:110px' }, [
+                el('option', { value: 'true', textContent: 'Dia laborable', selected: j.es_laborable !== false }),
+                el('option', { value: 'false', textContent: 'Dia NO laborable', selected: j.es_laborable === false })
+              ]);
+              selLab.disabled = !editing;
+              selLab.addEventListener('change', () => { j.es_laborable = selLab.value === 'true'; save(s); render(); });
+              jrow.append(el('div', {}, selLab));
 
+              // Persones (Botó desplegable)
               const btnPers = el('button', {
                 class: 'btn s',
                 style: 'min-width:110px;text-align:left',
@@ -779,13 +810,9 @@ function renderBudget(s) {
               btnPers.addEventListener('click', (ev) => {
                 ev.stopPropagation();
                 if (btnPers._dropdown && document.body.contains(btnPers._dropdown)) {
-                  btnPers._dropdown.remove();
-                  btnPers._dropdown = null;
-                  return;
+                  btnPers._dropdown.remove(); btnPers._dropdown = null; return;
                 }
-                const dd = el('div', {
-                  style: 'position:absolute;z-index:100;background:var(--card);border:1px solid var(--bd);border-radius:8px;padding:8px;box-shadow:0 8px 24px rgba(0,0,0,.15);min-width:180px'
-                });
+                const dd = el('div', { style: 'position:absolute;z-index:100;background:var(--card);border:1px solid var(--bd);border-radius:8px;padding:8px;box-shadow:0 8px 24px rgba(0,0,0,.15);min-width:180px' });
                 peopleNames().forEach(nom => {
                   const checked = (j.persones_noms || []).includes(nom);
                   const lbl = el('label', { style: 'display:flex;align-items:center;gap:8px;padding:4px 6px;border-radius:6px;cursor:pointer;font-size:13px;' + (checked ? 'background:rgba(180,71,31,.1);color:var(--ac);font-weight:600' : '') });
@@ -801,36 +828,42 @@ function renderBudget(s) {
                 });
                 document.body.appendChild(dd);
                 const rect = btnPers.getBoundingClientRect();
-                dd.style.left = rect.left + 'px';
-                dd.style.top = (rect.bottom + 4) + 'px';
+                dd.style.left = rect.left + 'px'; dd.style.top = (rect.bottom + 4) + 'px';
                 btnPers._dropdown = dd;
-                const closeDD = (e) => {
-                  if (dd.contains(e.target) || e.target === btnPers) return;
-                  dd.remove(); btnPers._dropdown = null;
-                  document.removeEventListener('click', closeDD, true);
-                };
+                const closeDD = (e) => { if (dd.contains(e.target) || e.target === btnPers) return; dd.remove(); btnPers._dropdown = null; document.removeEventListener('click', closeDD, true); };
                 setTimeout(() => document.addEventListener('click', closeDD, true), 0);
               });
               jrow.append(el('div', {}, btnPers));
 
+              // Concepte
               const inpC = el('input', { type: 'text', value: j.concepte || '', placeholder: 'Reunió, guió...' });
               inpC.disabled = !editing;
               inpC.addEventListener('input', () => { j.concepte = inpC.value; save(s); });
               jrow.append(el('div', {}, inpC));
 
-              jrow.append(el('div', { class: 'jorn-num', textContent: eur(PREUS_JORNADA[j.tipus] || 0) }));
-              jrow.append(el('div', { class: 'jorn-num', textContent: String((j.persones_noms || []).length) }));
+              // Preu Unitari (calculat automàticament)
+              const preuUnit = tipusCalc && tipusCalc !== 'fora_de_rang' ? (PREUS_JORNADA[tipusCalc] || 0) : 0;
+              jrow.append(el('div', { class: 'jorn-num', textContent: preuUnit ? eur(preuUnit) : '—' }));
+
+              // Nº Persones
+              const nPers = (j.persones_noms || []).length;
+              jrow.append(el('div', { class: 'jorn-num', textContent: String(nPers) }));
+
+              // Total (preu * persones)
+              const totalJornada = preuUnit * nPers;
               jrow.append(el('div', {
                 class: 'jorn-num',
                 style: 'font-weight:700;' + (j.cobrat ? '' : 'color:var(--mut);opacity:.65'),
-                textContent: eur(importJornada(j))
+                textContent: totalJornada > 0 ? eur(totalJornada) : '—'
               }));
 
+              // Cobrat (Checkbox)
               const cbC = el('input', { type: 'checkbox', checked: !!j.cobrat });
               cbC.disabled = !editing;
               cbC.addEventListener('change', () => { j.cobrat = cbC.checked; save(s); render(); });
               jrow.append(el('div', { style: 'text-align:center' }, cbC));
 
+              // Eliminar
               jrow.append(el('div', { style: 'text-align:center' },
                 editing ? el('button', { class: 'x', textContent: '×', onclick: () => {
                   if (!confirm('Esborrar aquesta jornada?')) return;
@@ -838,8 +871,16 @@ function renderBudget(s) {
                 } }) : ''
               ));
 
+              // Avís de rang incorrecte o tipus de dia
               const badgeRow = el('div', { style: 'grid-column:1/-1;padding:2px 0 4px 6px;font-size:11px;' + (j.cobrat ? 'color:var(--ok)' : 'color:var(--warn)') });
-              badgeRow.textContent = j.cobrat ? '🟢 Cobrat — suma al Real' : '🟡 Pendent de cobrar — NO suma al Real';
+              if (tipusCalc === 'fora_de_rang') {
+                badgeRow.textContent = '❌ Les hores indicades no compleixen el quadre legal per a aquest tipus de dia.';
+                badgeRow.style.color = 'var(--err)';
+              } else if (tipusCalc) {
+                badgeRow.textContent = ETIQ_JORNADA[tipusCalc] + ' (' + (j.es_laborable !== false ? 'laborable' : 'no laborable') + ') · ' + (j.cobrat ? '🟢 Cobrat — suma al Real' : '🟡 Pendent de cobrar — NO suma al Real');
+              } else {
+                badgeRow.textContent = '⚠️ Introdueix les hores per calcular la compensació.';
+              }
               taula.append(jrow);
               taula.append(badgeRow);
             });
@@ -861,7 +902,7 @@ function renderBudget(s) {
                   const avui = avuiISO();
                   const dataDefault = (mk && mk !== 'sense-data') ? (mk + '-' + String(new Date().getDate()).padStart(2, '0')) : avui;
                   p.jornades = p.jornades || [];
-                  p.jornades.push({ id: 'j' + Date.now().toString(36), data: dataDefault, hores: 2, tipus: 'mitja', persones_noms: [], concepte: '', cobrat: false });
+                  p.jornades.push({ id: 'j' + Date.now().toString(36), data: dataDefault, hores: 2, es_laborable: true, persones_noms: [], concepte: '', cobrat: false });
                   openMes[idx] = openMes[idx] || {};
                   openMes[idx][mk] = true;
                   save(s); render();
@@ -879,7 +920,7 @@ function renderBudget(s) {
               const valor = prompt('Mes (YYYY-MM):', ara.getFullYear() + '-' + String(ara.getMonth() + 1).padStart(2, '0'));
               if (!valor || !/^\d{4}-\d{2}$/.test(valor)) return;
               p.jornades = p.jornades || [];
-              p.jornades.push({ id: 'j' + Date.now().toString(36), data: valor + '-01', hores: 2, tipus: 'mitja', persones_noms: [], concepte: '', cobrat: false });
+              p.jornades.push({ id: 'j' + Date.now().toString(36), data: valor + '-01', hores: 2, es_laborable: true, persones_noms: [], concepte: '', cobrat: false });
               openMes[idx] = openMes[idx] || {};
               openMes[idx][valor] = true;
               save(s); render();
@@ -895,7 +936,15 @@ function renderBudget(s) {
   wrap.append(list);
 
   const totalP = s.budget.reduce((a, p) => a + (Number(p.p) || 0), 0);
-  const totalR = s.budget.reduce((a, p) => a + realOf(p), 0);
+  // CORRECCIÓ: El total real ara inclou les adquisicions de soundtrack pagades
+  const totalR = s.budget.reduce((a, p) => {
+    let base = realOf(p);
+    if (/soundtrack/i.test(p.c || '') && dSoundtrack.existeix && dSoundtrack.pagat > 0) {
+      base += dSoundtrack.pagat;
+    }
+    return a + base;
+  }, 0);
+  
   const diff = totalR - totalP;
   const sum = el('div', { class: 'summary', style: 'margin-top:16px;padding-top:14px;border-top:2px solid var(--bd)' });
   sum.append(el('div', { class: 'lbl', textContent: 'Total previst' }), el('div', { class: 'val big', textContent: eur(totalP) }));
@@ -2660,7 +2709,7 @@ $('#go').onclick = async () => {
 };
 $('#out').onclick = async () => { await db.auth.signOut(); location.reload(); };
 (async () => {
-  const { data } = await db.auth.getSession();
+  const { data } = await db.getSession();
   if (data.session) start(data.session.user); else $('#login').hidden = false;
 })();
 </script>
