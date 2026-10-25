@@ -2708,7 +2708,7 @@ $('#go').onclick = async () => {
 };
 $('#out').onclick = async () => { await db.auth.signOut(); location.reload(); };
 (async () => {
-  const { data } = await db.getSession();
+  const { data } = await db.auth.getSession();
   if (data.session) start(data.session.user); else $('#login').hidden = false;
 })();
 </script>
