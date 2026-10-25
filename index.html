@@ -660,7 +660,7 @@ function renderBudget(s) {
       if (isSoundtrack && dSoundtrack.existeix && dSoundtrack.pendent > 0) {
         concepteCell.append(el('span', { class: 'budget-badge', textContent: '🎼 ' + eur(dSoundtrack.pendent) + ' pendents en drets musicals' }));
       }
-          if (p.admet_jornades && (p.jornades || []).length) {
+      if (p.admet_jornades && (p.jornades || []).length) {
         const pend = pendentJornadesOf(p);
         if (pend > 0) concepteCell.append(el('span', { class: 'budget-badge', textContent: '🎬 ' + eur(pend) + ' pendents de cobrar' }));
       }
@@ -696,7 +696,8 @@ function renderBudget(s) {
       });
     }
     list.append(row);
-    // NOU: Resum de mesos a la pantalla inicial (només pendents)
+
+    // NOU: Resum de mesos pendents de cobrar (subllista)
     if (p.admet_jornades && (p.jornades || []).length) {
       const grupsResum = agrupaJornadesPerMes(p.jornades);
       const keysResum = ordenaMesos(Object.keys(grupsResum));
@@ -737,7 +738,6 @@ function renderBudget(s) {
       }
     }
 
-    if (open) {
     if (open) {
       const box = el('div', { class: 'exp-box' });
       (p.exp || []).forEach((e, ei) => {
@@ -797,7 +797,6 @@ function renderBudget(s) {
 
           if (obert) {
             const taula = el('div', { class: 'jorn-taula' });
-            // ACTUALITZAT: Nova capçalera amb "Laborable?"
             taula.append(el('div', { class: 'jorn-row jorn-head' }, [
               el('div', { textContent: 'Data' }),
               el('div', { textContent: 'Hores' }),
@@ -815,21 +814,18 @@ function renderBudget(s) {
               const jrow = el('div', { class: 'jorn-row' + (j.cobrat ? ' done' : '') });
               const tipusCalc = calculaTipusJornada(j.hores, j.es_laborable);
 
-              // Data
-                           const inpData = el('input', { type: 'date', value: j.data || '' });
+              const inpData = el('input', { type: 'date', value: j.data || '' });
               inpData.disabled = !editing;
               inpData.addEventListener('change', () => {
                 j.data = inpData.value; save(s); render();
               });
               jrow.append(el('div', {}, inpData));
 
-              // Hores
               const inpH = el('input', { type: 'number', value: j.hores || 0, min: 0, step: 0.25, style: 'width:70px' });
               inpH.disabled = !editing;
               inpH.addEventListener('input', () => { j.hores = Number(inpH.value) || 0; save(s); });
               jrow.append(el('div', {}, inpH));
 
-              // LABORABLE o NO (Selector)
               const selLab = el('select', { style: 'min-width:110px' }, [
                 el('option', { value: 'true', textContent: 'Dia laborable', selected: j.es_laborable !== false }),
                 el('option', { value: 'false', textContent: 'Dia NO laborable', selected: j.es_laborable === false })
@@ -838,7 +834,6 @@ function renderBudget(s) {
               selLab.addEventListener('change', () => { j.es_laborable = selLab.value === 'true'; save(s); render(); });
               jrow.append(el('div', {}, selLab));
 
-              // Persones (Botó desplegable)
               const btnPers = el('button', {
                 class: 'btn s',
                 style: 'min-width:110px;text-align:left',
@@ -875,21 +870,17 @@ function renderBudget(s) {
               });
               jrow.append(el('div', {}, btnPers));
 
-              // Concepte
               const inpC = el('input', { type: 'text', value: j.concepte || '', placeholder: 'Reunió, guió...' });
               inpC.disabled = !editing;
               inpC.addEventListener('input', () => { j.concepte = inpC.value; save(s); });
               jrow.append(el('div', {}, inpC));
 
-              // Preu Unitari (calculat automàticament)
               const preuUnit = tipusCalc && tipusCalc !== 'fora_de_rang' ? (PREUS_JORNADA[tipusCalc] || 0) : 0;
               jrow.append(el('div', { class: 'jorn-num', textContent: preuUnit ? eur(preuUnit) : '—' }));
 
-              // Nº Persones
               const nPers = (j.persones_noms || []).length;
               jrow.append(el('div', { class: 'jorn-num', textContent: String(nPers) }));
 
-              // Total (preu * persones)
               const totalJornada = preuUnit * nPers;
               jrow.append(el('div', {
                 class: 'jorn-num',
@@ -897,13 +888,16 @@ function renderBudget(s) {
                 textContent: totalJornada > 0 ? eur(totalJornada) : '—'
               }));
 
-              // Cobrat (Checkbox)
               const cbC = el('input', { type: 'checkbox', checked: !!j.cobrat });
               cbC.disabled = !editing;
               cbC.addEventListener('change', () => { j.cobrat = cbC.checked; save(s); render(); });
-              jrow.append(el('div', { style: 'text-align:center' }, cbC));
+              
+              if (j.cobrat && !editing) {
+                jrow.append(el('div', { style: 'text-align:center;font-size:16px', title: 'Cobrat', textContent: '✅' }));
+              } else {
+                jrow.append(el('div', { style: 'text-align:center' }, cbC));
+              }
 
-              // Eliminar
               jrow.append(el('div', { style: 'text-align:center' },
                 editing ? el('button', { class: 'x', textContent: '×', onclick: () => {
                   if (!confirm('Esborrar aquesta jornada?')) return;
@@ -911,13 +905,13 @@ function renderBudget(s) {
                 } }) : ''
               ));
 
-              // Avís de rang incorrecte o tipus de dia
               const badgeRow = el('div', { style: 'grid-column:1/-1;padding:2px 0 4px 6px;font-size:11px;' + (j.cobrat ? 'color:var(--ok)' : 'color:var(--warn)') });
               if (tipusCalc === 'fora_de_rang') {
                 badgeRow.textContent = '❌ Les hores indicades no compleixen el quadre legal per a aquest tipus de dia.';
                 badgeRow.style.color = 'var(--err)';
               } else if (tipusCalc) {
-                badgeRow.textContent = ETIQ_JORNADA[tipusCalc] + ' (' + (j.es_laborable !== false ? 'laborable' : 'no laborable') + ') · ' + (j.cobrat ? '🟢 Cobrat — suma al Real' : '🟡 Pendent de cobrar — NO suma al Real');
+                const estatText = j.cobrat ? '🟢 Cobrat' : '🟡 Pendent de cobrar';
+                badgeRow.textContent = ETIQ_JORNADA[tipusCalc] + ' (' + (j.es_laborable !== false ? 'laborable' : 'no laborable') + ') · ' + estatText;
               } else {
                 badgeRow.textContent = '⚠️ Introdueix les hores per calcular la compensació.';
               }
@@ -976,7 +970,6 @@ function renderBudget(s) {
   wrap.append(list);
 
   const totalP = s.budget.reduce((a, p) => a + (Number(p.p) || 0), 0);
-  // CORRECCIÓ: El total real ara inclou les adquisicions de soundtrack pagades
   const totalR = s.budget.reduce((a, p) => {
     let base = realOf(p);
     if (/soundtrack/i.test(p.c || '') && dSoundtrack.existeix && dSoundtrack.pagat > 0) {
@@ -2336,8 +2329,9 @@ function renderCal() {
       if (item.esJornada) {
         const { j, p, s } = item;
         const nPers = (j.persones_noms || []).length || Number(j.persones) || 0;
-        const label = '🎬 ' + ETIQ_CURTA[j.tipus] + ' ' + (j.concepte || p.c || 'Jornada') + ' (' + nPers + 'p)';
-        c.append(el('div', { class: 'chip jorn-chip' + (j.cobrat ? ' done' : ''), title: ETIQ_JORNADA[j.tipus] + ' × ' + nPers + ' persones = ' + eur(importJornada(j)), textContent: label, onclick: () => goto(s.id) }));
+        const tipusCalcCal = calculaTipusJornada(j.hores, j.es_laborable);
+        const label = '🎬 ' + (ETIQ_CURTA[tipusCalcCal] || '?') + ' ' + (j.concepte || p.c || 'Jornada') + ' (' + nPers + 'p)';
+        c.append(el('div', { class: 'chip jorn-chip' + (j.cobrat ? ' done' : ''), title: (ETIQ_JORNADA[tipusCalcCal] || 'Fora de rang') + ' × ' + nPers + ' persones = ' + eur(importJornada(j)), textContent: label, onclick: () => goto(s.id) }));
       } else {
         const { k, s } = item;
         c.append(el('div', { class: 'chip k' + ki(k) + (k.done ? ' done' : ''), textContent: (k.h ? k.h + ' ' : '') + (k.t || ''), onclick: () => goto(s.id) }));
