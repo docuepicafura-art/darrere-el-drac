@@ -697,30 +697,36 @@ function renderBudget(s) {
     }
     list.append(row);
 
-    // NOU: Resum de mesos pendents de cobrar (subllista)
+        // NOU: Resum de mesos (tots, cobrats i pendents)
     if (p.admet_jornades && (p.jornades || []).length) {
       const grupsResum = agrupaJornadesPerMes(p.jornades);
       const keysResum = ordenaMesos(Object.keys(grupsResum));
       
-      const mesosAmbPendent = keysResum.filter(mk => pendentMes(grupsResum[mk]) > 0);
-      
-      if (mesosAmbPendent.length > 0) {
+      if (keysResum.length > 0) {
         const sublinia = el('div', { style: 'padding:6px 10px 6px 46px;font-size:12px;background:rgba(122,90,166,.03)' });
         
-        mesosAmbPendent.forEach(mk => {
+        keysResum.forEach(mk => {
           const arr = grupsResum[mk];
           const pendent = pendentMes(arr);
           const total = totalMes(arr);
           const numJornades = arr.length;
+          const cobrat = pendent === 0; // Si no queda res pendent, està totalment cobrat
           
           const liniaMes = el('div', { style: 'display:flex;align-items:center;gap:8px;padding:3px 0;border-bottom:1px dashed var(--bd)' });
           
           liniaMes.append(el('span', { style: 'font-weight:600;min-width:120px;text-transform:capitalize', textContent: nomMes(mk) }));
           liniaMes.append(el('span', { style: 'font-size:11px;color:var(--mut);min-width:60px', textContent: '(' + numJornades + ' jornada' + (numJornades === 1 ? '' : 'es') + ')' }));
           liniaMes.append(el('span', { style: 'font-variant-numeric:tabular-nums;min-width:80px;text-align:right', textContent: eur(total) }));
-          liniaMes.append(el('span', { style: 'font-variant-numeric:tabular-nums;min-width:100px;text-align:right;color:var(--warn);font-weight:600', textContent: '🟡 ' + eur(pendent) + ' pendent' }));
           
-          if (editing) {
+          if (cobrat) {
+            // Tot cobrat → 🟢 Cobrat
+            liniaMes.append(el('span', { style: 'font-variant-numeric:tabular-nums;min-width:100px;text-align:right;color:var(--ok);font-weight:600', textContent: '🟢 Cobrat' }));
+          } else {
+            // Hi ha pendents → 🟡 X € pendent
+            liniaMes.append(el('span', { style: 'font-variant-numeric:tabular-nums;min-width:100px;text-align:right;color:var(--warn);font-weight:600', textContent: '🟡 ' + eur(pendent) + ' pendent' }));
+          }
+          
+          if (!cobrat && editing) {
             liniaMes.append(el('button', { class: 'btn s', textContent: '✅ Cobrar totes', onclick: async () => {
               if (!confirm('Marcar com a cobrades les ' + arr.filter(j => !j.cobrat).length + ' jornades pendents de ' + nomMes(mk) + '?')) return;
               arr.forEach(j => { if (!j.cobrat) j.cobrat = true; });
