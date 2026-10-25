@@ -973,9 +973,7 @@ function renderBudget(s) {
     }
   });
 
-  wrap.append(list);
-
-  const totalP = s.budget.reduce((a, p) => a + (Number(p.p) || 0), 0);
+    const totalP = s.budget.reduce((a, p) => a + (Number(p.p) || 0), 0);
   const totalR = s.budget.reduce((a, p) => {
     let base = realOf(p);
     if (/soundtrack/i.test(p.c || '') && dSoundtrack.existeix && dSoundtrack.pagat > 0) {
@@ -984,15 +982,43 @@ function renderBudget(s) {
     return a + base;
   }, 0);
   
-  const diff = totalR - totalP;
-  const sum = el('div', { class: 'summary', style: 'margin-top:16px;padding-top:14px;border-top:2px solid var(--bd)' });
-  sum.append(el('div', { class: 'lbl', textContent: 'Total previst' }), el('div', { class: 'val big', textContent: eur(totalP) }));
-  sum.append(el('div', { class: 'lbl', textContent: 'Total real' }), el('div', { class: 'val big', textContent: eur(totalR) }));
-  sum.append(el('div', { class: 'lbl', textContent: 'Diferència' }), el('div', { class: 'val big ' + (diff > 0 ? 'pos' : diff < 0 ? 'neg' : ''), textContent: (diff > 0 ? '+' : '') + eur(diff) }));
   const pendentsJorn = s.budget.reduce((a, p) => a + pendentJornadesOf(p), 0);
-  if (pendentsJorn > 0) {
-    sum.append(el('div', { class: 'lbl', textContent: 'Jornades pendents de cobrar' }), el('div', { class: 'val', style: 'color:var(--warn)', textContent: eur(pendentsJorn) }));
+  const pendentsSoundtrack = dSoundtrack.existeix ? dSoundtrack.pendent : 0;
+  const totalPendent = pendentsJorn + pendentsSoundtrack;
+  
+  // El total real és el que està pagat + el que està pendent
+  const totalRealComplert = totalR + totalPendent;
+  
+  const diff = totalRealComplert - totalP;
+
+  const sum = el('div', { class: 'summary', style: 'margin-top:16px;padding-top:14px;border-top:2px solid var(--bd)' });
+  
+  sum.append(el('div', { class: 'lbl' }, [
+    el('div', { textContent: 'Total previst' }),
+    el('div', { class: 'badge', style: 'font-size:10px;font-weight:normal;margin-top:-2px', textContent: 'El que teníeu pensat gastar.' })
+  ]));
+  sum.append(el('div', { class: 'val big', textContent: eur(totalP) }));
+  
+  sum.append(el('div', { class: 'lbl' }, [
+    el('div', { textContent: 'Total real' }),
+    el('div', { class: 'badge', style: 'font-size:10px;font-weight:normal;margin-top:-2px', textContent: 'El que heu pagat + el que teniu compromès a pagar.' })
+  ]));
+  sum.append(el('div', { class: 'val big', textContent: eur(totalRealComplert) }));
+  
+  if (totalPendent > 0) {
+    sum.append(el('div', { class: 'lbl' }, [
+      el('div', { textContent: '├─ Del qual, pendent de pagar/cobrar' }),
+      el('div', { class: 'badge', style: 'font-size:10px;font-weight:normal;margin-top:-2px', textContent: 'Jornades i drets (Soundtrack) encara per tancar.' })
+    ]));
+    sum.append(el('div', { class: 'val', style: 'color:var(--warn);font-weight:700', textContent: eur(totalPendent) }));
   }
+  
+  sum.append(el('div', { class: 'lbl' }, [
+    el('div', { textContent: 'Diferència' }),
+    el('div', { class: 'badge', style: 'font-size:10px;font-weight:normal;margin-top:-2px', textContent: 'Marge restant respecte al previst.' })
+  ]));
+  sum.append(el('div', { class: 'val big ' + (diff > 0 ? 'pos' : diff < 0 ? 'neg' : ''), textContent: (diff > 0 ? '+' : '') + eur(diff) }));
+  
   wrap.append(sum);
   return wrap;
 }
