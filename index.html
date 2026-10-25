@@ -289,7 +289,6 @@ const ETIQ_JORNADA  = { mitja: '½ jornada especial', sencera: '1 jornada especi
 const ETIQ_CURTA    = { mitja: '½', sencera: '1', mitja_i_mitja: '1½' };
 const PARTIDES_AMB_JORNADES = /direcci[oó]|gui[oó]/i;
 
-// NOVA FUNCIÓ: Calcula el tipus segons les hores i si és laborable o no (segons taula)
 const calculaTipusJornada = (hores, esLaborable) => {
   const h = Number(hores) || 0;
   if (h <= 0) return null;
@@ -697,7 +696,7 @@ function renderBudget(s) {
     }
     list.append(row);
 
-        // NOU: Resum de mesos (tots, cobrats i pendents)
+    // NOU: Resum de mesos (tots, cobrats i pendents)
     if (p.admet_jornades && (p.jornades || []).length) {
       const grupsResum = agrupaJornadesPerMes(p.jornades);
       const keysResum = ordenaMesos(Object.keys(grupsResum));
@@ -973,7 +972,9 @@ function renderBudget(s) {
     }
   });
 
-    const totalP = s.budget.reduce((a, p) => a + (Number(p.p) || 0), 0);
+  wrap.append(list);
+
+  const totalP = s.budget.reduce((a, p) => a + (Number(p.p) || 0), 0);
   const totalR = s.budget.reduce((a, p) => {
     let base = realOf(p);
     if (/soundtrack/i.test(p.c || '') && dSoundtrack.existeix && dSoundtrack.pagat > 0) {
