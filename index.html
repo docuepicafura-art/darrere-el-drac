@@ -6,8 +6,8 @@
 <title>Darrere el drac</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎥</text></svg>">
 <style>
-:root{--bg:#f6f4ef;--card:#fff;--tx:#1f1d1a;--mut:#6d675d;--ac:#b4471f;--bd:#e2ddd2;--ok:#2e9e5b;--warn:#c47b1f;--err:#c0392b}
-@media (prefers-color-scheme:dark){:root{--bg:#1b1a18;--card:#262421;--tx:#f0ece4;--mut:#a39c8f;--ac:#e47a4f;--bd:#3a3733;--ok:#3fbf75;--warn:#e0a63c;--err:#e26a5c}}
+:root{--bg:#f6f4ef;--card:#fff;--tx:#1f1d1a;--mut:#6d675d;--ac:#b4471f;--bd:#e2ddd2;--ok:#2e9e5b;--warn:#c47b1f;--err:#c0392b;--diet:#8a5a2b}
+@media (prefers-color-scheme:dark){:root{--bg:#1b1a18;--card:#262421;--tx:#f0ece4;--mut:#a39c8f;--ac:#e47a4f;--bd:#3a3733;--ok:#3fbf75;--warn:#e0a63c;--err:#e26a5c;--diet:#c58b4e}}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
 header{padding:20px 20px 8px;display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap}
@@ -53,6 +53,7 @@ input[type=time]{padding:6px;width:auto}
 .chip.done{opacity:.5;text-decoration:line-through}
 .k0{background:#b4471f}.k1{background:#2f6f8f}.k2{background:#7a5aa6}.k3{background:#3d8b5f}.k4{background:#7d776b}
 .k5{background:#a0522d}.k6{background:#5c7a3a}.k7{background:#8f4a6b}.k8{background:#4a4a4a}
+.chip.diet-chip{background:var(--diet);border-left:3px solid #5a3a17}
 .tag{font-size:12px;color:#fff;padding:1px 8px;border-radius:999px;margin-left:auto;white-space:nowrap}
 .pp{font-size:12px;color:var(--mut);white-space:nowrap}
 .badge{font-size:12px;color:var(--mut)}
@@ -130,6 +131,7 @@ input[type=time]{padding:6px;width:auto}
 .gantt-bar{position:absolute;top:3px;height:22px;border-radius:4px;color:#fff;font-size:11px;line-height:22px;padding:0 6px;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .gantt-bar.done{opacity:.5}
 .gantt-bar.auto{outline:2px dashed rgba(255,255,255,.65);outline-offset:-2px}
+.gantt-bar.diet-bar{background:var(--diet);outline:2px solid #5a3a17;outline-offset:-2px}
 .gantt-today{background:rgba(180,71,31,.08)}
 .audio-box{background:var(--bg);border:1px solid var(--bd);border-radius:10px;padding:10px 12px;margin-bottom:12px;display:flex;flex-direction:column;gap:6px}
 .audio-label{font-size:12px;color:var(--mut);font-weight:600}
@@ -213,6 +215,21 @@ input[type=time]{padding:6px;width:auto}
 .jorn-chip{background:#7a5aa6 !important;border-left:3px solid #4a2f7a}
 .gantt-bar-jornada{background:#7a5aa6;outline:2px solid #4a2f7a;outline-offset:-2px}
 
+/* DIETES */
+.diet-mes-head{display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--bg);border:1px solid var(--bd);border-radius:8px;font-size:14px;margin-top:10px;flex-wrap:wrap}
+.diet-mes-head .diet-titol{font-weight:700;flex:1;min-width:140px;text-transform:capitalize}
+.diet-mes-head input.diet-titol-input{font:inherit;font-weight:700;padding:4px 8px;flex:1;min-width:140px}
+.diet-mes-head .diet-mes-count{font-size:11px;color:var(--mut)}
+.diet-mes-head .diet-mes-total{font-variant-numeric:tabular-nums;font-weight:700}
+.diet-taula{margin:8px 0 4px 4px}
+.diet-row{display:grid;grid-template-columns:110px 110px 1fr 130px 100px 110px 70px 50px;gap:6px;align-items:center;padding:4px 0;border-bottom:1px solid var(--bd);font-size:13px}
+.diet-head{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--mut);font-weight:600;border-bottom:2px solid var(--bd)}
+.diet-num{text-align:right;font-variant-numeric:tabular-nums;font-weight:600}
+.diet-row.done .diet-num{color:var(--tx);opacity:1}
+.diet-summary{display:flex;gap:16px;flex-wrap:wrap;font-size:13px;margin-bottom:10px;padding:8px 10px;background:var(--bg);border-radius:8px;border:1px solid var(--bd)}
+.diet-summary .diet-cobrat{color:var(--ok);font-weight:600}
+.diet-summary .diet-pendent{color:var(--warn);font-weight:600}
+
 @media (max-width:640px){
   .bud-head,.bud-row{grid-template-columns:24px 1fr 90px 32px}
   .bud-head .hide-s,.bud-row .hide-s{display:none}
@@ -226,6 +243,8 @@ input[type=time]{padding:6px;width:auto}
   .budget-indicator .b-stats{flex-direction:column;gap:4px}
   .jorn-row{grid-template-columns:1fr 1fr;gap:4px}
   .jorn-head{display:none}
+  .diet-row{grid-template-columns:1fr 1fr;gap:4px}
+  .diet-head{display:none}
 }
 </style>
 </head>
@@ -256,7 +275,6 @@ input[type=time]{padding:6px;width:auto}
   <nav id="nav"></nav>
   <main id="app"></main>
 </div>
-
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script>
 const SUPABASE_URL = 'https://edmppcurmxlbjeiigacw.supabase.co';
@@ -289,10 +307,13 @@ const ETIQ_JORNADA  = { mitja: '½ jornada especial', sencera: '1 jornada especi
 const ETIQ_CURTA    = { mitja: '½', sencera: '1', mitja_i_mitja: '1½' };
 const PARTIDES_AMB_JORNADES = /direcci[oó]|gui[oó]/i;
 
+const DIETES_PREU_KM_DEFECTE = 0.26;
+const TIPUS_DIETA = [['apat','Àpat'],['allotjament','Allotjament'],['transport','Transport'],['quilometratge','Quilometratge'],['altres','Altres']];
+const ESTAT_DIETA = [['pendent','🟡 Pendent'],['cobrat','🟢 Cobrat']];
+
 const calculaTipusJornada = (hores, esLaborable) => {
   const h = Number(hores) || 0;
   if (h <= 0) return null;
-
   if (esLaborable) {
     if (h >= 1.5 && h <= 3.75) return 'mitja';
     if (h >= 5 && h <= 7.5) return 'sencera';
@@ -416,6 +437,12 @@ let creditFraseImatges = 'Fotografies i material d\'arxiu cortesia de:';
 let creditFraseMusica = 'Música:';
 let creditsTecnics = [];
 
+/* === DIETES (estat) === */
+let dietes = [];
+let dietesMesos = {};
+let dietesFiltre = { persona: '', tipus: '', estat: '' };
+let openDietMes = {};
+
 function save(s) {
   if (!s || !s.id) return;
   clearTimeout(timers[s.id]);
@@ -466,6 +493,92 @@ async function carregaCreditsTecnics() {
   creditsTecnics = data || [];
 }
 
+/* === DIETES: càrrega i helpers === */
+async function carregaDietes() {
+  const { data, error } = await db.from('dietes').select('*').order('data', { ascending: true });
+  if (error) { console.warn('Error carregant dietes:', error.message); return; }
+  dietes = data || [];
+  const { data: mesosDB, error: err2 } = await db.from('dietes_mesos').select('*');
+  if (err2) { console.warn('Error carregant dietes_mesos:', err2.message); return; }
+  dietesMesos = {};
+  (mesosDB || []).forEach(m => { dietesMesos[m.any_mes + '-' + String(m.mes).padStart(2,'0')] = m; });
+}
+const dietaImport = d => {
+  if (d.tipus === 'quilometratge') return (Number(d.km) || 0) * (Number(d.preu_km) || DIETES_PREU_KM_DEFECTE);
+  return Number(d.import) || 0;
+};
+const dietaEsViatge = d => d.tipus === 'transport' || d.tipus === 'quilometratge';
+const dietaMesKey = d => (d.data || '').slice(0, 7);
+const nomMesDieta = key => {
+  if (!key || key.length < 7) return '(sense data)';
+  const [y, m] = key.split('-').map(Number);
+  return mesos[m - 1] + ' ' + y;
+};
+function agrupaDietesPerMes(arr) {
+  const g = {};
+  (arr || []).forEach(d => { const k = dietaMesKey(d) || 'sense-data'; (g[k] = g[k] || []).push(d); });
+  Object.values(g).forEach(a => a.sort((x,y) => (x.data||'').localeCompare(y.data||'')));
+  return g;
+}
+const totalDietesMes   = arr => arr.reduce((a, d) => a + dietaImport(d), 0);
+const cobratDietesMes  = arr => arr.filter(d => d.estat === 'cobrat').reduce((a, d) => a + dietaImport(d), 0);
+const pendentDietesMes = arr => arr.filter(d => d.estat !== 'cobrat').reduce((a, d) => a + dietaImport(d), 0);
+const pendentDietesPartida = nomPartida => dietes
+  .filter(d => d.estat !== 'cobrat' && (d.partida_nom || '').toLowerCase() === (nomPartida || '').toLowerCase())
+  .reduce((a, d) => a + dietaImport(d), 0);
+const dietesCobradesPartida = nomPartida => dietes
+  .filter(d => d.estat === 'cobrat' && (d.partida_nom || '').toLowerCase() === (nomPartida || '').toLowerCase())
+  .reduce((a, d) => a + dietaImport(d), 0);
+
+/* === DIETES: CRUD === */
+async function desaDietaMes(any, mes, titol) {
+  const key = any + '-' + String(mes).padStart(2,'0');
+  const existent = dietesMesos[key];
+  if (existent) {
+    const r = await db.from('dietes_mesos').update({ titol }).eq('id', existent.id);
+    if (r.error) { alert('Error: ' + r.error.message); return; }
+    existent.titol = titol;
+  } else {
+    const r = await db.from('dietes_mesos').insert({ any_mes: any, mes, titol }).select().single();
+    if (r.error) { alert('Error: ' + r.error.message); return; }
+    dietesMesos[key] = r.data;
+  }
+}
+async function desaDieta(d) {
+  const payload = {
+    data: d.data, persona: d.persona || '', concepte: d.concepte || '',
+    tipus: d.tipus || 'apat', import: Number(d.import) || 0,
+    km: Number(d.km) || 0, preu_km: Number(d.preu_km) || DIETES_PREU_KM_DEFECTE,
+    partida_id: d.partida_id || null, partida_nom: d.partida_nom || '',
+    estat: d.estat || 'pendent', notes: d.notes || '', adjunt: d.adjunt || null,
+    created_by: me, updated_at: new Date().toISOString()
+  };
+  if (d.id) {
+    const r = await db.from('dietes').update(payload).eq('id', d.id).select().single();
+    if (r.error) { alert('Error: ' + r.error.message); return; }
+    const i = dietes.findIndex(x => x.id === d.id); if (i >= 0) dietes[i] = r.data;
+  } else {
+    const r = await db.from('dietes').insert(payload).select().single();
+    if (r.error) { alert('Error: ' + r.error.message); return; }
+    dietes.push(r.data);
+  }
+}
+async function esborraDieta(d) {
+  if (!d.id) return;
+  if (!confirm('Esborrar aquesta dieta?')) return;
+  const r = await db.from('dietes').delete().eq('id', d.id);
+  if (r.error) { alert('Error: ' + r.error.message); return; }
+  dietes = dietes.filter(x => x.id !== d.id);
+}
+async function cobrarMesDietes(any, mes) {
+  const arr = dietes.filter(d => { const dt = new Date(d.data + 'T00:00:00'); return dt.getFullYear() === any && dt.getMonth()+1 === mes && d.estat !== 'cobrat'; });
+  if (!arr.length) return;
+  if (!confirm('Marcar com a cobrades ' + arr.length + ' dietes pendents de ' + nomMesDieta(any + '-' + String(mes).padStart(2,'0')) + '?')) return;
+  const ids = arr.map(d => d.id);
+  const r = await db.from('dietes').update({ estat: 'cobrat' }).in('id', ids);
+  if (r.error) { alert('Error: ' + r.error.message); return; }
+  arr.forEach(d => d.estat = 'cobrat');
+}
 const nm = e => e.split('@')[0];
 const others = id => Object.entries(peers).filter(([k, v]) => k !== me && v.some(x => x.sec === id)).map(([k]) => nm(k));
 function goto(id) { cur = id; render(); if (pch) pch.track({ sec: id }); }
@@ -476,9 +589,10 @@ function paintNav() {
   n.append(el('button', { class: cur === 'drets' ? 'on' : '', textContent: '🎼 Drets', onclick: () => goto('drets') }));
   n.append(el('button', { class: cur === 'imatges' ? 'on' : '', textContent: '🖼️ Imatges', onclick: () => goto('imatges') }));
   n.append(el('button', { class: cur === 'credits' ? 'on' : '', textContent: '📜 Crèdits', onclick: () => goto('credits') }));
+  n.append(el('button', { class: cur === 'dietes' ? 'on' : '', textContent: '🍽️ Dietes', onclick: () => goto('dietes') }));
   secs.forEach(s => n.append(el('button', { class: s.id === cur ? 'on' : '', textContent: s.name + (others(s.id).length ? ' 🟢' : ''), onclick: () => goto(s.id) })));
   if (editing) n.append(el('button', { textContent: '+ Secció', onclick: addSec }));
-  const o = ['cal','gantt','drets','imatges','credits'].includes(cur) ? [] : others(cur);
+  const o = ['cal','gantt','drets','imatges','credits','dietes'].includes(cur) ? [] : others(cur);
   $('#who').textContent = o.length ? '🟢 ' + o.join(', ') + ' és a la secció' : '';
 }
 function addSec() { const n = { id: 's' + Date.now().toString(36), pos: (secs.length ? Math.max(...secs.map(x => x.pos)) : 0) + 1, name: 'Nova secció', notes: '', tasks: [], budget: [], files: [], text: '' }; secs.push(n); save(n); goto(n.id); }
@@ -531,6 +645,7 @@ function render() {
   if (cur === 'drets') return renderDrets();
   if (cur === 'imatges') return renderImatges();
   if (cur === 'credits') return renderCredits();
+  if (cur === 'dietes') return renderDietes();
   const s = cur_();
   if (!s) { app.textContent = 'Encara no hi ha seccions.'; return; }
   app.append(el('div', { class: 'row', style: 'margin:0 0 14px' }, el('button', { class: 'btn', textContent: editing ? "Acabar d'editar" : 'Editar', onclick: () => { editing = !editing; render(); } })));
@@ -584,7 +699,7 @@ function renderBudget(s) {
         calDesar = true;
       }
       if (typeof j.es_laborable !== 'boolean') {
-        j.es_laborable = true; // Valor per defecte per a jornades antigues
+        j.es_laborable = true;
         calDesar = true;
       }
     });
@@ -629,7 +744,7 @@ function renderBudget(s) {
 
   s.budget.forEach((p, idx) => {
     const open = !!openBud[idx];
-    const real = realOf(p);
+    const real = realOf(p) + dietesCobradesPartida(p.c);
     const isSoundtrack = /soundtrack/i.test(p.c || '');
     const row = el('div', { class: 'bud-row' + (open ? ' open' : '') });
 
@@ -663,6 +778,8 @@ function renderBudget(s) {
         const pend = pendentJornadesOf(p);
         if (pend > 0) concepteCell.append(el('span', { class: 'budget-badge', textContent: '🎬 ' + eur(pend) + ' pendents de cobrar' }));
       }
+      const pendD = pendentDietesPartida(p.c);
+      if (pendD > 0) concepteCell.append(el('span', { class: 'budget-badge', textContent: '🍽️ ' + eur(pendD) + ' en dietes pendents' }));
       row.append(concepteCell);
       row.append(el('div', { class: 'hide-s' }, el('span', { class: 'cat-pill', textContent: p.cat || 'Altres' })));
       row.append(el('div', { class: 'bc-num', textContent: eur(p.p) }));
@@ -696,35 +813,26 @@ function renderBudget(s) {
     }
     list.append(row);
 
-    // NOU: Resum de mesos (tots, cobrats i pendents)
     if (p.admet_jornades && (p.jornades || []).length) {
       const grupsResum = agrupaJornadesPerMes(p.jornades);
       const keysResum = ordenaMesos(Object.keys(grupsResum));
-      
       if (keysResum.length > 0) {
         const sublinia = el('div', { style: 'padding:6px 10px 6px 46px;font-size:12px;background:rgba(122,90,166,.03)' });
-        
         keysResum.forEach(mk => {
           const arr = grupsResum[mk];
           const pendent = pendentMes(arr);
           const total = totalMes(arr);
           const numJornades = arr.length;
-          const cobrat = pendent === 0; // Si no queda res pendent, està totalment cobrat
-          
+          const cobrat = pendent === 0;
           const liniaMes = el('div', { style: 'display:flex;align-items:center;gap:8px;padding:3px 0;border-bottom:1px dashed var(--bd)' });
-          
           liniaMes.append(el('span', { style: 'font-weight:600;min-width:120px;text-transform:capitalize', textContent: nomMes(mk) }));
           liniaMes.append(el('span', { style: 'font-size:11px;color:var(--mut);min-width:60px', textContent: '(' + numJornades + ' jornada' + (numJornades === 1 ? '' : 'es') + ')' }));
           liniaMes.append(el('span', { style: 'font-variant-numeric:tabular-nums;min-width:80px;text-align:right', textContent: eur(total) }));
-          
           if (cobrat) {
-            // Tot cobrat → 🟢 Cobrat
             liniaMes.append(el('span', { style: 'font-variant-numeric:tabular-nums;min-width:100px;text-align:right;color:var(--ok);font-weight:600', textContent: '🟢 Cobrat' }));
           } else {
-            // Hi ha pendents → 🟡 X € pendent
             liniaMes.append(el('span', { style: 'font-variant-numeric:tabular-nums;min-width:100px;text-align:right;color:var(--warn);font-weight:600', textContent: '🟡 ' + eur(pendent) + ' pendent' }));
           }
-          
           if (!cobrat && editing) {
             liniaMes.append(el('button', { class: 'btn s', textContent: '✅ Cobrar totes', onclick: async () => {
               if (!confirm('Marcar com a cobrades les ' + arr.filter(j => !j.cobrat).length + ' jornades pendents de ' + nomMes(mk) + '?')) return;
@@ -734,10 +842,8 @@ function renderBudget(s) {
           } else {
             liniaMes.append(el('span', { style: 'min-width:110px' }));
           }
-          
           sublinia.append(liniaMes);
         });
-        
         const subWrap = el('div', { style: 'background:rgba(122,90,166,.03);border-bottom:1px solid var(--bd)' }, sublinia);
         list.append(subWrap);
       }
@@ -762,6 +868,21 @@ function renderBudget(s) {
       if (!(p.exp || []).length) box.append(el('div', { class: 'badge', textContent: 'Cap despesa.' }));
       if (editing) box.append(el('button', { class: 'btn s', textContent: '+ Afegir despesa', onclick: () => { p.exp = p.exp || []; p.exp.push({ d:'', t:'', a:0 }); save(s); render(); } }));
       list.append(box);
+
+      const dietesPartida = dietes.filter(d => (d.partida_nom || '').toLowerCase() === (p.c || '').toLowerCase());
+      if (dietesPartida.length) {
+        const dbox = el('div', { class: 'exp-box', style: 'background:rgba(138,90,43,.06)' });
+        dbox.append(el('h4', { class: 'jorn-title', textContent: '🍽️ Dietes assignades a aquesta partida' }));
+        dietesPartida.forEach(d => {
+          const item = el('div', { class: 'exp-item' });
+          item.append(el('span', { class: 'exp-date', textContent: d.data ? fmt(d.data) : '—' }));
+          item.append(el('span', { class: 'exp-name', textContent: (d.concepte || '(sense concepte)') + ' · ' + (d.persona || '') + ' · ' + (d.tipus || '') }));
+          item.append(el('span', { class: 'exp-amt', textContent: eur(dietaImport(d)) }));
+          item.append(el('span', { class: 'st-pill ' + (d.estat === 'cobrat' ? 'st-pagat' : 'st-pendent'), textContent: d.estat === 'cobrat' ? 'Cobrat' : 'Pendent' }));
+          dbox.append(item);
+        });
+        list.append(dbox);
+      }
 
       if (p.admet_jornades) {
         const jbox = el('div', { class: 'jorn-box' });
@@ -821,9 +942,7 @@ function renderBudget(s) {
 
               const inpData = el('input', { type: 'date', value: j.data || '' });
               inpData.disabled = !editing;
-              inpData.addEventListener('change', () => {
-                j.data = inpData.value; save(s); render();
-              });
+              inpData.addEventListener('change', () => { j.data = inpData.value; save(s); render(); });
               jrow.append(el('div', {}, inpData));
 
               const inpH = el('input', { type: 'number', value: j.hores || 0, min: 0, step: 0.25, style: 'width:70px' });
@@ -896,7 +1015,6 @@ function renderBudget(s) {
               const cbC = el('input', { type: 'checkbox', checked: !!j.cobrat });
               cbC.disabled = !editing;
               cbC.addEventListener('change', () => { j.cobrat = cbC.checked; save(s); render(); });
-              
               if (j.cobrat && !editing) {
                 jrow.append(el('div', { style: 'text-align:center;font-size:16px', title: 'Cobrat', textContent: '✅' }));
               } else {
@@ -976,54 +1094,55 @@ function renderBudget(s) {
 
   const totalP = s.budget.reduce((a, p) => a + (Number(p.p) || 0), 0);
   const totalR = s.budget.reduce((a, p) => {
-    let base = realOf(p);
+    let base = realOf(p) + dietesCobradesPartida(p.c);
     if (/soundtrack/i.test(p.c || '') && dSoundtrack.existeix && dSoundtrack.pagat > 0) {
       base += dSoundtrack.pagat;
     }
     return a + base;
   }, 0);
-  
+
   const pendentsJorn = s.budget.reduce((a, p) => a + pendentJornadesOf(p), 0);
   const pendentsSoundtrack = dSoundtrack.existeix ? dSoundtrack.pendent : 0;
-  const totalPendent = pendentsJorn + pendentsSoundtrack;
-  
-  // El total real és el que està pagat + el que està pendent
+  const pendentsDietes = s.budget.reduce((a, p) => a + pendentDietesPartida(p.c), 0);
+  const totalPendent = pendentsJorn + pendentsSoundtrack + pendentsDietes;
+
   const totalRealComplert = totalR + totalPendent;
-  
   const diff = totalRealComplert - totalP;
 
   const sum = el('div', { class: 'summary', style: 'margin-top:16px;padding-top:14px;border-top:2px solid var(--bd)' });
-  
+
   sum.append(el('div', { class: 'lbl' }, [
     el('div', { textContent: 'Total previst' }),
     el('div', { class: 'badge', style: 'font-size:10px;font-weight:normal;margin-top:-2px', textContent: 'El que teníeu pensat gastar.' })
   ]));
   sum.append(el('div', { class: 'val big', textContent: eur(totalP) }));
-  
+
   sum.append(el('div', { class: 'lbl' }, [
     el('div', { textContent: 'Total real' }),
     el('div', { class: 'badge', style: 'font-size:10px;font-weight:normal;margin-top:-2px', textContent: 'El que heu pagat + el que teniu compromès a pagar.' })
   ]));
   sum.append(el('div', { class: 'val big', textContent: eur(totalRealComplert) }));
-  
+
   if (totalPendent > 0) {
     sum.append(el('div', { class: 'lbl' }, [
       el('div', { textContent: '├─ Del qual, pendent de pagar/cobrar' }),
-      el('div', { class: 'badge', style: 'font-size:10px;font-weight:normal;margin-top:-2px', textContent: 'Jornades i drets (Soundtrack) encara per tancar.' })
+      el('div', { class: 'badge', style: 'font-size:10px;font-weight:normal;margin-top:-2px', textContent: 'Jornades, dietes i drets (Soundtrack) encara per tancar.' })
     ]));
     sum.append(el('div', { class: 'val', style: 'color:var(--warn);font-weight:700', textContent: eur(totalPendent) }));
+    if (pendentsJorn > 0) { sum.append(el('div', { class: 'lbl', style: 'padding-left:14px' }, [el('div', { textContent: '· Jornades pendents' })])); sum.append(el('div', { class: 'val', style: 'color:var(--warn)', textContent: eur(pendentsJorn) })); }
+    if (pendentsDietes > 0) { sum.append(el('div', { class: 'lbl', style: 'padding-left:14px' }, [el('div', { textContent: '· Dietes pendents' })])); sum.append(el('div', { class: 'val', style: 'color:var(--warn)', textContent: eur(pendentsDietes) })); }
+    if (pendentsSoundtrack > 0) { sum.append(el('div', { class: 'lbl', style: 'padding-left:14px' }, [el('div', { textContent: '· Drets Soundtrack pendents' })])); sum.append(el('div', { class: 'val', style: 'color:var(--warn)', textContent: eur(pendentsSoundtrack) })); }
   }
-  
+
   sum.append(el('div', { class: 'lbl' }, [
     el('div', { textContent: 'Diferència' }),
     el('div', { class: 'badge', style: 'font-size:10px;font-weight:normal;margin-top:-2px', textContent: 'Marge restant respecte al previst.' })
   ]));
   sum.append(el('div', { class: 'val big ' + (diff > 0 ? 'pos' : diff < 0 ? 'neg' : ''), textContent: (diff > 0 ? '+' : '') + eur(diff) }));
-  
+
   wrap.append(sum);
   return wrap;
 }
-
 function calcularDiagnosticoLegal(c) {
   const anyG = Number(c.ano_grabacion) || 0;
   const anyM = Number(c.ano_muerte_autor) || 0;
@@ -1043,7 +1162,6 @@ function calcularDiagnosticoLegal(c) {
   if (ovM === 'ko') out.estat_master_mundial = { ok: false, text: '🔴 CONTRACTE COMERCIAL (manual)', base: c.override_nota || 'Override' };
   if (ovS === 'ok') out.estat_composicio_sgae = { ok: true, text: '🟢 COMPOSICIÓ LLIURE (manual)', base: c.override_nota || 'Override' };
   if (ovS === 'ko') out.estat_composicio_sgae = { ok: false, text: '🔴 COMPOSICIÓ PROTEGIDA (manual)', base: c.override_nota || 'Override' };
-
   const adq = c.adquisicio || 'cap';
   out.adquisicio = adq;
   out.adquisicio_ref = c.adquisicio_ref || '';
@@ -1056,7 +1174,6 @@ function calcularDiagnosticoLegal(c) {
     if (!out.estat_master_mundial.ok) out.estat_master_mundial = { ok: true, text: '🟢 ADQUIRIT PER CONTRACTE', base: 'Adquisició: ' + adq + refTxt };
     if (!out.estat_composicio_sgae.ok) out.estat_composicio_sgae = { ok: true, text: '🟢 ADQUIRIT PER CONTRACTE', base: 'Adquisició: ' + adq + refTxt };
   }
-
   const masterOk = out.estat_master_mundial.ok || out.estat_master_europa.ok;
   const sgaeOk = out.estat_composicio_sgae.ok;
   if (adqResolta) out.accio_requerida = '✅ APTE: drets adquirits' + (out.adquisicio_ref ? ' (Ref: ' + out.adquisicio_ref + ')' : '') + '. Es pot integrar al muntatge.';
@@ -1609,7 +1726,6 @@ async function importaImatges(text) {
   alert('✅ ' + r.data.length + ' imatges importades.');
   render();
 }
-
 const ANNEX_COBERTURES = [
 '================================================================',
 'GUIA DE COBERTURES LEGALS PER A IMATGES D\'ARXIU',
@@ -1955,6 +2071,7 @@ function mostraImportador() {
   app.innerHTML = ''; app.append(card);
 }
 
+/* CRÈDITS */
 function textCreditsFinals() {
   const blocs = [];
   const textTec = textCreditsTecnics();
@@ -2053,7 +2170,6 @@ async function importaCreditsTecnics() {
   alert('✅ ' + r.data.length + ' línies importades.');
   render();
 }
-
 function renderCredits() {
   const app = $('#app'); app.innerHTML = '';
   if (!currentCredit) {
@@ -2262,7 +2378,7 @@ function renderOverview() {
     el('div', { class: 'row', style: 'justify-content:space-between;margin:0 0 10px' }, [el('h3', { textContent: '💰 Pressupost', style: 'margin:0' }), el('div', { class: 'badge', textContent: 'Veure →' })]));
   if (bsec && bsec.budget && bsec.budget.length) {
     const tp = bsec.budget.reduce((a, p) => a + (Number(p.p) || 0), 0);
-    const tr = bsec.budget.reduce((a, p) => a + realOf(p), 0);
+    const tr = bsec.budget.reduce((a, p) => a + realOf(p) + dietesCobradesPartida(p.c), 0);
     const sum = el('div', { class: 'summary' });
     sum.append(el('div', { class: 'lbl', textContent: 'Previst' }), el('div', { class: 'val big', textContent: eur(tp) }));
     sum.append(el('div', { class: 'lbl', textContent: 'Real' }), el('div', { class: 'val big', textContent: eur(tr) }));
@@ -2285,8 +2401,13 @@ function renderGantt() {
     bsec.budget.forEach(p => { (p.jornades || []).forEach(j => {
       if (!j.data) return;
       const nPers = (j.persones_noms || []).length || Number(j.persones) || 0;
-      tasques.push({ tasca: { t: '🎬 ' + (j.concepte || p.c || 'Jornada') + ' · ' + ETIQ_CURTA[j.tipus] + ' × ' + nPers + 'p', k: 'Producció', done: !!j.cobrat, h: '' }, seccio: bsec, inici: j.data, fi: j.data, auto: false, esJornada: true });
+      const tipusCalcJ = calculaTipusJornada(j.hores, j.es_laborable);
+      tasques.push({ tasca: { t: '🎬 ' + (j.concepte || p.c || 'Jornada') + ' · ' + (ETIQ_CURTA[tipusCalcJ] || '?') + ' × ' + nPers + 'p', k: 'Producció', done: !!j.cobrat, h: '' }, seccio: bsec, inici: j.data, fi: j.data, auto: false, esJornada: true });
     }); });
+  });
+  dietes.forEach(d => {
+    if (!d.data) return;
+    tasques.push({ tasca: { t: '🍽️ ' + (d.concepte || 'Dieta') + ' · ' + (d.persona || '') + ' · ' + (d.tipus || ''), k: 'Producció', done: d.estat === 'cobrat', h: '' }, seccio: { id: 'dietes', name: 'Dietes' }, inici: d.data, fi: d.data, auto: false, esJornada: false, esDieta: true });
   });
   if (!tasques.length) { app.append(el('div', { class: 'card' }, el('div', { class: 'badge', textContent: 'Cap tasca amb data.' }))); return; }
   tasques.sort((a, b) => a.inici.localeCompare(b.inici));
@@ -2310,7 +2431,7 @@ function renderGantt() {
   mesCells.forEach(m => gantt.append(el('div', { class: 'gantt-head month', style: 'grid-column:span ' + m.span, textContent: m.text })));
   gantt.append(el('div', { class: 'gantt-head', textContent: 'Tasca' }));
   dies.forEach(d => { const wkd = d.getDay() === 0 || d.getDay() === 6; const td = iso(d) === avuiStr; gantt.append(el('div', { class: 'gantt-head' + (wkd ? ' weekend' : '') + (td ? ' today' : ''), textContent: String(d.getDate()) })); });
-  tasques.forEach(({ tasca, seccio, inici, fi, auto, esJornada }) => {
+  tasques.forEach(({ tasca, seccio, inici, fi, auto, esJornada, esDieta }) => {
     gantt.append(el('div', { class: 'gantt-label', title: seccio.name, textContent: tasca.t || '(sense títol)' }));
     const si = dies.findIndex(d => iso(d) === inici);
     const ei = dies.findIndex(d => iso(d) === fi);
@@ -2320,7 +2441,7 @@ function renderGantt() {
       const c = el('div', { class: 'gantt-cell' });
       if (iso(d) === avuiStr) c.classList.add('gantt-today');
       if (i === si && span > 0) {
-        const bClass = 'gantt-bar' + (tasca.done ? ' done' : '') + (auto ? ' auto' : '') + (esJornada ? ' gantt-bar-jornada' : ' k' + ki(tasca));
+        const bClass = 'gantt-bar' + (tasca.done ? ' done' : '') + (auto ? ' auto' : '') + (esJornada ? ' gantt-bar-jornada' : '') + (esDieta ? ' diet-bar' : '') + (!esJornada && !esDieta ? ' k' + ki(tasca) : '');
         c.append(el('div', { class: bClass, style: 'left:0;width:calc(100% * ' + span + ' + ' + (span-1) + 'px)', textContent: tasca.t || '', onclick: () => goto(seccio.id) }));
       }
       gantt.append(c);
@@ -2341,6 +2462,11 @@ function renderCal() {
       by[j.data] = by[j.data] || [];
       by[j.data].push({ j, p, s: bsec, esJornada: true });
     }); });
+  });
+  dietes.forEach(d => {
+    if (!d.data) return;
+    by[d.data] = by[d.data] || [];
+    by[d.data].push({ dieta: d, esDieta: true });
   });
   const avuiStr = avuiISO();
   app.append(el('div', { class: 'row', style: 'align-items:center;justify-content:space-between;margin:0 0 12px' }, [
@@ -2365,6 +2491,10 @@ function renderCal() {
         const tipusCalcCal = calculaTipusJornada(j.hores, j.es_laborable);
         const label = '🎬 ' + (ETIQ_CURTA[tipusCalcCal] || '?') + ' ' + (j.concepte || p.c || 'Jornada') + ' (' + nPers + 'p)';
         c.append(el('div', { class: 'chip jorn-chip' + (j.cobrat ? ' done' : ''), title: (ETIQ_JORNADA[tipusCalcCal] || 'Fora de rang') + ' × ' + nPers + ' persones = ' + eur(importJornada(j)), textContent: label, onclick: () => goto(s.id) }));
+      } else if (item.esDieta) {
+        const dd = item.dieta;
+        const label = '🍽️ ' + (dd.concepte || dd.tipus || 'Dieta') + (dd.persona ? ' · ' + dd.persona : '');
+        c.append(el('div', { class: 'chip diet-chip' + (dd.estat === 'cobrat' ? ' done' : ''), title: eur(dietaImport(dd)) + ' · ' + (dd.tipus || ''), textContent: label, onclick: () => goto('dietes') }));
       } else {
         const { k, s } = item;
         c.append(el('div', { class: 'chip k' + ki(k) + (k.done ? ' done' : ''), textContent: (k.h ? k.h + ' ' : '') + (k.t || ''), onclick: () => goto(s.id) }));
@@ -2697,7 +2827,7 @@ function inicialitzaCercador() {
   document.addEventListener('click', (e) => { if (!e.target.closest('.search-wrap')) results.classList.remove('open'); });
 }
 function cercaGlobal(q) {
-  const r = { tasques: [], documents: [], fitxers: [], drets: [], imatges: [], credits: [], tecnics: [] };
+  const r = { tasques: [], documents: [], fitxers: [], drets: [], imatges: [], credits: [], tecnics: [], dietes: [] };
   secs.forEach(s => (s.tasks || []).forEach(k => { const blob = [k.t, k.k, k.n, tasquesPersones(k).join(' ')].filter(Boolean).join(' ').toLowerCase(); if (blob.includes(q)) r.tasques.push({ tasca: k, seccio: s }); }));
   docs.forEach(d => { const blob = [d.title, (d.content || '').replace(/<[^>]+>/g, ' ')].join(' ').toLowerCase(); if (blob.includes(q)) r.documents.push(d); });
   secs.forEach(s => (s.files || []).forEach(f => { if ((f.name || '').toLowerCase().includes(q)) r.fitxers.push({ fitxer: f, seccio: s }); }));
@@ -2705,17 +2835,19 @@ function cercaGlobal(q) {
   imageRights.forEach(i => { const blob = [i.titol, i.autor, i.etiquetes, i.notes, i.cobertura].filter(Boolean).join(' ').toLowerCase(); if (blob.includes(q)) r.imatges.push(i); });
   credits.forEach(c => { const blob = [c.arxiu, c.atribucio, c.titol, c.nota].filter(Boolean).join(' ').toLowerCase(); if (blob.includes(q)) r.credits.push(c); });
   creditsTecnics.forEach(c => { const blob = [c.categoria, c.nom].filter(Boolean).join(' ').toLowerCase(); if (blob.includes(q)) r.tecnics.push(c); });
+  dietes.forEach(d => { const blob = [d.concepte, d.persona, d.tipus, d.notes].filter(Boolean).join(' ').toLowerCase(); if (blob.includes(q)) r.dietes.push(d); });
   return r;
 }
 function mostraResultats(r) {
   const box = $('#search-results'); box.innerHTML = '';
-  const total = r.tasques.length + r.documents.length + r.fitxers.length + r.drets.length + r.imatges.length + r.credits.length + r.tecnics.length;
+  const total = r.tasques.length + r.documents.length + r.fitxers.length + r.drets.length + r.imatges.length + r.credits.length + r.tecnics.length + r.dietes.length;
   if (!total) { box.append(el('div', { class: 'search-empty', textContent: 'Cap resultat.' })); box.classList.add('open'); return; }
   const addGrup = (titol, items, clickFn, labelFn) => {
     if (!items.length) return;
     box.append(el('div', { class: 'search-group', textContent: titol + ' (' + items.length + ')' }));
     items.slice(0, 10).forEach(it => { const { title, meta } = labelFn(it); box.append(el('div', { class: 'search-result', onclick: () => { box.classList.remove('open'); $('#search-input').value = ''; clickFn(it); } }, [el('div', { class: 'title', textContent: title }), el('div', { class: 'meta', textContent: meta })])); });
   };
+  addGrup('🍽️ Dietes', r.dietes, (d) => goto('dietes'), (d) => ({ title: (d.concepte || '(sense concepte)') + ' · ' + (d.persona || ''), meta: [d.data, d.tipus, eur(dietaImport(d))].filter(Boolean).join(' · ') }));
   addGrup('📋 Crèdits tècnics', r.tecnics, (c) => goto('credits'), (c) => ({ title: c.nom || '(sense nom)', meta: c.categoria || '—' }));
   addGrup('🎼 Drets musicals', r.drets, (c) => { currentMR = c; editingMR = false; goto('drets'); }, (c) => ({ title: c.titulo || '(sense títol)', meta: [c.referencia, c.interprete, c.ano_grabacion].filter(Boolean).join(' · ') }));
   addGrup('🖼️ Imatges', r.imatges, (i) => { currentImg = i; editingImg = false; goto('imatges'); }, (i) => ({ title: i.titol || '(sense títol)', meta: [i.any_data, i.tipus, i.autor].filter(Boolean).join(' · ') }));
@@ -2724,6 +2856,224 @@ function mostraResultats(r) {
   addGrup('📚 Documents', r.documents, (d) => { currentDoc = d; goto(secs.find(x => /^gui[oó]$/i.test(x.name))?.id || 'cal'); }, (d) => ({ title: d.title || 'Sense títol', meta: d.folder }));
   addGrup('📎 Fitxers', r.fitxers, (x) => goto(x.seccio.id), (x) => ({ title: x.fitxer.name, meta: x.seccio.name }));
   box.classList.add('open');
+}
+
+/* ============================================================
+   DIETES · UI
+   ============================================================ */
+function renderDietes() {
+  const app = $('#app'); app.innerHTML = '';
+  const card = el('div', { class: 'card' });
+  card.append(el('div', { class: 'row', style: 'justify-content:space-between;align-items:center;margin:0' }, [
+    el('h2', { textContent: '🍽️ Dietes i desplaçaments', style: 'margin:0' }),
+    el('button', { class: 'btn p', textContent: '+ Nova dieta', onclick: () => novaDieta() })
+  ]));
+  card.append(el('div', { class: 'badge', style: 'margin-top:6px', textContent: 'Cada mes té un títol editable. Les dietes cobrades sumen al Real de la partida corresponent. Les de tipus transport/quilometratge es mostren també a Despeses de viatge.' }));
+
+  // Filtres
+  const filtres = el('div', { class: 'row', style: 'margin:12px 0' });
+  const persones = Array.from(new Set(dietes.map(d => d.persona).filter(Boolean))).sort();
+  filtres.append(el('select', { onchange: e => { dietesFiltre.persona = e.target.value; render(); } }, [el('option', { value: '', textContent: 'Totes les persones', selected: dietesFiltre.persona === '' })].concat(persones.map(p => el('option', { value: p, textContent: p, selected: dietesFiltre.persona === p })))));
+  filtres.append(el('select', { onchange: e => { dietesFiltre.tipus = e.target.value; render(); } }, [el('option', { value: '', textContent: 'Tots els tipus', selected: dietesFiltre.tipus === '' })].concat(TIPUS_DIETA.map(([v,l]) => el('option', { value: v, textContent: l, selected: dietesFiltre.tipus === v })))));
+  filtres.append(el('select', { onchange: e => { dietesFiltre.estat = e.target.value; render(); } }, [el('option', { value: '', textContent: 'Tots els estats', selected: dietesFiltre.estat === '' })].concat(ESTAT_DIETA.map(([v,l]) => el('option', { value: v, textContent: l, selected: dietesFiltre.estat === v })))));
+  if (dietesFiltre.persona || dietesFiltre.tipus || dietesFiltre.estat) {
+    filtres.append(el('button', { class: 'btn s', textContent: '✖ Netejar filtres', onclick: () => { dietesFiltre = { persona: '', tipus: '', estat: '' }; render(); } }));
+  }
+  card.append(filtres);
+
+  // Filtrem
+  let llista = dietes.slice();
+  if (dietesFiltre.persona) llista = llista.filter(d => d.persona === dietesFiltre.persona);
+  if (dietesFiltre.tipus) llista = llista.filter(d => d.tipus === dietesFiltre.tipus);
+  if (dietesFiltre.estat) llista = llista.filter(d => d.estat === dietesFiltre.estat);
+
+  if (!llista.length) {
+    card.append(el('div', { class: 'agenda-empty', textContent: dietes.length ? 'Cap dieta amb aquests filtres.' : 'Cap dieta encara. Prem "+ Nova dieta" per començar.' }));
+    app.append(card);
+    return;
+  }
+
+  // Agrupem per mes
+  const grups = agrupaDietesPerMes(llista);
+  const keys = Object.keys(grups).sort();
+
+  // Totals globals
+  const totalGlobal = llista.reduce((a,d) => a + dietaImport(d), 0);
+  const cobratGlobal = llista.filter(d => d.estat === 'cobrat').reduce((a,d) => a + dietaImport(d), 0);
+  const pendentGlobal = totalGlobal - cobratGlobal;
+  card.append(el('div', { class: 'diet-summary' }, [
+    el('span', { textContent: 'Total: ' + eur(totalGlobal) }),
+    el('span', { class: 'diet-cobrat', textContent: 'Cobrat: ' + eur(cobratGlobal) }),
+    el('span', { class: 'diet-pendent', textContent: 'Pendent: ' + eur(pendentGlobal) })
+  ]));
+
+  keys.forEach(k => {
+    const arr = grups[k];
+    const any = Number(k.split('-')[0]);
+    const mes = Number(k.split('-')[1]);
+    const objMes = dietesMesos[k];
+    const titolMes = (objMes && objMes.titol) || nomMesDieta(k);
+    const obert = !!openDietMes[k];
+    const totalM = totalDietesMes(arr), cobratM = cobratDietesMes(arr), pendentM = pendentDietesMes(arr);
+
+    const header = el('div', { class: 'diet-mes-head' });
+    header.append(el('span', { style: 'cursor:pointer;font-size:12px;color:var(--mut);width:14px', textContent: obert ? '▼' : '▶', onclick: () => { openDietMes[k] = !obert; render(); } }));
+    const inpTitol = el('input', { type: 'text', class: 'diet-titol-input', value: titolMes, title: 'Edita el títol del mes' });
+    inpTitol.addEventListener('change', async () => {
+      const nou = inpTitol.value.trim();
+      if (!nou) { inpTitol.value = titolMes; return; }
+      await desaDietaMes(any, mes, nou);
+    });
+    header.append(inpTitol);
+    header.append(el('span', { class: 'diet-mes-count', textContent: '(' + arr.length + ' dieta' + (arr.length === 1 ? '' : 'es') + ')' }));
+    header.append(el('span', { class: 'diet-mes-total', textContent: eur(totalM) }));
+    if (pendentM === 0) header.append(el('span', { style: 'color:var(--ok);font-weight:600;font-size:12px', textContent: '🟢 Cobrat' }));
+    else header.append(el('span', { style: 'color:var(--warn);font-weight:600;font-size:12px', textContent: '🟡 ' + eur(pendentM) + ' pendent' }));
+    if (pendentM > 0) {
+      header.append(el('button', { class: 'btn s', textContent: '✅ Cobrar totes', onclick: async () => { await cobrarMesDietes(any, mes); render(); } }));
+    }
+    header.append(el('button', { class: 'btn s', textContent: '＋', title: 'Afegir dieta en aquest mes', onclick: () => novaDieta(k) }));
+    card.append(header);
+
+    if (obert) {
+      const taula = el('div', { class: 'diet-taula' });
+      taula.append(el('div', { class: 'diet-row diet-head' }, [
+        el('div', { textContent: 'Data' }),
+        el('div', { textContent: 'Persona' }),
+        el('div', { textContent: 'Concepte' }),
+        el('div', { textContent: 'Tipus' }),
+        el('div', { class: 'diet-num', textContent: 'Import' }),
+        el('div', { textContent: 'Partida' }),
+        el('div', { textContent: 'Estat' }),
+        el('div')
+      ]));
+      arr.forEach(d => {
+        const row = el('div', { class: 'diet-row' + (d.estat === 'cobrat' ? ' done' : '') });
+        row.append(el('div', { textContent: d.data ? fmt(d.data) : '—' }));
+        row.append(el('div', { textContent: d.persona || '—' }));
+        row.append(el('div', { textContent: d.concepte || '—' }));
+        let tipusLabel = d.tipus || '—';
+        if (d.tipus === 'quilometratge') tipusLabel = 'Km: ' + (d.km || 0) + ' × ' + (d.preu_km || DIETES_PREU_KM_DEFECTE) + ' €';
+        row.append(el('div', { textContent: tipusLabel }));
+        row.append(el('div', { class: 'diet-num', textContent: eur(dietaImport(d)) }));
+        row.append(el('div', { style: 'font-size:11px;color:var(--mut)', textContent: d.partida_nom || '—' }));
+        row.append(el('div', { textContent: d.estat === 'cobrat' ? '🟢 Cobrat' : '🟡 Pendent' }));
+        const actions = el('div', { style: 'display:flex;gap:4px' });
+        actions.append(el('button', { class: 'btn s', textContent: '✏️', title: 'Editar', onclick: () => editaDieta(d) }));
+        actions.append(el('button', { class: 'btn d s', textContent: '×', title: 'Esborrar', onclick: async () => { await esborraDieta(d); render(); } }));
+        row.append(actions);
+        taula.append(row);
+        if (d.notes) taula.append(el('div', { style: 'grid-column:1/-1;font-size:11px;color:var(--mut);padding:0 0 4px 6px;font-style:italic', textContent: '📝 ' + d.notes }));
+      });
+      card.append(taula);
+    }
+  });
+
+  app.append(card);
+}
+
+function novaDieta(mesKey) {
+  const dataDefault = mesKey ? (mesKey + '-' + String(new Date().getDate()).padStart(2,'0')) : avuiISO();
+  const nova = { id:null, data: dataDefault, persona:'', concepte:'', tipus:'apat', import:0, km:0, preu_km:DIETES_PREU_KM_DEFECTE, partida_nom:'', estat:'pendent', notes:'' };
+  obreFormulariDieta(nova, true);
+}
+function editaDieta(d) {
+  obreFormulariDieta(JSON.parse(JSON.stringify(d)), false);
+}
+async function obreFormulariDieta(d, esNova) {
+  const app = $('#app'); app.innerHTML = '';
+  const card = el('div', { class: 'card' });
+  card.append(el('div', { class: 'row', style: 'justify-content:space-between;align-items:center;margin:0 0 12px' }, [
+    el('button', { class: 'btn', textContent: '← Tornar', onclick: () => renderDietes() }),
+    el('h2', { textContent: esNova ? 'Nova dieta' : 'Editar dieta', style: 'margin:0' })
+  ]));
+
+  const form = el('div', { class: 'mr-form' });
+  const camp = (label, key, type, ph) => {
+    const l = el('label');
+    l.append(el('span', { textContent: label }));
+    const inp = el('input', { type: type || 'text', value: d[key] == null ? '' : d[key], placeholder: ph || '' });
+    inp.addEventListener('input', () => { if (type === 'number') d[key] = inp.value === '' ? 0 : Number(inp.value); else d[key] = inp.value; if (key === 'tipus' || key === 'km' || key === 'preu_km') refrescaImport(); });
+    l.append(inp); return l;
+  };
+  const lData = el('label'); lData.append(el('span', { textContent: 'Data' }));
+  const inpData = el('input', { type: 'date', value: d.data || avuiISO() });
+  inpData.addEventListener('input', () => d.data = inpData.value);
+  lData.append(inpData); form.append(lData);
+
+  const lPers = el('label'); lPers.append(el('span', { textContent: 'Persona' }));
+  const inpPers = el('input', { type: 'text', value: d.persona || '', placeholder: 'Joan, David...' });
+  inpPers.addEventListener('input', () => d.persona = inpPers.value);
+  lPers.append(inpPers); form.append(lPers);
+
+  const lConc = el('label', { class: 'full' }); lConc.append(el('span', { textContent: 'Concepte' }));
+  const inpConc = el('input', { type: 'text', value: d.concepte || '', placeholder: 'Dinar rodatge, tren BCN-Madrid...' });
+  inpConc.addEventListener('input', () => d.concepte = inpConc.value);
+  lConc.append(inpConc); form.append(lConc);
+
+  const lTipus = el('label'); lTipus.append(el('span', { textContent: 'Tipus' }));
+  const selTipus = el('select', { onchange: e => { d.tipus = e.target.value; refrescaImport(); } }, TIPUS_DIETA.map(([v,l]) => el('option', { value: v, textContent: l, selected: d.tipus === v })));
+  lTipus.append(selTipus); form.append(lTipus);
+
+  const lKm = el('label'); lKm.append(el('span', { textContent: 'Km' }));
+  const inpKm = el('input', { type: 'number', value: d.km || 0, min: 0, step: '0.1' });
+  inpKm.addEventListener('input', () => { d.km = Number(inpKm.value) || 0; refrescaImport(); });
+  lKm.append(inpKm); form.append(lKm);
+
+  const lPreu = el('label'); lPreu.append(el('span', { textContent: 'Preu/km (€)' }));
+  const inpPreu = el('input', { type: 'number', value: d.preu_km || DIETES_PREU_KM_DEFECTE, min: 0, step: '0.01' });
+  inpPreu.addEventListener('input', () => { d.preu_km = Number(inpPreu.value) || 0; refrescaImport(); });
+  lPreu.append(inpPreu); form.append(lPreu);
+
+  const lImport = el('label'); lImport.append(el('span', { textContent: 'Import (€)' }));
+  const inpImport = el('input', { type: 'number', value: d.import || 0, min: 0, step: '0.01' });
+  inpImport.addEventListener('input', () => { d.import = Number(inpImport.value) || 0; });
+  lImport.append(inpImport); form.append(lImport);
+
+  const lPart = el('label'); lPart.append(el('span', { textContent: 'Partida del pressupost' }));
+  const bsec = secs.find(s => isBudgetSec(s));
+  const partides = (bsec && bsec.budget) ? bsec.budget : [];
+  const selPart = el('select', { onchange: e => { d.partida_nom = e.target.value; } }, [el('option', { value: '', textContent: '— Cap —', selected: !d.partida_nom })].concat(partides.map(p => el('option', { value: p.c, textContent: p.c, selected: d.partida_nom === p.c }))));
+  lPart.append(selPart); form.append(lPart);
+
+  const lEstat = el('label'); lEstat.append(el('span', { textContent: 'Estat' }));
+  const selEstat = el('select', { onchange: e => d.estat = e.target.value }, ESTAT_DIETA.map(([v,l]) => el('option', { value: v, textContent: l, selected: d.estat === v })));
+  lEstat.append(selEstat); form.append(lEstat);
+
+  const lNotes = el('label', { class: 'full' }); lNotes.append(el('span', { textContent: 'Notes' }));
+  const taNotes = el('textarea', { value: d.notes || '' });
+  taNotes.addEventListener('input', () => d.notes = taNotes.value);
+  lNotes.append(taNotes); form.append(lNotes);
+
+  card.append(form);
+
+  // Vista prèvia de l'import
+  const preview = el('div', { style: 'margin-top:12px;padding:10px 14px;background:var(--bg);border-radius:8px;border:1px solid var(--bd);font-size:14px' });
+  const refrescaImport = () => {
+    if (d.tipus === 'quilometratge') {
+      d.import = (Number(d.km) || 0) * (Number(d.preu_km) || DIETES_PREU_KM_DEFECTE);
+      inpImport.value = d.import.toFixed(2);
+      inpImport.disabled = true;
+      preview.textContent = '💰 Import calculat: ' + (d.km || 0) + ' km × ' + (d.preu_km || DIETES_PREU_KM_DEFECTE) + ' €/km = ' + eur(d.import);
+    } else {
+      inpImport.disabled = false;
+      preview.textContent = '💰 Import: ' + eur(d.import);
+    }
+  };
+  refrescaImport();
+  card.append(preview);
+
+  const btns = el('div', { class: 'row', style: 'margin-top:16px' });
+  btns.append(el('button', { class: 'btn p', textContent: '💾 Desar', onclick: async () => {
+    if (!d.data) { alert('Cal indicar la data.'); return; }
+    if (!d.concepte || !d.concepte.trim()) { alert('Cal indicar un concepte.'); return; }
+    await desaDieta(d); renderDietes();
+  } }));
+  btns.append(el('button', { class: 'btn', textContent: 'Cancel·lar', onclick: () => renderDietes() }));
+  if (!esNova && d.id) btns.append(el('button', { class: 'btn d', textContent: '🗑️ Esborrar', onclick: async () => { await esborraDieta(d); renderDietes(); } }));
+  card.append(btns);
+
+  app.append(card);
 }
 
 async function start(user) {
@@ -2744,6 +3094,7 @@ async function start(user) {
   await carregaImageRights();
   await carregaCredits();
   await carregaCreditsTecnics();
+  await carregaDietes();
   cur = 'cal'; render();
   inicialitzaCercador();
   db.channel('canvis')
@@ -2764,6 +3115,8 @@ async function start(user) {
     .on('postgres_changes', { event: '*', schema: 'public', table: 'image_rights' }, async () => { await carregaImageRights(); if (cur === 'imatges' && !busy()) render(); })
     .on('postgres_changes', { event: '*', schema: 'public', table: 'credits' }, async () => { await carregaCredits(); if (cur === 'credits' && !busy()) render(); })
     .on('postgres_changes', { event: '*', schema: 'public', table: 'credits_tecnics' }, async () => { await carregaCreditsTecnics(); if (cur === 'credits' && !busy()) render(); })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'dietes' }, async () => { await carregaDietes(); if (cur === 'dietes' && !busy()) render(); })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'dietes_mesos' }, async () => { await carregaDietes(); if (cur === 'dietes' && !busy()) render(); })
     .subscribe();
   pch = db.channel('presencia', { config: { presence: { key: me } } });
   pch.on('presence', { event: 'sync' }, () => { peers = pch.presenceState(); paintNav(); }).subscribe(st => { if (st === 'SUBSCRIBED') pch.track({ sec: cur }); });
