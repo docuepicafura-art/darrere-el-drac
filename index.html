@@ -215,7 +215,7 @@ input[type=time]{padding:6px;width:auto}
 .jorn-chip{background:#7a5aa6 !important;border-left:3px solid #4a2f7a}
 .gantt-bar-jornada{background:#7a5aa6;outline:2px solid #4a2f7a;outline-offset:-2px}
 
-/* DIETES (sub-línia dins del pressupost, com les jornades) */
+/* DIETES (sub-línia dins del pressupost) */
 .diet-box{padding:12px 14px;background:rgba(138,90,43,.06);border-top:1px dashed var(--bd);border-bottom:1px solid var(--bd)}
 .diet-title{margin:0 0 8px;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--mut)}
 .diet-summary{display:flex;gap:16px;flex-wrap:wrap;font-size:13px;margin-bottom:10px;padding:8px 10px;background:var(--bg);border-radius:8px;border:1px solid var(--bd)}
@@ -460,7 +460,6 @@ const dietaImport = d => {
   }
   return Number(d.import) || 0;
 };
-const dietaEsViatge = d => d.tipus === 'transport' || d.tipus === 'quilometratge';
 const dietaMesKey = d => (d.data || '').slice(0, 7);
 const nomMesDieta = key => {
   if (!key || key.length < 7) return '(sense data)';
@@ -537,11 +536,6 @@ async function carregaCreditsTecnics() {
   const { data, error } = await db.from('credits_tecnics').select('*').order('ordre');
   if (error) { console.warn('No s\'han pogut carregar els crèdits tècnics:', error.message); return; }
   creditsTecnics = data || [];
-}
-async function carregaDietes() {
-  const { data, error } = await db.from('dietes').select('*').order('data', { ascending: true });
-  if (error) { console.warn('Error carregant dietes:', error.message); return; }
-  window.__dietesDB = data || [];
 }
 
 const nm = e => e.split('@')[0];
@@ -2370,7 +2364,7 @@ function mostraResultats(r) {
 }
 
 /* ============================================================
-   RENDER BUDGET amb el bloc DIETES integrat
+   RENDER BUDGET
    ============================================================ */
 function renderBudget(s) {
   s.budget = s.budget || [];
@@ -2380,10 +2374,7 @@ function renderBudget(s) {
     if (!Array.isArray(p.jornades)) { p.jornades = []; calDesar = true; }
     if (!Array.isArray(p.dietes)) { p.dietes = []; calDesar = true; }
     p.jornades.forEach(j => {
-      if (!Array.isArray(j.persones_noms)) {
-        j.persones_noms = Number(j.persones) > 0 ? Array(Number(j.persones)).fill('?').map((_, k) => 'Persona ' + (k+1)) : [];
-        delete j.persones; calDesar = true;
-      }
+      if (!Array.isArray(j.persones_noms)) { j.persones_noms = Number(j.persones) > 0 ? Array(Number(j.persones)).fill('?').map((_, k) => 'Persona ' + (k+1)) : []; delete j.persones; calDesar = true; }
       if (typeof j.es_laborable !== 'boolean') { j.es_laborable = true; calDesar = true; }
     });
     p.dietes.forEach(d => {
@@ -2504,10 +2495,7 @@ function renderBudget(s) {
         const sublinia = el('div', { style: 'padding:6px 10px 6px 46px;font-size:12px;background:rgba(122,90,166,.03)' });
         keysResum.forEach(mk => {
           const arr = grupsResum[mk];
-          const pendent = pendentMes(arr);
-          const total = totalMes(arr);
-          const numJornades = arr.length;
-          const cobrat = pendent === 0;
+          const pendent = pendentMes(arr); const total = totalMes(arr); const numJornades = arr.length; const cobrat = pendent === 0;
           const liniaMes = el('div', { style: 'display:flex;align-items:center;gap:8px;padding:3px 0;border-bottom:1px dashed var(--bd)' });
           liniaMes.append(el('span', { style: 'font-weight:600;min-width:120px;text-transform:capitalize', textContent: nomMes(mk) }));
           liniaMes.append(el('span', { style: 'font-size:11px;color:var(--mut);min-width:60px', textContent: '(' + numJornades + ' jornada' + (numJornades === 1 ? '' : 'es') + ')' }));
@@ -2546,22 +2534,13 @@ function renderBudget(s) {
       if (p.admet_jornades) {
         const jbox = el('div', { class: 'jorn-box' });
         jbox.append(el('h4', { class: 'jorn-title', textContent: '🎬 Jornades especials' }));
-
         const grups = agrupaJornadesPerMes(p.jornades);
         const keys  = ordenaMesos(Object.keys(grups));
         const totalPartida   = keys.reduce((a, k) => a + totalMes(grups[k]), 0);
         const cobratPartida  = keys.reduce((a, k) => a + cobratMes(grups[k]), 0);
         const pendentPartida = totalPartida - cobratPartida;
-
-        if (totalPartida > 0) {
-          jbox.append(el('div', { class: 'jorn-summary' }, [
-            el('span', { textContent: 'Total jornades: ' + eur(totalPartida) }),
-            el('span', { class: 'jorn-cobrat',  textContent: 'Cobrat: ' + eur(cobratPartida) }),
-            el('span', { class: 'jorn-pendent', textContent: 'Pendent: ' + eur(pendentPartida) })
-          ]));
-        }
+        if (totalPartida > 0) jbox.append(el('div', { class: 'jorn-summary' }, [el('span', { textContent: 'Total jornades: ' + eur(totalPartida) }), el('span', { class: 'jorn-cobrat', textContent: 'Cobrat: ' + eur(cobratPartida) }), el('span', { class: 'jorn-pendent', textContent: 'Pendent: ' + eur(pendentPartida) })]));
         if (!keys.length) jbox.append(el('div', { class: 'badge', textContent: 'Cap jornada encara.' }));
-
         keys.forEach(mk => {
           const arr = grups[mk];
           const tM = totalMes(arr), cM = cobratMes(arr), nJ = arr.length;
@@ -2574,15 +2553,9 @@ function renderBudget(s) {
           header.append(el('span', { class: 'jorn-mes-cobrat', textContent: '(' + eur(cM) + ' cobrats)' }));
           header.addEventListener('click', () => { openMes[idx] = openMes[idx] || {}; openMes[idx][mk] = !obert; render(); });
           jbox.append(header);
-
           if (obert) {
             const taula = el('div', { class: 'jorn-taula' });
-            taula.append(el('div', { class: 'jorn-row jorn-head' }, [
-              el('div', { textContent: 'Data' }), el('div', { textContent: 'Hores' }), el('div', { textContent: 'Laborable?' }),
-              el('div', { textContent: 'Persones' }), el('div', { textContent: 'Concepte' }),
-              el('div', { class: 'jorn-num', textContent: 'Preu unit.' }), el('div', { class: 'jorn-num', textContent: 'Pers.' }),
-              el('div', { class: 'jorn-num', textContent: 'Total' }), el('div', { textContent: 'Cobrat' }), el('div')
-            ]));
+            taula.append(el('div', { class: 'jorn-row jorn-head' }, [el('div', { textContent: 'Data' }), el('div', { textContent: 'Hores' }), el('div', { textContent: 'Laborable?' }), el('div', { textContent: 'Persones' }), el('div', { textContent: 'Concepte' }), el('div', { class: 'jorn-num', textContent: 'Preu unit.' }), el('div', { class: 'jorn-num', textContent: 'Pers.' }), el('div', { class: 'jorn-num', textContent: 'Total' }), el('div', { textContent: 'Cobrat' }), el('div')]));
             arr.forEach(j => {
               const jrow = el('div', { class: 'jorn-row' + (j.cobrat ? ' done' : '') });
               const tipusCalc = calculaTipusJornada(j.hores, j.es_laborable);
@@ -2592,10 +2565,7 @@ function renderBudget(s) {
               const inpH = el('input', { type: 'number', value: j.hores || 0, min: 0, step: 0.25, style: 'width:70px' }); inpH.disabled = !editing;
               inpH.addEventListener('input', () => { j.hores = Number(inpH.value) || 0; save(s); });
               jrow.append(el('div', {}, inpH));
-              const selLab = el('select', { style: 'min-width:110px' }, [
-                el('option', { value: 'true', textContent: 'Dia laborable', selected: j.es_laborable !== false }),
-                el('option', { value: 'false', textContent: 'Dia NO laborable', selected: j.es_laborable === false })
-              ]);
+              const selLab = el('select', { style: 'min-width:110px' }, [el('option', { value: 'true', textContent: 'Dia laborable', selected: j.es_laborable !== false }), el('option', { value: 'false', textContent: 'Dia NO laborable', selected: j.es_laborable === false })]);
               selLab.disabled = !editing;
               selLab.addEventListener('change', () => { j.es_laborable = selLab.value === 'true'; save(s); render(); });
               jrow.append(el('div', {}, selLab));
@@ -2642,36 +2612,25 @@ function renderBudget(s) {
             });
             const tMes = totalMes(arr), cMes = cobratMes(arr), pMes = pendentMes(arr);
             const resumMes = el('div', { style: 'margin-top:10px;padding:10px 12px;background:var(--card);border:1px solid var(--bd);border-radius:8px;font-size:13px;display:grid;grid-template-columns:1fr auto;gap:4px 16px' });
-            resumMes.append(
-              el('span', { textContent: 'Total mes', style: 'font-weight:600' }), el('span', { textContent: eur(tMes), style: 'text-align:right;font-weight:700' }),
-              el('span', { textContent: '├─ Cobrat (suma al Real)', style: 'color:var(--ok)' }), el('span', { textContent: eur(cMes), style: 'text-align:right;color:var(--ok);font-weight:600' }),
-              el('span', { textContent: '└─ Pendent de cobrar', style: 'color:var(--warn)' }), el('span', { textContent: eur(pMes), style: 'text-align:right;color:var(--warn);font-weight:600' })
-            );
+            resumMes.append(el('span', { textContent: 'Total mes', style: 'font-weight:600' }), el('span', { textContent: eur(tMes), style: 'text-align:right;font-weight:700' }), el('span', { textContent: '├─ Cobrat (suma al Real)', style: 'color:var(--ok)' }), el('span', { textContent: eur(cMes), style: 'text-align:right;color:var(--ok);font-weight:600' }), el('span', { textContent: '└─ Pendent de cobrar', style: 'color:var(--warn)' }), el('span', { textContent: eur(pMes), style: 'text-align:right;color:var(--warn);font-weight:600' }));
             taula.append(resumMes);
-            if (editing) taula.append(el('div', { class: 'row', style: 'margin-top:6px' },
-              el('button', { class: 'btn s', textContent: '+ Afegir jornada', onclick: () => {
-                const dataDefault = (mk && mk !== 'sense-data') ? (mk + '-' + String(new Date().getDate()).padStart(2, '0')) : avuiISO();
-                p.jornades = p.jornades || [];
-                p.jornades.push({ id: 'j' + Date.now().toString(36), data: dataDefault, hores: 2, es_laborable: true, persones_noms: [], concepte: '', cobrat: false });
-                openMes[idx] = openMes[idx] || {}; openMes[idx][mk] = true; save(s); render();
-              } })
-            ));
+            if (editing) taula.append(el('div', { class: 'row', style: 'margin-top:6px' }, el('button', { class: 'btn s', textContent: '+ Afegir jornada', onclick: () => {
+              const dataDefault = (mk && mk !== 'sense-data') ? (mk + '-' + String(new Date().getDate()).padStart(2, '0')) : avuiISO();
+              p.jornades = p.jornades || [];
+              p.jornades.push({ id: 'j' + Date.now().toString(36), data: dataDefault, hores: 2, es_laborable: true, persones_noms: [], concepte: '', cobrat: false });
+              openMes[idx] = openMes[idx] || {}; openMes[idx][mk] = true; save(s); render();
+            } })));
             jbox.append(taula);
           }
         });
-
-        if (editing) {
-          jbox.append(el('div', { class: 'row', style: 'margin-top:8px' },
-            el('button', { class: 'btn s', textContent: '+ Nova jornada en un altre mes', onclick: () => {
-              const ara = new Date();
-              const valor = prompt('Mes (YYYY-MM):', ara.getFullYear() + '-' + String(ara.getMonth() + 1).padStart(2, '0'));
-              if (!valor || !/^\d{4}-\d{2}$/.test(valor)) return;
-              p.jornades = p.jornades || [];
-              p.jornades.push({ id: 'j' + Date.now().toString(36), data: valor + '-01', hores: 2, es_laborable: true, persones_noms: [], concepte: '', cobrat: false });
-              openMes[idx] = openMes[idx] || {}; openMes[idx][valor] = true; save(s); render();
-            } })
-          ));
-        }
+        if (editing) jbox.append(el('div', { class: 'row', style: 'margin-top:8px' }, el('button', { class: 'btn s', textContent: '+ Nova jornada en un altre mes', onclick: () => {
+          const ara = new Date();
+          const valor = prompt('Mes (YYYY-MM):', ara.getFullYear() + '-' + String(ara.getMonth() + 1).padStart(2, '0'));
+          if (!valor || !/^\d{4}-\d{2}$/.test(valor)) return;
+          p.jornades = p.jornades || [];
+          p.jornades.push({ id: 'j' + Date.now().toString(36), data: valor + '-01', hores: 2, es_laborable: true, persones_noms: [], concepte: '', cobrat: false });
+          openMes[idx] = openMes[idx] || {}; openMes[idx][valor] = true; save(s); render();
+        } })));
         jbox.append(el('div', { class: 'badge', style: 'margin-top:6px', textContent: 'Les jornades cobrades sumen al Real. Les pendents es mostren però no sumen.' }));
         list.append(jbox);
       }
@@ -2681,12 +2640,7 @@ function renderBudget(s) {
   wrap.append(list);
 
   const totalP = s.budget.reduce((a, p) => a + (Number(p.p) || 0), 0);
-  const totalR = s.budget.reduce((a, p) => {
-    let base = realOf(p);
-    if (/soundtrack/i.test(p.c || '') && dSoundtrack.existeix && dSoundtrack.pagat > 0) base += dSoundtrack.pagat;
-    return a + base;
-  }, 0);
-
+  const totalR = s.budget.reduce((a, p) => { let base = realOf(p); if (/soundtrack/i.test(p.c || '') && dSoundtrack.existeix && dSoundtrack.pagat > 0) base += dSoundtrack.pagat; return a + base; }, 0);
   const pendentsJorn = s.budget.reduce((a, p) => a + pendentJornadesOf(p), 0);
   const pendentsDietes = s.budget.reduce((a, p) => a + pendentDietesOf(p), 0);
   const pendentsSoundtrack = dSoundtrack.existeix ? dSoundtrack.pendent : 0;
@@ -2714,7 +2668,7 @@ function renderBudget(s) {
 }
 
 /* ============================================================
-   BLOC DIETES dins del pressupost
+   BLOC DIETES
    ============================================================ */
 function renderBlocDietes(s, p, idx) {
   const dbox = el('div', { class: 'diet-box' });
@@ -2726,13 +2680,7 @@ function renderBlocDietes(s, p, idx) {
   const cobratPartida = keys.reduce((a, k) => a + cobratDietesMes(grups[k]), 0);
   const pendentPartida = totalPartida - cobratPartida;
 
-  if (totalPartida > 0) {
-    dbox.append(el('div', { class: 'diet-summary' }, [
-      el('span', { textContent: 'Total dietes: ' + eur(totalPartida) }),
-      el('span', { class: 'diet-cobrat', textContent: 'Cobrat: ' + eur(cobratPartida) }),
-      el('span', { class: 'diet-pendent', textContent: 'Pendent: ' + eur(pendentPartida) })
-    ]));
-  }
+  if (totalPartida > 0) dbox.append(el('div', { class: 'diet-summary' }, [el('span', { textContent: 'Total dietes: ' + eur(totalPartida) }), el('span', { class: 'diet-cobrat', textContent: 'Cobrat: ' + eur(cobratPartida) }), el('span', { class: 'diet-pendent', textContent: 'Pendent: ' + eur(pendentPartida) })]));
   if (!keys.length) dbox.append(el('div', { class: 'badge', textContent: 'Cap dieta encara.' }));
 
   keys.forEach(mk => {
@@ -2778,48 +2726,41 @@ function renderBlocDietes(s, p, idx) {
 
     if (obert) {
       const taula = el('div', { class: 'diet-taula' });
-      taula.append(el('div', { class: 'diet-row diet-head' }, [
-        el('div', { textContent: 'Data' }),
-        el('div', { textContent: 'Persones' }),
-        el('div', { textContent: 'Concepte' }),
-        el('div', { textContent: 'Tipus' }),
-        el('div', { class: 'diet-num', textContent: 'Import' }),
-        el('div', { textContent: 'Notes' }),
-        el('div', { textContent: 'Estat' }),
-        el('div')
-      ]));
+      taula.append(el('div', { class: 'diet-row diet-head' }, [el('div', { textContent: 'Data' }), el('div', { textContent: 'Persones' }), el('div', { textContent: 'Concepte' }), el('div', { textContent: 'Tipus' }), el('div', { class: 'diet-num', textContent: 'Import' }), el('div', { textContent: 'Notes' }), el('div', { textContent: 'Estat' }), el('div')]));
       arr.forEach(d => {
         const row = el('div', { class: 'diet-row' + (d.estat === 'cobrat' ? ' done' : '') });
 
-        // Data
-        const inpData = el('input', { type: 'date', value: d.data || '' }); inpData.disabled = !editing;
+        const inpData = el('input', { type: 'date', value: d.data || '' });
+        inpData.disabled = !editing;
         inpData.addEventListener('change', () => { d.data = inpData.value; save(s); render(); });
         row.append(el('div', {}, inpData));
 
-        // Persones (desplegable amb checkboxes, com a jornades especials)
         if (!Array.isArray(d.persones_noms)) d.persones_noms = d.persona ? String(d.persona).split(',').map(x => x.trim()).filter(Boolean) : [];
-        const btnPers = el('button', {
-          class: 'btn s', style: 'min-width:110px;text-align:left',
-          textContent: d.persones_noms.length ? d.persones_noms.join(', ') + ' (' + d.persones_noms.length + ')' : '— Triar persones —'
-        });
+        const btnPers = el('button', { class: 'btn s', style: 'min-width:110px;text-align:left', textContent: d.persones_noms.length ? d.persones_noms.join(', ') + ' (' + d.persones_noms.length + ')' : '— Triar persones —' });
         if (!editing) btnPers.disabled = true;
         btnPers.addEventListener('click', (ev) => {
           ev.stopPropagation();
           if (btnPers._dropdown && document.body.contains(btnPers._dropdown)) { btnPers._dropdown.remove(); btnPers._dropdown = null; return; }
           const dd = el('div', { style: 'position:absolute;z-index:100;background:var(--card);border:1px solid var(--bd);border-radius:8px;padding:8px;box-shadow:0 8px 24px rgba(0,0,0,.15);min-width:180px' });
-          peopleNames().forEach(nom => {
-            const checked = (d.persones_noms || []).includes(nom);
-            const lbl = el('label', { style: 'display:flex;align-items:center;gap:8px;padding:4px 6px;border-radius:6px;cursor:pointer;font-size:13px;' + (checked ? 'background:rgba(180,71,31,.1);color:var(--ac);font-weight:600' : '') });
-            const cb = el('input', { type: 'checkbox', checked });
-            cb.addEventListener('change', () => {
-              d.persones_noms = d.persones_noms || [];
-              if (cb.checked) { if (!d.persones_noms.includes(nom)) d.persones_noms.push(nom); }
-              else { d.persones_noms = d.persones_noms.filter(x => x !== nom); }
-              d.persona = d.persones_noms.join(', ');
-              save(s); render();
+          const noms = peopleNames();
+          if (!noms.length) {
+            dd.append(el('div', { style: 'padding:6px 8px;font-size:12px;color:var(--mut)', textContent: 'No hi ha cap persona a l\'equip.' }));
+          } else {
+            noms.forEach(nom => {
+              const checked = (d.persones_noms || []).includes(nom);
+              const lbl = el('label', { style: 'display:flex;align-items:center;gap:8px;padding:4px 6px;border-radius:6px;cursor:pointer;font-size:13px;' + (checked ? 'background:rgba(180,71,31,.1);color:var(--ac);font-weight:600' : '') });
+              const cb = el('input', { type: 'checkbox', checked });
+              cb.addEventListener('change', () => {
+                d.persones_noms = d.persones_noms || [];
+                if (cb.checked) { if (!d.persones_noms.includes(nom)) d.persones_noms.push(nom); }
+                else { d.persones_noms = d.persones_noms.filter(x => x !== nom); }
+                d.persona = d.persones_noms.join(', ');
+                save(s); render();
+              });
+              lbl.append(cb, el('span', { textContent: nom }));
+              dd.append(lbl);
             });
-            lbl.append(cb, el('span', { textContent: nom })); dd.append(lbl);
-          });
+          }
           document.body.appendChild(dd);
           const rect = btnPers.getBoundingClientRect();
           dd.style.left = rect.left + 'px'; dd.style.top = (rect.bottom + 4) + 'px';
@@ -2829,50 +2770,52 @@ function renderBlocDietes(s, p, idx) {
         });
         row.append(el('div', {}, btnPers));
 
-        // Concepte
-        const inpConc = el('input', { type: 'text', value: d.concepte || '', placeholder: 'Dinar, tren...' }); inpConc.disabled = !editing;
+        const inpConc = el('input', { type: 'text', value: d.concepte || '', placeholder: 'Dinar, tren...' });
+        inpConc.disabled = !editing;
         inpConc.addEventListener('input', () => { d.concepte = inpConc.value; save(s); });
         row.append(el('div', {}, inpConc));
 
-        // Tipus
         const selTipus = el('select', {}, TIPUS_DIETA.map(([v,l]) => el('option', { value: v, textContent: l, selected: (d.tipus || 'apat') === v })));
         selTipus.disabled = !editing;
         selTipus.addEventListener('change', () => { d.tipus = selTipus.value; save(s); render(); });
         row.append(el('div', {}, selTipus));
 
-        // Import segons tipus
         if (d.tipus === 'quilometratge') {
           const wrapKm = el('div', { style: 'display:flex;gap:4px;align-items:center' });
-          const inpKm = el('input', { type: 'number', value: d.km || 0, min: 0, step: '0.1', style: 'width:60px' }); inpKm.disabled = !editing;
+          const inpKm = el('input', { type: 'number', value: d.km || 0, min: 0, step: '0.1', style: 'width:60px' });
+          inpKm.disabled = !editing;
           inpKm.addEventListener('input', () => { d.km = Number(inpKm.value) || 0; save(s); render(); });
-          const inpPreu = el('input', { type: 'number', value: d.preu_km || DIETES_PREU_KM_DEFECTE, min: 0, step: '0.01', style: 'width:60px' }); inpPreu.disabled = !editing;
+          const inpPreu = el('input', { type: 'number', value: d.preu_km || DIETES_PREU_KM_DEFECTE, min: 0, step: '0.01', style: 'width:60px' });
+          inpPreu.disabled = !editing;
           inpPreu.addEventListener('input', () => { d.preu_km = Number(inpPreu.value) || 0; save(s); render(); });
           wrapKm.append(inpKm, el('span', { textContent: '×', style: 'font-size:11px' }), inpPreu);
           row.append(el('div', {}, wrapKm));
         } else if (d.tipus === 'manutencio_pernocta') {
           const wrapDies = el('div', { style: 'display:flex;flex-wrap:wrap;gap:4px;align-items:center;font-size:11px;color:var(--mut)' });
-          const inpDies = el('input', { type: 'number', value: d.dies || 1, min: 0, step: '1', style: 'width:50px' }); inpDies.disabled = !editing;
+          const inpDies = el('input', { type: 'number', value: d.dies || 1, min: 0, step: '1', style: 'width:50px' });
+          inpDies.disabled = !editing;
           inpDies.addEventListener('input', () => { d.dies = Number(inpDies.value) || 0; save(s); render(); });
           wrapDies.append(el('span', { textContent: 'dies:' }), inpDies);
-          wrapDies.append(el('span', { textContent: '× ' + PREU_MANUTENCIO_PERNOCTA.toFixed(2) + ' € × ' + (d.persones_noms || []).length + 'p' }));
+          const nPersAra = (d.persones_noms || []).length;
+          wrapDies.append(el('span', { textContent: '× ' + PREU_MANUTENCIO_PERNOCTA.toFixed(2) + ' €/dia × ' + nPersAra + ' pers.' }));
           row.append(el('div', {}, wrapDies));
         } else {
-          const inpImport = el('input', { type: 'number', value: d.import || 0, min: 0, step: '0.01', style: 'width:90px;text-align:right' }); inpImport.disabled = !editing;
-          inpImport.addEventListener('input', () => { d.import = Number(inpImport.value) || 0; save(s); render(); });
+          const inpImport = el('input', { type: 'number', value: d.import || 0, min: 0, step: '0.01', style: 'width:90px;text-align:right' });
+          inpImport.disabled = !editing;
+          inpImport.addEventListener('input', () => { d.import = Number(inpImport.value) || 0; save(s); });
           row.append(el('div', { class: 'diet-num' }, inpImport));
         }
 
-        // Notes
-        const inpNotes = el('input', { type: 'text', value: d.notes || '', placeholder: 'Notes...' }); inpNotes.disabled = !editing;
+        const inpNotes = el('input', { type: 'text', value: d.notes || '', placeholder: 'Notes...' });
+        inpNotes.disabled = !editing;
         inpNotes.addEventListener('input', () => { d.notes = inpNotes.value; save(s); });
         row.append(el('div', {}, inpNotes));
 
-        // Estat
-        const cbEstat = el('input', { type: 'checkbox', checked: d.estat === 'cobrat' }); cbEstat.disabled = !editing;
+        const cbEstat = el('input', { type: 'checkbox', checked: d.estat === 'cobrat' });
+        cbEstat.disabled = !editing;
         cbEstat.addEventListener('change', () => { d.estat = cbEstat.checked ? 'cobrat' : 'pendent'; save(s); render(); });
         row.append(el('div', { style: 'text-align:center;font-size:13px' }, cbEstat));
 
-        // Esborrar
         row.append(el('div', { style: 'text-align:center' }, editing ? el('button', { class: 'x', textContent: '×', onclick: () => { if (!confirm('Esborrar aquesta dieta?')) return; p.dietes = p.dietes.filter(x => x !== d); save(s); render(); } }) : ''));
 
         taula.append(row);
@@ -2883,30 +2826,24 @@ function renderBlocDietes(s, p, idx) {
         ]));
       });
       const resumMes = el('div', { style: 'margin-top:10px;padding:10px 12px;background:var(--card);border:1px solid var(--bd);border-radius:8px;font-size:13px;display:grid;grid-template-columns:1fr auto;gap:4px 16px' });
-      resumMes.append(
-        el('span', { textContent: 'Total mes', style: 'font-weight:600' }), el('span', { textContent: eur(tM), style: 'text-align:right;font-weight:700' }),
-        el('span', { textContent: '├─ Cobrat (suma al Real)', style: 'color:var(--ok)' }), el('span', { textContent: eur(cM), style: 'text-align:right;color:var(--ok);font-weight:600' }),
-        el('span', { textContent: '└─ Pendent de cobrar', style: 'color:var(--warn)' }), el('span', { textContent: eur(pM), style: 'text-align:right;color:var(--warn);font-weight:600' })
-      );
+      resumMes.append(el('span', { textContent: 'Total mes', style: 'font-weight:600' }), el('span', { textContent: eur(tM), style: 'text-align:right;font-weight:700' }), el('span', { textContent: '├─ Cobrat (suma al Real)', style: 'color:var(--ok)' }), el('span', { textContent: eur(cM), style: 'text-align:right;color:var(--ok);font-weight:600' }), el('span', { textContent: '└─ Pendent de cobrar', style: 'color:var(--warn)' }), el('span', { textContent: eur(pM), style: 'text-align:right;color:var(--warn);font-weight:600' }));
       taula.append(resumMes);
       dbox.append(taula);
     }
   });
 
   if (editing) {
-    dbox.append(el('div', { class: 'row', style: 'margin-top:8px' },
-      el('button', { class: 'btn s', textContent: '+ Nova dieta en un altre mes', onclick: () => {
-        const ara = new Date();
-        const valor = prompt('Mes (YYYY-MM):', ara.getFullYear() + '-' + String(ara.getMonth() + 1).padStart(2, '0'));
-        if (!valor || !/^\d{4}-\d{2}$/.test(valor)) return;
-        p.dietes = p.dietes || [];
-        p.dietes.push({ id: 'd' + Date.now().toString(36), data: valor + '-01', persona:'', persones_noms:[], concepte:'', tipus:'apat', import:0, km:0, preu_km:DIETES_PREU_KM_DEFECTE, dies:0, estat:'pendent', notes:'', __titolMes: nomMesDieta(valor) });
-        openDietMes[idx] = openDietMes[idx] || {}; openDietMes[idx][valor] = true;
-        save(s); render();
-      } })
-    ));
+    dbox.append(el('div', { class: 'row', style: 'margin-top:8px' }, el('button', { class: 'btn s', textContent: '+ Nova dieta en un altre mes', onclick: () => {
+      const ara = new Date();
+      const valor = prompt('Mes (YYYY-MM):', ara.getFullYear() + '-' + String(ara.getMonth() + 1).padStart(2, '0'));
+      if (!valor || !/^\d{4}-\d{2}$/.test(valor)) return;
+      p.dietes = p.dietes || [];
+      p.dietes.push({ id: 'd' + Date.now().toString(36), data: valor + '-01', persona:'', persones_noms:[], concepte:'', tipus:'apat', import:0, km:0, preu_km:DIETES_PREU_KM_DEFECTE, dies:0, estat:'pendent', notes:'', __titolMes: nomMesDieta(valor) });
+      openDietMes[idx] = openDietMes[idx] || {}; openDietMes[idx][valor] = true;
+      save(s); render();
+    } })));
   }
-  dbox.append(el('div', { class: 'badge', style: 'margin-top:6px', textContent: 'Les dietes cobrades sumen al Real. Les pendents es mostren com a badge a la partida. Manutenció amb pernocta: 53,34 €/dia × dies × persones. Les de transport/quilometratge també surten al calendari i al gantt.' }));
+  dbox.append(el('div', { class: 'badge', style: 'margin-top:6px', textContent: 'Les dietes cobrades sumen al Real. Manutenció amb pernocta: 53,34 €/dia × dies × persones.' }));
   return dbox;
 }
 
@@ -2918,10 +2855,16 @@ async function start(user) {
   secs = a.data || [];
   const b = await db.from('settings').select('people, credit_frase_imatges, credit_frase_musica').eq('id', 1).maybeSingle();
   if (b.data) {
-    if (Array.isArray(b.data.people) && b.data.people.length) people = b.data.people.map(p => typeof p === 'string' ? { name: p, email: '' } : p);
+    if (Array.isArray(b.data.people) && b.data.people.length) {
+      people = b.data.people.map(p => typeof p === 'string' ? { name: p, email: '' } : p);
+    } else {
+      await db.from('settings').upsert({ id: 1, people });
+    }
     if (b.data.credit_frase_imatges) creditFraseImatges = b.data.credit_frase_imatges;
     if (b.data.credit_frase_musica) creditFraseMusica = b.data.credit_frase_musica;
   }
+  const chkSettings = await db.from('settings').select('id').eq('id', 1).maybeSingle();
+  if (!chkSettings.data) await db.from('settings').insert({ id: 1, people });
   await carregaBlocks();
   await carregaDocs();
   await carregaMusicRights();
