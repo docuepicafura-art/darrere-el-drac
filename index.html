@@ -2488,7 +2488,7 @@ function renderBudget(s) {
     }
     list.append(row);
 
-    if (p.admet_jornades && (p.jornades || []).length) {
+       if (p.admet_jornades && (p.jornades || []).length) {
       const grupsResum = agrupaJornadesPerMes(p.jornades);
       const keysResum = ordenaMesos(Object.keys(grupsResum));
       if (keysResum.length > 0) {
@@ -2497,7 +2497,7 @@ function renderBudget(s) {
           const arr = grupsResum[mk];
           const pendent = pendentMes(arr); const total = totalMes(arr); const numJornades = arr.length; const cobrat = pendent === 0;
           const liniaMes = el('div', { style: 'display:flex;align-items:center;gap:8px;padding:3px 0;border-bottom:1px dashed var(--bd)' });
-          liniaMes.append(el('span', { style: 'font-weight:600;min-width:120px;text-transform:capitalize', textContent: nomMes(mk) }));
+          liniaMes.append(el('span', { style: 'font-weight:600;min-width:120px;text-transform:capitalize', textContent: '🎬 ' + nomMes(mk) }));
           liniaMes.append(el('span', { style: 'font-size:11px;color:var(--mut);min-width:60px', textContent: '(' + numJornades + ' jornada' + (numJornades === 1 ? '' : 'es') + ')' }));
           liniaMes.append(el('span', { style: 'font-variant-numeric:tabular-nums;min-width:80px;text-align:right', textContent: eur(total) }));
           if (cobrat) liniaMes.append(el('span', { style: 'font-variant-numeric:tabular-nums;min-width:100px;text-align:right;color:var(--ok);font-weight:600', textContent: '🟢 Cobrat' }));
@@ -2506,6 +2506,31 @@ function renderBudget(s) {
           sublinia.append(liniaMes);
         });
         list.append(el('div', { style: 'background:rgba(122,90,166,.03);border-bottom:1px solid var(--bd)' }, sublinia));
+      }
+    }
+
+    if (p.admet_dietes && (p.dietes || []).length) {
+      const grupsResumD = agrupaDietesPerMes(p.dietes);
+      const keysResumD = ordenaMesos(Object.keys(grupsResumD));
+      if (keysResumD.length > 0) {
+        const subliniaD = el('div', { style: 'padding:6px 10px 6px 46px;font-size:12px;background:rgba(138,90,43,.04)' });
+        keysResumD.forEach(mk => {
+          const arr = grupsResumD[mk];
+          const pendent = pendentDietesMes(arr);
+          const total = totalDietesMes(arr);
+          const numDietes = arr.length;
+          const cobrat = pendent === 0;
+          const titolMes = (arr[0] && arr[0].__titolMes) || nomMesDieta(mk);
+          const liniaMes = el('div', { style: 'display:flex;align-items:center;gap:8px;padding:3px 0;border-bottom:1px dashed var(--bd)' });
+          liniaMes.append(el('span', { style: 'font-weight:600;min-width:120px;text-transform:capitalize', textContent: '🍽️ ' + titolMes }));
+          liniaMes.append(el('span', { style: 'font-size:11px;color:var(--mut);min-width:60px', textContent: '(' + numDietes + ' dieta' + (numDietes === 1 ? '' : 'es') + ')' }));
+          liniaMes.append(el('span', { style: 'font-variant-numeric:tabular-nums;min-width:80px;text-align:right', textContent: eur(total) }));
+          if (cobrat) liniaMes.append(el('span', { style: 'font-variant-numeric:tabular-nums;min-width:100px;text-align:right;color:var(--ok);font-weight:600', textContent: '🟢 Cobrat' }));
+          else liniaMes.append(el('span', { style: 'font-variant-numeric:tabular-nums;min-width:100px;text-align:right;color:var(--warn);font-weight:600', textContent: '🟡 ' + eur(pendent) + ' pendent' }));
+          liniaMes.append(el('span', { style: 'min-width:110px' }));
+          subliniaD.append(liniaMes);
+        });
+        list.append(el('div', { style: 'background:rgba(138,90,43,.04);border-bottom:1px solid var(--bd)' }, subliniaD));
       }
     }
 
