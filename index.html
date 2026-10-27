@@ -227,7 +227,7 @@ input[type=time]{padding:6px;width:auto}
 .diet-mes-head .diet-mes-count{font-size:11px;color:var(--mut)}
 .diet-mes-head .diet-mes-total{font-variant-numeric:tabular-nums;font-weight:700}
 .diet-taula{margin:8px 0 4px 16px}
-.diet-row{display:grid;grid-template-columns:110px 110px 1fr 130px 100px 110px 70px 50px;gap:6px;align-items:center;padding:4px 0;border-bottom:1px solid var(--bd);font-size:13px}
+.diet-row{display:grid;grid-template-columns:110px 130px 1fr 140px 120px 110px 60px 40px;gap:6px;align-items:center;padding:4px 0;border-bottom:1px solid var(--bd);font-size:13px}
 .diet-head{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--mut);font-weight:600;border-bottom:2px solid var(--bd)}
 .diet-num{text-align:right;font-variant-numeric:tabular-nums;font-weight:600}
 .diet-row.done .diet-num{color:var(--tx);opacity:1}
@@ -311,7 +311,15 @@ const PARTIDES_AMB_JORNADES = /direcci[oó]|gui[oó]/i;
 const PARTIDES_AMB_DIETES   = /dietes|despla[cç]aments|producci[oó]|viatge|rodatge/i;
 
 const DIETES_PREU_KM_DEFECTE = 0.26;
-const TIPUS_DIETA = [['apat','Àpat'],['allotjament','Allotjament'],['transport','Transport'],['quilometratge','Quilometratge'],['altres','Altres']];
+const PREU_MANUTENCIO_PERNOCTA = 53.34;
+const TIPUS_DIETA = [
+  ['apat','Àpat'],
+  ['allotjament','Allotjament'],
+  ['transport','Transport'],
+  ['quilometratge','Quilometratge'],
+  ['manutencio_pernocta','Manutenció amb pernocta'],
+  ['altres','Altres']
+];
 const ESTAT_DIETA = [['pendent','🟡 Pendent'],['cobrat','🟢 Cobrat']];
 
 const calculaTipusJornada = (hores, esLaborable) => {
@@ -442,9 +450,14 @@ let creditFraseImatges = 'Fotografies i material d\'arxiu cortesia de:';
 let creditFraseMusica = 'Música:';
 let creditsTecnics = [];
 
-/* === DIETES: helpers de dades (viuen dins de cada partida del pressupost) === */
+/* === DIETES: helpers de dades === */
 const dietaImport = d => {
   if (d.tipus === 'quilometratge') return (Number(d.km) || 0) * (Number(d.preu_km) || DIETES_PREU_KM_DEFECTE);
+  if (d.tipus === 'manutencio_pernocta') {
+    const nPers = Array.isArray(d.persones_noms) ? d.persones_noms.length : (Number(d.persones) || 0);
+    const dies = Number(d.dies) || 0;
+    return PREU_MANUTENCIO_PERNOCTA * nPers * dies;
+  }
   return Number(d.import) || 0;
 };
 const dietaEsViatge = d => d.tipus === 'transport' || d.tipus === 'quilometratge';
@@ -464,10 +477,17 @@ const totalDietesMes   = arr => arr.reduce((a, d) => a + dietaImport(d), 0);
 const cobratDietesMes  = arr => arr.filter(d => d.estat === 'cobrat').reduce((a, d) => a + dietaImport(d), 0);
 const pendentDietesMes = arr => arr.filter(d => d.estat !== 'cobrat').reduce((a, d) => a + dietaImport(d), 0);
 const pendentDietesOf = p => (p.dietes || []).filter(d => d.estat !== 'cobrat').reduce((a, d) => a + dietaImport(d), 0);
-const dietesMesTitol = (any, mes) => {
-  // Títol de mes per a dietes. Es guarda a la pròpia partida per simplicitat.
-  return nomMesDieta(any + '-' + String(mes).padStart(2,'0'));
-};
+
+async function desaDietaMes(any, mes, titol) {
+  const { data: existent } = await db.from('dietes_mesos').select('*').eq('any_mes', any).eq('mes', mes).maybeSingle();
+  if (existent) {
+    const r = await db.from('dietes_mesos').update({ titol }).eq('id', existent.id);
+    if (r.error) { alert('Error: ' + r.error.message); return; }
+  } else {
+    const r = await db.from('dietes_mesos').insert({ any_mes: any, mes, titol });
+    if (r.error) { alert('Error: ' + r.error.message); return; }
+  }
+}
 
 function save(s) {
   if (!s || !s.id) return;
@@ -521,28 +541,7 @@ async function carregaCreditsTecnics() {
 async function carregaDietes() {
   const { data, error } = await db.from('dietes').select('*').order('data', { ascending: true });
   if (error) { console.warn('Error carregant dietes:', error.message); return; }
-  // Les dietes ara viuen dins de cada partida (p.dietes). Les carreguem com a font
-  // externa per si es vol migrar o per al calendari/gantt.
   window.__dietesDB = data || [];
-}
-async function carregaDietesMesos() {
-  const { data, error } = await db.from('dietes_mesos').select('*');
-  if (error) { console.warn('Error carregant dietes_mesos:', error.message); return; }
-  window.__dietesMesosDB = data || [];
-}
-
-async function desaDietaMes(any, mes, titol) {
-  const clau = any + '-' + String(mes).padStart(2,'0');
-  const { data: existent } = await db.from('dietes_mesos').select('*').eq('any_mes', any).eq('mes', mes).maybeSingle();
-  if (existent) {
-    const r = await db.from('dietes_mesos').update({ titol }).eq('id', existent.id);
-    if (r.error) { alert('Error: ' + r.error.message); return; }
-  } else {
-    const r = await db.from('dietes_mesos').insert({ any_mes: any, mes, titol });
-    if (r.error) { alert('Error: ' + r.error.message); return; }
-  }
-  window.__dietesMesosDB = (window.__dietesMesosDB || []).filter(x => !(x.any_mes === any && x.mes === mes));
-  window.__dietesMesosDB.push({ any_mes: any, mes, titol, __clau: clau });
 }
 
 const nm = e => e.split('@')[0];
@@ -1912,7 +1911,9 @@ function renderGantt() {
       });
       (p.dietes || []).forEach(d => {
         if (!d.data) return;
-        tasques.push({ tasca: { t: '🍽️ ' + (d.concepte || d.tipus || 'Dieta') + ' · ' + (d.persona || '') + ' · ' + (d.tipus || ''), k: 'Producció', done: d.estat === 'cobrat', h: '' }, seccio: bsec, inici: d.data, fi: d.data, auto: false, esJornada: false, esDieta: true });
+        const nPersD = (d.persones_noms || []).length || (d.persona ? 1 : 0);
+        const t = '🍽️ ' + (d.concepte || d.tipus || 'Dieta') + (nPersD ? ' (' + nPersD + 'p)' : '') + ' · ' + (d.tipus || '');
+        tasques.push({ tasca: { t, k: 'Producció', done: d.estat === 'cobrat', h: '' }, seccio: bsec, inici: d.data, fi: d.data, auto: false, esJornada: false, esDieta: true });
       });
     });
   });
@@ -2002,7 +2003,8 @@ function renderCal() {
         c.append(el('div', { class: 'chip jorn-chip' + (j.cobrat ? ' done' : ''), title: (ETIQ_JORNADA[tipusCalcCal] || 'Fora de rang') + ' × ' + nPers + ' persones = ' + eur(importJornada(j)), textContent: label, onclick: () => goto(s.id) }));
       } else if (item.esDieta) {
         const dd = item.dieta;
-        const label = '🍽️ ' + (dd.concepte || dd.tipus || 'Dieta') + (dd.persona ? ' · ' + dd.persona : '');
+        const nPersD = (dd.persones_noms || []).length || (dd.persona ? 1 : 0);
+        const label = '🍽️ ' + (dd.concepte || dd.tipus || 'Dieta') + (nPersD ? ' (' + nPersD + 'p)' : '');
         c.append(el('div', { class: 'chip diet-chip' + (dd.estat === 'cobrat' ? ' done' : ''), title: eur(dietaImport(dd)) + ' · ' + (dd.tipus || ''), textContent: label, onclick: () => goto(item.s.id) }));
       } else {
         const { k, s } = item;
@@ -2344,7 +2346,7 @@ function cercaGlobal(q) {
   imageRights.forEach(i => { const blob = [i.titol, i.autor, i.etiquetes, i.notes, i.cobertura].filter(Boolean).join(' ').toLowerCase(); if (blob.includes(q)) r.imatges.push(i); });
   credits.forEach(c => { const blob = [c.arxiu, c.atribucio, c.titol, c.nota].filter(Boolean).join(' ').toLowerCase(); if (blob.includes(q)) r.credits.push(c); });
   creditsTecnics.forEach(c => { const blob = [c.categoria, c.nom].filter(Boolean).join(' ').toLowerCase(); if (blob.includes(q)) r.tecnics.push(c); });
-  secs.forEach(s => (s.budget || []).forEach(p => (p.dietes || []).forEach(d => { const blob = [d.concepte, d.persona, d.tipus, d.notes, p.c].filter(Boolean).join(' ').toLowerCase(); if (blob.includes(q)) r.dietes.push({ ...d, __partida: p.c, __seccio: s.id }); })));
+  secs.forEach(s => (s.budget || []).forEach(p => (p.dietes || []).forEach(d => { const blob = [d.concepte, d.persona, (d.persones_noms||[]).join(' '), d.tipus, d.notes, p.c].filter(Boolean).join(' ').toLowerCase(); if (blob.includes(q)) r.dietes.push({ ...d, __partida: p.c, __seccio: s.id }); })));
   return r;
 }
 function mostraResultats(r) {
@@ -2368,7 +2370,7 @@ function mostraResultats(r) {
 }
 
 /* ============================================================
-   RENDER BUDGET amb el bloc DIETES integrat (sub-línia com jornades)
+   RENDER BUDGET amb el bloc DIETES integrat
    ============================================================ */
 function renderBudget(s) {
   s.budget = s.budget || [];
@@ -2379,13 +2381,14 @@ function renderBudget(s) {
     if (!Array.isArray(p.dietes)) { p.dietes = []; calDesar = true; }
     p.jornades.forEach(j => {
       if (!Array.isArray(j.persones_noms)) {
-        j.persones_noms = Number(j.persones) > 0
-          ? Array(Number(j.persones)).fill('?').map((_, k) => 'Persona ' + (k+1))
-          : [];
-        delete j.persones;
-        calDesar = true;
+        j.persones_noms = Number(j.persones) > 0 ? Array(Number(j.persones)).fill('?').map((_, k) => 'Persona ' + (k+1)) : [];
+        delete j.persones; calDesar = true;
       }
       if (typeof j.es_laborable !== 'boolean') { j.es_laborable = true; calDesar = true; }
+    });
+    p.dietes.forEach(d => {
+      if (!Array.isArray(d.persones_noms)) { d.persones_noms = d.persona ? String(d.persona).split(',').map(x => x.trim()).filter(Boolean) : []; calDesar = true; }
+      if (typeof d.dies !== 'number') { d.dies = 0; calDesar = true; }
     });
     if (typeof p.admet_jornades !== 'boolean') { p.admet_jornades = PARTIDES_AMB_JORNADES.test(p.c || ''); calDesar = true; }
     if (typeof p.admet_dietes !== 'boolean') { p.admet_dietes = PARTIDES_AMB_DIETES.test(p.c || ''); calDesar = true; }
@@ -2458,17 +2461,9 @@ function renderBudget(s) {
       row.append(el('div', { class: 'bc-num' }, el('input', { type: 'number', value: p.p, min: 0, step: '0.01', style: 'text-align:right', oninput: e => { p.p = Number(e.target.value) || 0; save(s); } })));
     } else {
       const concepteCell = el('div', { textContent: p.c || '(sense nom)' });
-      if (isSoundtrack && dSoundtrack.existeix && dSoundtrack.pendent > 0) {
-        concepteCell.append(el('span', { class: 'budget-badge', textContent: '🎼 ' + eur(dSoundtrack.pendent) + ' pendents en drets musicals' }));
-      }
-      if (p.admet_jornades && (p.jornades || []).length) {
-        const pend = pendentJornadesOf(p);
-        if (pend > 0) concepteCell.append(el('span', { class: 'budget-badge', textContent: '🎬 ' + eur(pend) + ' pendents de cobrar' }));
-      }
-      if (p.admet_dietes && (p.dietes || []).length) {
-        const pendD = pendentDietesOf(p);
-        if (pendD > 0) concepteCell.append(el('span', { class: 'budget-badge', textContent: '🍽️ ' + eur(pendD) + ' en dietes pendents' }));
-      }
+      if (isSoundtrack && dSoundtrack.existeix && dSoundtrack.pendent > 0) concepteCell.append(el('span', { class: 'budget-badge', textContent: '🎼 ' + eur(dSoundtrack.pendent) + ' pendents en drets musicals' }));
+      if (p.admet_jornades && (p.jornades || []).length) { const pend = pendentJornadesOf(p); if (pend > 0) concepteCell.append(el('span', { class: 'budget-badge', textContent: '🎬 ' + eur(pend) + ' pendents de cobrar' })); }
+      if (p.admet_dietes && (p.dietes || []).length) { const pendD = pendentDietesOf(p); if (pendD > 0) concepteCell.append(el('span', { class: 'budget-badge', textContent: '🍽️ ' + eur(pendD) + ' en dietes pendents' })); }
       row.append(concepteCell);
       row.append(el('div', { class: 'hide-s' }, el('span', { class: 'cat-pill', textContent: p.cat || 'Altres' })));
       row.append(el('div', { class: 'bc-num', textContent: eur(p.p) }));
@@ -2546,9 +2541,7 @@ function renderBudget(s) {
       if (editing) box.append(el('button', { class: 'btn s', textContent: '+ Afegir despesa', onclick: () => { p.exp = p.exp || []; p.exp.push({ d:'', t:'', a:0 }); save(s); render(); } }));
       list.append(box);
 
-      if (p.admet_dietes) {
-        list.append(renderBlocDietes(s, p, idx));
-      }
+      if (p.admet_dietes) list.append(renderBlocDietes(s, p, idx));
 
       if (p.admet_jornades) {
         const jbox = el('div', { class: 'jorn-box' });
@@ -2585,32 +2578,20 @@ function renderBudget(s) {
           if (obert) {
             const taula = el('div', { class: 'jorn-taula' });
             taula.append(el('div', { class: 'jorn-row jorn-head' }, [
-              el('div', { textContent: 'Data' }),
-              el('div', { textContent: 'Hores' }),
-              el('div', { textContent: 'Laborable?' }),
-              el('div', { textContent: 'Persones' }),
-              el('div', { textContent: 'Concepte' }),
-              el('div', { class: 'jorn-num', textContent: 'Preu unit.' }),
-              el('div', { class: 'jorn-num', textContent: 'Pers.' }),
-              el('div', { class: 'jorn-num', textContent: 'Total' }),
-              el('div', { textContent: 'Cobrat' }),
-              el('div')
+              el('div', { textContent: 'Data' }), el('div', { textContent: 'Hores' }), el('div', { textContent: 'Laborable?' }),
+              el('div', { textContent: 'Persones' }), el('div', { textContent: 'Concepte' }),
+              el('div', { class: 'jorn-num', textContent: 'Preu unit.' }), el('div', { class: 'jorn-num', textContent: 'Pers.' }),
+              el('div', { class: 'jorn-num', textContent: 'Total' }), el('div', { textContent: 'Cobrat' }), el('div')
             ]));
-
             arr.forEach(j => {
               const jrow = el('div', { class: 'jorn-row' + (j.cobrat ? ' done' : '') });
               const tipusCalc = calculaTipusJornada(j.hores, j.es_laborable);
-
-              const inpData = el('input', { type: 'date', value: j.data || '' });
-              inpData.disabled = !editing;
+              const inpData = el('input', { type: 'date', value: j.data || '' }); inpData.disabled = !editing;
               inpData.addEventListener('change', () => { j.data = inpData.value; save(s); render(); });
               jrow.append(el('div', {}, inpData));
-
-              const inpH = el('input', { type: 'number', value: j.hores || 0, min: 0, step: 0.25, style: 'width:70px' });
-              inpH.disabled = !editing;
+              const inpH = el('input', { type: 'number', value: j.hores || 0, min: 0, step: 0.25, style: 'width:70px' }); inpH.disabled = !editing;
               inpH.addEventListener('input', () => { j.hores = Number(inpH.value) || 0; save(s); });
               jrow.append(el('div', {}, inpH));
-
               const selLab = el('select', { style: 'min-width:110px' }, [
                 el('option', { value: 'true', textContent: 'Dia laborable', selected: j.es_laborable !== false }),
                 el('option', { value: 'false', textContent: 'Dia NO laborable', selected: j.es_laborable === false })
@@ -2618,7 +2599,6 @@ function renderBudget(s) {
               selLab.disabled = !editing;
               selLab.addEventListener('change', () => { j.es_laborable = selLab.value === 'true'; save(s); render(); });
               jrow.append(el('div', {}, selLab));
-
               const btnPers = el('button', { class: 'btn s', style: 'min-width:110px;text-align:left', textContent: (j.persones_noms && j.persones_noms.length) ? j.persones_noms.join(', ') + ' (' + j.persones_noms.length + ')' : '— Triar persones —' });
               if (!editing) btnPers.disabled = true;
               btnPers.addEventListener('click', (ev) => {
@@ -2630,8 +2610,7 @@ function renderBudget(s) {
                   const lbl = el('label', { style: 'display:flex;align-items:center;gap:8px;padding:4px 6px;border-radius:6px;cursor:pointer;font-size:13px;' + (checked ? 'background:rgba(180,71,31,.1);color:var(--ac);font-weight:600' : '') });
                   const cb = el('input', { type: 'checkbox', checked });
                   cb.addEventListener('change', () => { j.persones_noms = j.persones_noms || []; if (cb.checked) { if (!j.persones_noms.includes(nom)) j.persones_noms.push(nom); } else { j.persones_noms = j.persones_noms.filter(x => x !== nom); } save(s); render(); });
-                  lbl.append(cb, el('span', { textContent: nom }));
-                  dd.append(lbl);
+                  lbl.append(cb, el('span', { textContent: nom })); dd.append(lbl);
                 });
                 document.body.appendChild(dd);
                 const rect = btnPers.getBoundingClientRect();
@@ -2641,37 +2620,26 @@ function renderBudget(s) {
                 setTimeout(() => document.addEventListener('click', closeDD, true), 0);
               });
               jrow.append(el('div', {}, btnPers));
-
-              const inpC = el('input', { type: 'text', value: j.concepte || '', placeholder: 'Reunió, guió...' });
-              inpC.disabled = !editing;
+              const inpC = el('input', { type: 'text', value: j.concepte || '', placeholder: 'Reunió, guió...' }); inpC.disabled = !editing;
               inpC.addEventListener('input', () => { j.concepte = inpC.value; save(s); });
               jrow.append(el('div', {}, inpC));
-
               const preuUnit = tipusCalc && tipusCalc !== 'fora_de_rang' ? (PREUS_JORNADA[tipusCalc] || 0) : 0;
               jrow.append(el('div', { class: 'jorn-num', textContent: preuUnit ? eur(preuUnit) : '—' }));
-
               const nPers = (j.persones_noms || []).length;
               jrow.append(el('div', { class: 'jorn-num', textContent: String(nPers) }));
-
               const totalJornada = preuUnit * nPers;
               jrow.append(el('div', { class: 'jorn-num', style: 'font-weight:700;' + (j.cobrat ? '' : 'color:var(--mut);opacity:.65'), textContent: totalJornada > 0 ? eur(totalJornada) : '—' }));
-
-              const cbC = el('input', { type: 'checkbox', checked: !!j.cobrat });
-              cbC.disabled = !editing;
+              const cbC = el('input', { type: 'checkbox', checked: !!j.cobrat }); cbC.disabled = !editing;
               cbC.addEventListener('change', () => { j.cobrat = cbC.checked; save(s); render(); });
               if (j.cobrat && !editing) jrow.append(el('div', { style: 'text-align:center;font-size:16px', title: 'Cobrat', textContent: '✅' }));
               else jrow.append(el('div', { style: 'text-align:center' }, cbC));
-
               jrow.append(el('div', { style: 'text-align:center' }, editing ? el('button', { class: 'x', textContent: '×', onclick: () => { if (!confirm('Esborrar aquesta jornada?')) return; p.jornades = p.jornades.filter(x => x !== j); save(s); render(); } }) : ''));
-
               const badgeRow = el('div', { style: 'grid-column:1/-1;padding:2px 0 4px 6px;font-size:11px;' + (j.cobrat ? 'color:var(--ok)' : 'color:var(--warn)') });
               if (tipusCalc === 'fora_de_rang') { badgeRow.textContent = '❌ Les hores indicades no compleixen el quadre legal per a aquest tipus de dia.'; badgeRow.style.color = 'var(--err)'; }
               else if (tipusCalc) { badgeRow.textContent = ETIQ_JORNADA[tipusCalc] + ' (' + (j.es_laborable !== false ? 'laborable' : 'no laborable') + ') · ' + (j.cobrat ? '🟢 Cobrat' : '🟡 Pendent de cobrar'); }
               else { badgeRow.textContent = '⚠️ Introdueix les hores per calcular la compensació.'; }
-              taula.append(jrow);
-              taula.append(badgeRow);
+              taula.append(jrow); taula.append(badgeRow);
             });
-
             const tMes = totalMes(arr), cMes = cobratMes(arr), pMes = pendentMes(arr);
             const resumMes = el('div', { style: 'margin-top:10px;padding:10px 12px;background:var(--card);border:1px solid var(--bd);border-radius:8px;font-size:13px;display:grid;grid-template-columns:1fr auto;gap:4px 16px' });
             resumMes.append(
@@ -2680,19 +2648,14 @@ function renderBudget(s) {
               el('span', { textContent: '└─ Pendent de cobrar', style: 'color:var(--warn)' }), el('span', { textContent: eur(pMes), style: 'text-align:right;color:var(--warn);font-weight:600' })
             );
             taula.append(resumMes);
-
-            if (editing) {
-              taula.append(el('div', { class: 'row', style: 'margin-top:6px' },
-                el('button', { class: 'btn s', textContent: '+ Afegir jornada', onclick: () => {
-                  const dataDefault = (mk && mk !== 'sense-data') ? (mk + '-' + String(new Date().getDate()).padStart(2, '0')) : avuiISO();
-                  p.jornades = p.jornades || [];
-                  p.jornades.push({ id: 'j' + Date.now().toString(36), data: dataDefault, hores: 2, es_laborable: true, persones_noms: [], concepte: '', cobrat: false });
-                  openMes[idx] = openMes[idx] || {};
-                  openMes[idx][mk] = true;
-                  save(s); render();
-                } })
-              ));
-            }
+            if (editing) taula.append(el('div', { class: 'row', style: 'margin-top:6px' },
+              el('button', { class: 'btn s', textContent: '+ Afegir jornada', onclick: () => {
+                const dataDefault = (mk && mk !== 'sense-data') ? (mk + '-' + String(new Date().getDate()).padStart(2, '0')) : avuiISO();
+                p.jornades = p.jornades || [];
+                p.jornades.push({ id: 'j' + Date.now().toString(36), data: dataDefault, hores: 2, es_laborable: true, persones_noms: [], concepte: '', cobrat: false });
+                openMes[idx] = openMes[idx] || {}; openMes[idx][mk] = true; save(s); render();
+              } })
+            ));
             jbox.append(taula);
           }
         });
@@ -2704,10 +2667,8 @@ function renderBudget(s) {
               const valor = prompt('Mes (YYYY-MM):', ara.getFullYear() + '-' + String(ara.getMonth() + 1).padStart(2, '0'));
               if (!valor || !/^\d{4}-\d{2}$/.test(valor)) return;
               p.jornades = p.jornades || [];
-              p.jornades.push({ id: 'j' + Date.now().toString(36), data: valor + '-01', hores: 2, es_laborable: true, perssones_noms: [], concepte: '', cobrat: false });
-              openMes[idx] = openMes[idx] || {};
-              openMes[idx][valor] = true;
-              save(s); render();
+              p.jornades.push({ id: 'j' + Date.now().toString(36), data: valor + '-01', hores: 2, es_laborable: true, persones_noms: [], concepte: '', cobrat: false });
+              openMes[idx] = openMes[idx] || {}; openMes[idx][valor] = true; save(s); render();
             } })
           ));
         }
@@ -2753,7 +2714,7 @@ function renderBudget(s) {
 }
 
 /* ============================================================
-   BLOC DIETES dins del pressupost (com les jornades especials)
+   BLOC DIETES dins del pressupost
    ============================================================ */
 function renderBlocDietes(s, p, idx) {
   const dbox = el('div', { class: 'diet-box' });
@@ -2799,14 +2760,19 @@ function renderBlocDietes(s, p, idx) {
     if (pM === 0) header.append(el('span', { style: 'color:var(--ok);font-weight:600;font-size:12px', textContent: '🟢 Cobrat' }));
     else header.append(el('span', { style: 'color:var(--warn);font-weight:600;font-size:12px', textContent: '🟡 ' + eur(pM) + ' pendent' }));
     if (pM > 0) {
-      header.append(el('button', { class: 'btn s', textContent: '✅ Cobrar totes', onclick: async () => {
+      header.append(el('button', { class: 'btn s', textContent: '✅ Cobrar totes', onclick: () => {
         if (!confirm('Marcar com a cobrades ' + arr.filter(d => d.estat !== 'cobrat').length + ' dietes pendents de ' + nomMesDieta(mk) + '?')) return;
         arr.forEach(d => { if (d.estat !== 'cobrat') d.estat = 'cobrat'; });
         save(s); render();
       } }));
     }
     if (editing) {
-      header.append(el('button', { class: 'btn s', textContent: '＋', title: 'Afegir dieta en aquest mes', onclick: () => { p.dietes = p.dietes || []; p.dietes.push({ id: 'd' + Date.now().toString(36), data: (mk && mk !== 'sense-data' ? mk + '-' + String(new Date().getDate()).padStart(2,'0') : avuiISO()), persona:'', concepte:'', tipus:'apat', import:0, km:0, preu_km:DIETES_PREU_KM_DEFECTE, estat:'pendent', notes:'', __titolMes: titol }); openDietMes[idx] = openDietMes[idx] || {}; openDietMes[idx][mk] = true; save(s); render(); } }));
+      header.append(el('button', { class: 'btn s', textContent: '＋', title: 'Afegir dieta en aquest mes', onclick: () => {
+        p.dietes = p.dietes || [];
+        p.dietes.push({ id: 'd' + Date.now().toString(36), data: (mk && mk !== 'sense-data' ? mk + '-' + String(new Date().getDate()).padStart(2,'0') : avuiISO()), persona:'', persones_noms:[], concepte:'', tipus:'apat', import:0, km:0, preu_km:DIETES_PREU_KM_DEFECTE, dies:0, estat:'pendent', notes:'', __titolMes: titol });
+        openDietMes[idx] = openDietMes[idx] || {}; openDietMes[idx][mk] = true;
+        save(s); render();
+      } }));
     }
     dbox.append(header);
 
@@ -2814,7 +2780,7 @@ function renderBlocDietes(s, p, idx) {
       const taula = el('div', { class: 'diet-taula' });
       taula.append(el('div', { class: 'diet-row diet-head' }, [
         el('div', { textContent: 'Data' }),
-        el('div', { textContent: 'Persona' }),
+        el('div', { textContent: 'Persones' }),
         el('div', { textContent: 'Concepte' }),
         el('div', { textContent: 'Tipus' }),
         el('div', { class: 'diet-num', textContent: 'Import' }),
@@ -2824,41 +2790,94 @@ function renderBlocDietes(s, p, idx) {
       ]));
       arr.forEach(d => {
         const row = el('div', { class: 'diet-row' + (d.estat === 'cobrat' ? ' done' : '') });
+
+        // Data
         const inpData = el('input', { type: 'date', value: d.data || '' }); inpData.disabled = !editing;
         inpData.addEventListener('change', () => { d.data = inpData.value; save(s); render(); });
         row.append(el('div', {}, inpData));
-        const inpPers = el('input', { type: 'text', value: d.persona || '', placeholder: 'Joan, David...' }); inpPers.disabled = !editing;
-        inpPers.addEventListener('input', () => { d.persona = inpPers.value; save(s); });
-        row.append(el('div', {}, inpPers));
+
+        // Persones (desplegable amb checkboxes, com a jornades especials)
+        if (!Array.isArray(d.persones_noms)) d.persones_noms = d.persona ? String(d.persona).split(',').map(x => x.trim()).filter(Boolean) : [];
+        const btnPers = el('button', {
+          class: 'btn s', style: 'min-width:110px;text-align:left',
+          textContent: d.persones_noms.length ? d.persones_noms.join(', ') + ' (' + d.persones_noms.length + ')' : '— Triar persones —'
+        });
+        if (!editing) btnPers.disabled = true;
+        btnPers.addEventListener('click', (ev) => {
+          ev.stopPropagation();
+          if (btnPers._dropdown && document.body.contains(btnPers._dropdown)) { btnPers._dropdown.remove(); btnPers._dropdown = null; return; }
+          const dd = el('div', { style: 'position:absolute;z-index:100;background:var(--card);border:1px solid var(--bd);border-radius:8px;padding:8px;box-shadow:0 8px 24px rgba(0,0,0,.15);min-width:180px' });
+          peopleNames().forEach(nom => {
+            const checked = (d.persones_noms || []).includes(nom);
+            const lbl = el('label', { style: 'display:flex;align-items:center;gap:8px;padding:4px 6px;border-radius:6px;cursor:pointer;font-size:13px;' + (checked ? 'background:rgba(180,71,31,.1);color:var(--ac);font-weight:600' : '') });
+            const cb = el('input', { type: 'checkbox', checked });
+            cb.addEventListener('change', () => {
+              d.persones_noms = d.persones_noms || [];
+              if (cb.checked) { if (!d.persones_noms.includes(nom)) d.persones_noms.push(nom); }
+              else { d.persones_noms = d.persones_noms.filter(x => x !== nom); }
+              d.persona = d.persones_noms.join(', ');
+              save(s); render();
+            });
+            lbl.append(cb, el('span', { textContent: nom })); dd.append(lbl);
+          });
+          document.body.appendChild(dd);
+          const rect = btnPers.getBoundingClientRect();
+          dd.style.left = rect.left + 'px'; dd.style.top = (rect.bottom + 4) + 'px';
+          btnPers._dropdown = dd;
+          const closeDD = (e) => { if (dd.contains(e.target) || e.target === btnPers) return; dd.remove(); btnPers._dropdown = null; document.removeEventListener('click', closeDD, true); };
+          setTimeout(() => document.addEventListener('click', closeDD, true), 0);
+        });
+        row.append(el('div', {}, btnPers));
+
+        // Concepte
         const inpConc = el('input', { type: 'text', value: d.concepte || '', placeholder: 'Dinar, tren...' }); inpConc.disabled = !editing;
         inpConc.addEventListener('input', () => { d.concepte = inpConc.value; save(s); });
         row.append(el('div', {}, inpConc));
+
+        // Tipus
         const selTipus = el('select', {}, TIPUS_DIETA.map(([v,l]) => el('option', { value: v, textContent: l, selected: (d.tipus || 'apat') === v })));
         selTipus.disabled = !editing;
         selTipus.addEventListener('change', () => { d.tipus = selTipus.value; save(s); render(); });
         row.append(el('div', {}, selTipus));
+
+        // Import segons tipus
         if (d.tipus === 'quilometratge') {
           const wrapKm = el('div', { style: 'display:flex;gap:4px;align-items:center' });
-          const inpKm = el('input', { type: 'number', value: d.km || 0, min: 0, step: '0.1', style: 'width:70px' }); inpKm.disabled = !editing;
-          inpKm.addEventListener('input', () => { d.km = Number(inpKm.value) || 0; d.import = (Number(d.km) || 0) * (Number(d.preu_km) || DIETES_PREU_KM_DEFECTE); save(s); render(); });
-          const inpPreu = el('input', { type: 'number', value: d.preu_km || DIETES_PREU_KM_DEFECTE, min: 0, step: '0.01', style: 'width:70px' }); inpPreu.disabled = !editing;
-          inpPreu.addEventListener('input', () => { d.preu_km = Number(inpPreu.value) || 0; d.import = (Number(d.km) || 0) * (Number(d.preu_km) || DIETES_PREU_KM_DEFECTE); save(s); render(); });
+          const inpKm = el('input', { type: 'number', value: d.km || 0, min: 0, step: '0.1', style: 'width:60px' }); inpKm.disabled = !editing;
+          inpKm.addEventListener('input', () => { d.km = Number(inpKm.value) || 0; save(s); render(); });
+          const inpPreu = el('input', { type: 'number', value: d.preu_km || DIETES_PREU_KM_DEFECTE, min: 0, step: '0.01', style: 'width:60px' }); inpPreu.disabled = !editing;
+          inpPreu.addEventListener('input', () => { d.preu_km = Number(inpPreu.value) || 0; save(s); render(); });
           wrapKm.append(inpKm, el('span', { textContent: '×', style: 'font-size:11px' }), inpPreu);
           row.append(el('div', {}, wrapKm));
+        } else if (d.tipus === 'manutencio_pernocta') {
+          const wrapDies = el('div', { style: 'display:flex;flex-wrap:wrap;gap:4px;align-items:center;font-size:11px;color:var(--mut)' });
+          const inpDies = el('input', { type: 'number', value: d.dies || 1, min: 0, step: '1', style: 'width:50px' }); inpDies.disabled = !editing;
+          inpDies.addEventListener('input', () => { d.dies = Number(inpDies.value) || 0; save(s); render(); });
+          wrapDies.append(el('span', { textContent: 'dies:' }), inpDies);
+          wrapDies.append(el('span', { textContent: '× ' + PREU_MANUTENCIO_PERNOCTA.toFixed(2) + ' € × ' + (d.persones_noms || []).length + 'p' }));
+          row.append(el('div', {}, wrapDies));
         } else {
           const inpImport = el('input', { type: 'number', value: d.import || 0, min: 0, step: '0.01', style: 'width:90px;text-align:right' }); inpImport.disabled = !editing;
           inpImport.addEventListener('input', () => { d.import = Number(inpImport.value) || 0; save(s); render(); });
           row.append(el('div', { class: 'diet-num' }, inpImport));
         }
+
+        // Notes
         const inpNotes = el('input', { type: 'text', value: d.notes || '', placeholder: 'Notes...' }); inpNotes.disabled = !editing;
         inpNotes.addEventListener('input', () => { d.notes = inpNotes.value; save(s); });
         row.append(el('div', {}, inpNotes));
+
+        // Estat
         const cbEstat = el('input', { type: 'checkbox', checked: d.estat === 'cobrat' }); cbEstat.disabled = !editing;
         cbEstat.addEventListener('change', () => { d.estat = cbEstat.checked ? 'cobrat' : 'pendent'; save(s); render(); });
         row.append(el('div', { style: 'text-align:center;font-size:13px' }, cbEstat));
+
+        // Esborrar
         row.append(el('div', { style: 'text-align:center' }, editing ? el('button', { class: 'x', textContent: '×', onclick: () => { if (!confirm('Esborrar aquesta dieta?')) return; p.dietes = p.dietes.filter(x => x !== d); save(s); render(); } }) : ''));
+
         taula.append(row);
-        const importCalc = d.tipus === 'quilometratge' ? (Number(d.km)||0)*(Number(d.preu_km)||DIETES_PREU_KM_DEFECTE) : (Number(d.import)||0);
+
+        const importCalc = dietaImport(d);
         taula.append(el('div', { style: 'grid-column:1/-1;font-size:11px;color:var(--mut);padding:0 0 4px 6px' }, [
           el('span', { textContent: '💰 ' + eur(importCalc) + (d.estat === 'cobrat' ? ' · 🟢 Cobrat' : ' · 🟡 Pendent') })
         ]));
@@ -2881,14 +2900,13 @@ function renderBlocDietes(s, p, idx) {
         const valor = prompt('Mes (YYYY-MM):', ara.getFullYear() + '-' + String(ara.getMonth() + 1).padStart(2, '0'));
         if (!valor || !/^\d{4}-\d{2}$/.test(valor)) return;
         p.dietes = p.dietes || [];
-        p.dietes.push({ id: 'd' + Date.now().toString(36), data: valor + '-01', persona:'', concepte:'', tipus:'apat', import:0, km:0, preu_km:DIETES_PREU_KM_DEFECTE, estat:'pendent', notes:'', __titolMes: nomMesDieta(valor) });
-        openDietMes[idx] = openDietMes[idx] || {};
-        openDietMes[idx][valor] = true;
+        p.dietes.push({ id: 'd' + Date.now().toString(36), data: valor + '-01', persona:'', persones_noms:[], concepte:'', tipus:'apat', import:0, km:0, preu_km:DIETES_PREU_KM_DEFECTE, dies:0, estat:'pendent', notes:'', __titolMes: nomMesDieta(valor) });
+        openDietMes[idx] = openDietMes[idx] || {}; openDietMes[idx][valor] = true;
         save(s); render();
       } })
     ));
   }
-  dbox.append(el('div', { class: 'badge', style: 'margin-top:6px', textContent: 'Les dietes cobrades sumen al Real. Les pendents es mostren com a badge a la partida. Les de transport/quilometratge també surten al calendari i al gantt.' }));
+  dbox.append(el('div', { class: 'badge', style: 'margin-top:6px', textContent: 'Les dietes cobrades sumen al Real. Les pendents es mostren com a badge a la partida. Manutenció amb pernocta: 53,34 €/dia × dies × persones. Les de transport/quilometratge també surten al calendari i al gantt.' }));
   return dbox;
 }
 
@@ -2910,8 +2928,6 @@ async function start(user) {
   await carregaImageRights();
   await carregaCredits();
   await carregaCreditsTecnics();
-  await carregaDietes();
-  await carregaDietesMesos();
   cur = 'cal'; render();
   inicialitzaCercador();
   db.channel('canvis')
