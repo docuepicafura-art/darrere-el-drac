@@ -1206,10 +1206,19 @@ async function importaImatges(text) {
   if (files.length < 2) { alert('Cal capçalera + almenys una fila.'); return; }
   const capcalera = files[0].map(normalitzaCapcalera);
   if (!capcalera.includes('titol')) { alert('No s\'ha detectat la columna "títol". Revisa la capçalera.'); return; }
-  const dades = [];
+   const dades = [];
   for (let i = 1; i < files.length; i++) {
     const obj = { estat_intern: 'pendent', created_by: me, updated_by: me, updated_at: new Date().toISOString() };
-    files[i].forEach((v, j) => { const k = capcalera[j]; if (k) obj[k] = v; });
+    files[i].forEach((v, j) => {
+      const k = capcalera[j];
+      if (!k) return;
+      if (k === 'durada_visualitzacio') {
+        const num = Number(v);
+        obj[k] = isNaN(num) ? 0 : num;
+      } else {
+        obj[k] = v;
+      }
+    });
     if (obj.titol && obj.titol.trim()) dades.push(obj);
   }
   if (!dades.length) { alert('Cap fila vàlida.'); return; }
