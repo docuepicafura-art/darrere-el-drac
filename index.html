@@ -6,8 +6,8 @@
 <title>Darrere el drac</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎥</text></svg>">
 <style>
-:root{--bg:#f6f4ef;--card:#fff;--tx:#1f1d1a;--mut:#6d675d;--ac:#b4471f;--bd:#e2ddd2;--ok:#2e9e5b;--warn:#c47b1f;--err:#c0392b;--diet:#8a5a2b}
-@media (prefers-color-scheme:dark){:root{--bg:#1b1a18;--card:#262421;--tx:#f0ece4;--mut:#a39c8f;--ac:#e47a4f;--bd:#3a3733;--ok:#3fbf75;--warn:#e0a63c;--err:#e26a5c;--diet:#c58b4e}}
+:root{--bg:#f6f4ef;--card:#fff;--tx:#1f1d1a;--mut:#6d675d;--ac:#b4471f;--bd:#e2ddd2;--ok:#2e9e5b;--warn:#c47b1f;--err:#c0392b;--diet:#8a5a2b;--foto:#2f6f8f}
+@media (prefers-color-scheme:dark){:root{--bg:#1b1a18;--card:#262421;--tx:#f0ece4;--mut:#a39c8f;--ac:#e47a4f;--bd:#3a3733;--ok:#3fbf75;--warn:#e0a63c;--err:#e26a5c;--diet:#c58b4e;--foto:#5a9dbf}}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
 header{padding:20px 20px 8px;display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap}
@@ -54,6 +54,7 @@ input[type=time]{padding:6px;width:auto}
 .k0{background:#b4471f}.k1{background:#2f6f8f}.k2{background:#7a5aa6}.k3{background:#3d8b5f}.k4{background:#7d776b}
 .k5{background:#a0522d}.k6{background:#5c7a3a}.k7{background:#8f4a6b}.k8{background:#4a4a4a}
 .chip.diet-chip{background:var(--diet);border-left:3px solid #5a3a17}
+.chip.foto-chip{background:var(--foto);border-left:3px solid #1a4a63}
 .tag{font-size:12px;color:#fff;padding:1px 8px;border-radius:999px;margin-left:auto;white-space:nowrap}
 .pp{font-size:12px;color:var(--mut);white-space:nowrap}
 .badge{font-size:12px;color:var(--mut)}
@@ -132,6 +133,7 @@ input[type=time]{padding:6px;width:auto}
 .gantt-bar.done{opacity:.5}
 .gantt-bar.auto{outline:2px dashed rgba(255,255,255,.65);outline-offset:-2px}
 .gantt-bar.diet-bar{background:var(--diet);outline:2px solid #5a3a17;outline-offset:-2px}
+.gantt-bar.foto-bar{background:var(--foto);outline:2px solid #1a4a63;outline-offset:-2px}
 .gantt-today{background:rgba(180,71,31,.08)}
 .audio-box{background:var(--bg);border:1px solid var(--bd);border-radius:10px;padding:10px 12px;margin-bottom:12px;display:flex;flex-direction:column;gap:6px}
 .audio-label{font-size:12px;color:var(--mut);font-weight:600}
@@ -311,14 +313,7 @@ const PARTIDES_AMB_DIETES   = /dietes|despla[cç]aments|producci[oó]|viatge|rod
 
 const DIETES_PREU_KM_DEFECTE = 0.26;
 const PREU_MANUTENCIO_PERNOCTA = 53.34;
-const TIPUS_DIETA = [
-  ['apat','Àpat'],
-  ['allotjament','Allotjament'],
-  ['transport','Transport'],
-  ['quilometratge','Quilometratge'],
-  ['manutencio_pernocta','Manutenció amb pernocta'],
-  ['altres','Altres']
-];
+const TIPUS_DIETA = [['apat','Àpat'],['allotjament','Allotjament'],['transport','Transport'],['quilometratge','Quilometratge'],['manutencio_pernocta','Manutenció amb pernocta'],['altres','Altres']];
 const ESTAT_DIETA = [['pendent','🟡 Pendent'],['cobrat','🟢 Cobrat']];
 
 const calculaTipusJornada = (hores, esLaborable) => {
@@ -433,11 +428,19 @@ let editingMR = false;
 let seleccioMR = new Set();
 const ANNO_ACTUAL = new Date().getFullYear();
 
+/* === IMATGES (es manté exactament igual que abans) === */
 let imageRights = [];
 let currentImg = null;
 let editingImg = false;
 let seleccioImg = new Set();
 let filtreImg = { text: '', cobertura: 'totes', estat: 'tots', tipus: 'tots', compliment: 'tots' };
+
+/* === FOTOGRAFIES (nou mòdul independent) === */
+let fotografies = [];
+let currentFoto = null;
+let editingFoto = false;
+let seleccioFoto = new Set();
+let filtreFoto = { text: '', cobertura: 'totes', estat: 'tots', tipus: 'tots', compliment: 'tots' };
 
 let credits = [];
 let currentCredit = null;
@@ -523,6 +526,11 @@ async function carregaImageRights() {
   if (error) { console.warn(error.message); return; }
   imageRights = data || [];
 }
+async function carregaFotografies() {
+  const { data, error } = await db.from('fotografies').select('*').order('updated_at', { ascending: false });
+  if (error) { console.warn('Error carregant fotografies:', error.message); return; }
+  fotografies = data || [];
+}
 async function carregaCredits() {
   const { data, error } = await db.from('credits').select('*').order('ordre');
   if (error) { console.warn(error.message); return; }
@@ -543,10 +551,11 @@ function paintNav() {
   n.append(el('button', { class: cur === 'gantt' ? 'on' : '', textContent: '📊 Gantt', onclick: () => goto('gantt') }));
   n.append(el('button', { class: cur === 'drets' ? 'on' : '', textContent: '🎼 Drets', onclick: () => goto('drets') }));
   n.append(el('button', { class: cur === 'imatges' ? 'on' : '', textContent: '🖼️ Imatges', onclick: () => goto('imatges') }));
+  n.append(el('button', { class: cur === 'fotografies' ? 'on' : '', textContent: '📸 Fotografies', onclick: () => goto('fotografies') }));
   n.append(el('button', { class: cur === 'credits' ? 'on' : '', textContent: '📜 Crèdits', onclick: () => goto('credits') }));
   secs.forEach(s => n.append(el('button', { class: s.id === cur ? 'on' : '', textContent: s.name + (others(s.id).length ? ' 🟢' : ''), onclick: () => goto(s.id) })));
   if (editing) n.append(el('button', { textContent: '+ Secció', onclick: addSec }));
-  const o = ['cal','gantt','drets','imatges','credits'].includes(cur) ? [] : others(cur);
+  const o = ['cal','gantt','drets','imatges','fotografies','credits'].includes(cur) ? [] : others(cur);
   $('#who').textContent = o.length ? '🟢 ' + o.join(', ') + ' és a la secció' : '';
 }
 function addSec() { const n = { id: 's' + Date.now().toString(36), pos: (secs.length ? Math.max(...secs.map(x => x.pos)) : 0) + 1, name: 'Nova secció', notes: '', tasks: [], budget: [], files: [], text: '' }; secs.push(n); save(n); goto(n.id); }
@@ -598,6 +607,7 @@ function render() {
   if (cur === 'gantt') return renderGantt();
   if (cur === 'drets') return renderDrets();
   if (cur === 'imatges') return renderImatges();
+  if (cur === 'fotografies') return renderFotografies();
   if (cur === 'credits') return renderCredits();
   const s = cur_();
   if (!s) { app.textContent = 'Encara no hi ha seccions.'; return; }
@@ -737,16 +747,7 @@ function textInformeAgregat(cancions) {
     else negociar++;
     costTotal += Number(c.partida_presupuesto) || 0;
   });
-  const cap = [
-    linia, 'BADALONA COMUNICACIÓ · INFORME AGREGAT DE DRETS MUSICALS',
-    'Documental "Darrere el drac"', linia,
-    'Data: ' + dataGen, 'Total cançons: ' + cancions.length, '',
-    'RESUM EXECUTIU', liniaCurta,
-    '✅ Aptes: ' + aptes, '⚠️ Només SGAE: ' + sgae,
-    '⚠️ Només màster: ' + master, '❌ Negociació completa: ' + negociar,
-    'Cost total previst: ' + costTotal.toLocaleString('ca-ES') + ' €', '',
-    'REFERÈNCIES', liniaCurta
-  ];
+  const cap = [linia, 'BADALONA COMUNICACIÓ · INFORME AGREGAT DE DRETS MUSICALS','Documental "Darrere el drac"', linia,'Data: ' + dataGen, 'Total cançons: ' + cancions.length, '','RESUM EXECUTIU', liniaCurta,'✅ Aptes: ' + aptes, '⚠️ Només SGAE: ' + sgae,'⚠️ Només màster: ' + master, '❌ Negociació completa: ' + negociar,'Cost total previst: ' + costTotal.toLocaleString('ca-ES') + ' €', '','REFERÈNCIES', liniaCurta];
   cancions.forEach((c,i) => {
     const d = calcularDiagnosticoLegal(c);
     let est = '❌';
@@ -774,17 +775,7 @@ function textResumAgregat(cancions) {
     else { negociar++; grups.negociar.push(ref); }
     costTotal += Number(c.partida_presupuesto) || 0;
   });
-  const out = [
-    linia, 'BADALONA COMUNICACIÓ · RESUM DE DRETS MUSICALS',
-    'Documental "Darrere el drac"', linia,
-    'Data: ' + avui.toLocaleDateString('ca-ES'),
-    'Total cançons: ' + cancions.length, '',
-    'RESUM EXECUTIU', liniaCurta,
-    '✅ Aptes: ' + aptes, '⚠️ Només SGAE: ' + sgae,
-    '⚠️ Només màster: ' + master, '❌ Negociació: ' + negociar,
-    'Cost total: ' + costTotal.toLocaleString('ca-ES') + ' €', '',
-    'LLISTAT', liniaCurta
-  ];
+  const out = [linia, 'BADALONA COMUNICACIÓ · RESUM DE DRETS MUSICALS','Documental "Darrere el drac"', linia,'Data: ' + avui.toLocaleDateString('ca-ES'),'Total cançons: ' + cancions.length, '','RESUM EXECUTIU', liniaCurta,'✅ Aptes: ' + aptes, '⚠️ Només SGAE: ' + sgae,'⚠️ Només màster: ' + master, '❌ Negociació: ' + negociar,'Cost total: ' + costTotal.toLocaleString('ca-ES') + ' €', '','LLISTAT', liniaCurta];
   cancions.forEach((c,i) => {
     const d = calcularDiagnosticoLegal(c);
     let est = '❌';
@@ -812,17 +803,7 @@ function cancionsSeleccionades() { return musicRights.filter(c => seleccioMR.has
 
 async function desaCancion(c) {
   if (!c.titulo || !c.titulo.trim()) { alert('Cal indicar el títol.'); return; }
-  const payload = {
-    referencia: c.referencia || '', link_descarga: c.link_descarga || '', titulo: c.titulo || '',
-    interprete: c.interprete || '', ano_grabacion: Number(c.ano_grabacion) || 0,
-    autor: c.autor || '', ano_muerte_autor: Number(c.ano_muerte_autor) || 0,
-    partida_presupuesto: Number(c.partida_presupuesto) || 0, notas: c.notas || '',
-    override_europa: c.override_europa || '', override_mundial: c.override_mundial || '',
-    override_sgae: c.override_sgae || '', override_nota: c.override_nota || '',
-    adquisicio: c.adquisicio || 'cap', adquisicio_ref: c.adquisicio_ref || '',
-    adquisicio_data: c.adquisicio_data || '', adquisicio_import: Number(c.adquisicio_import) || 0,
-    updated_at: new Date().toISOString(), updated_by: me
-  };
+  const payload = { referencia: c.referencia || '', link_descarga: c.link_descarga || '', titulo: c.titulo || '', interprete: c.interprete || '', ano_grabacion: Number(c.ano_grabacion) || 0, autor: c.autor || '', ano_muerte_autor: Number(c.ano_muerte_autor) || 0, partida_presupuesto: Number(c.partida_presupuesto) || 0, notas: c.notas || '', override_europa: c.override_europa || '', override_mundial: c.override_mundial || '', override_sgae: c.override_sgae || '', override_nota: c.override_nota || '', adquisicio: c.adquisicio || 'cap', adquisicio_ref: c.adquisicio_ref || '', adquisicio_data: c.adquisicio_data || '', adquisicio_import: Number(c.adquisicio_import) || 0, updated_at: new Date().toISOString(), updated_by: me };
   if (c.id) {
     const r = await db.from('music_rights').update(payload).eq('id', c.id).select().single();
     if (r.error) { alert('Error: ' + r.error.message); return; }
@@ -995,44 +976,32 @@ function renderDrets() {
   form.append(camp('Any defunció', 'ano_muerte_autor', 'number'));
   form.append(camp('Cost previst (€)', 'partida_presupuesto', 'number'));
   card.append(form);
-
   const adqBox = el('div', { class: 'mr-override', style: 'margin-top:16px' });
   adqBox.append(el('h4', { textContent: '💼 Adquisició de drets' }));
   const adqGrid = el('div', { class: 'mr-form' });
   const lAdq = el('label');
   lAdq.append(el('span', { textContent: 'Estat' }));
-  const selAdq = el('select', { onchange: e => { c.adquisicio = e.target.value; render(); } }, [
-    ['cap', '— No adquirida —'],['negociada', '🟡 Negociada amb discogràfica/editorial'],['pagada', '🟢 Pagada (amb factura)'],['cedida', '🟢 Cedida gratuïtament'],['no_necessari', '🟢 No cal (domini públic)']
-  ].map(([v, t]) => el('option', { value: v, textContent: t, selected: (c.adquisicio || 'cap') === v })));
+  const selAdq = el('select', { onchange: e => { c.adquisicio = e.target.value; render(); } }, [['cap', '— No adquirida —'],['negociada', '🟡 Negociada amb discogràfica/editorial'],['pagada', '🟢 Pagada (amb factura)'],['cedida', '🟢 Cedida gratuïtament'],['no_necessari', '🟢 No cal (domini públic)']].map(([v, t]) => el('option', { value: v, textContent: t, selected: (c.adquisicio || 'cap') === v })));
   selAdq.disabled = !editingMR;
   lAdq.append(selAdq); adqGrid.append(lAdq);
-  const lRef = el('label');
-  lRef.append(el('span', { textContent: 'Ref. contracte/factura' }));
+  const lRef = el('label'); lRef.append(el('span', { textContent: 'Ref. contracte/factura' }));
   const inpRef = el('input', { type: 'text', value: c.adquisicio_ref || '', placeholder: '2026/045' });
-  inpRef.disabled = !editingMR;
-  inpRef.addEventListener('input', () => c.adquisicio_ref = inpRef.value);
+  inpRef.disabled = !editingMR; inpRef.addEventListener('input', () => c.adquisicio_ref = inpRef.value);
   lRef.append(inpRef); adqGrid.append(lRef);
-  const lData = el('label');
-  lData.append(el('span', { textContent: 'Data adquisició' }));
+  const lData = el('label'); lData.append(el('span', { textContent: 'Data adquisició' }));
   const inpData = el('input', { type: 'text', value: c.adquisicio_data || '', placeholder: '2026-10-01' });
-  inpData.disabled = !editingMR;
-  inpData.addEventListener('input', () => c.adquisicio_data = inpData.value);
+  inpData.disabled = !editingMR; inpData.addEventListener('input', () => c.adquisicio_data = inpData.value);
   lData.append(inpData); adqGrid.append(lData);
-  const lImp = el('label');
-  lImp.append(el('span', { textContent: 'Import (€)' }));
+  const lImp = el('label'); lImp.append(el('span', { textContent: 'Import (€)' }));
   const inpImp = el('input', { type: 'number', value: c.adquisicio_import || 0, min: 0, step: '0.01' });
-  inpImp.disabled = !editingMR;
-  inpImp.addEventListener('input', () => c.adquisicio_import = Number(inpImp.value) || 0);
+  inpImp.disabled = !editingMR; inpImp.addEventListener('input', () => c.adquisicio_import = Number(inpImp.value) || 0);
   lImp.append(inpImp); adqGrid.append(lImp);
   adqBox.append(adqGrid); card.append(adqBox);
-
   const lN = el('label', { class: 'full', style: 'margin-top:14px' });
   lN.append(el('span', { textContent: 'Notes internes' }));
   const ta = el('textarea', { value: c.notas || '' });
-  ta.disabled = !editingMR;
-  ta.addEventListener('input', () => c.notas = ta.value);
+  ta.disabled = !editingMR; ta.addEventListener('input', () => c.notas = ta.value);
   lN.append(ta); card.append(lN);
-
   if (editingMR) {
     const ov = el('div', { class: 'mr-override' });
     ov.append(el('h4', { textContent: '⚖️ Override manual del diagnòstic' }));
@@ -1040,11 +1009,7 @@ function renderDrets() {
     const ovSel = (label, key) => {
       const l = el('label');
       l.append(el('span', { textContent: label }));
-      l.append(el('select', { onchange: e => { c[key] = e.target.value; render(); } }, [
-        el('option', { value: '', textContent: '— Automàtic —', selected: !c[key] }),
-        el('option', { value: 'ok', textContent: '🟢 Domini públic', selected: c[key]==='ok' }),
-        el('option', { value: 'ko', textContent: '🔴 Protegit', selected: c[key]==='ko' })
-      ]));
+      l.append(el('select', { onchange: e => { c[key] = e.target.value; render(); } }, [el('option', { value: '', textContent: '— Automàtic —', selected: !c[key] }),el('option', { value: 'ok', textContent: '🟢 Domini públic', selected: c[key]==='ok' }),el('option', { value: 'ko', textContent: '🔴 Protegit', selected: c[key]==='ko' })]));
       return l;
     };
     grid.append(ovSel('Màster UE', 'override_europa'));
@@ -1114,7 +1079,6 @@ function esURLEstricta(url) {
   if (!url) return false;
   try { const u = new URL(url); return u.protocol === 'http:' || u.protocol === 'https:'; } catch(e) { return false; }
 }
-
 function complimentLegal(img) {
   const c = classificaCobertura(img.cobertura, img.override_cobertura);
   const errors = [], avisos = [];
@@ -1129,6 +1093,9 @@ function complimentLegal(img) {
   return { ok: errors.length === 0, errors, avisos };
 }
 
+/* ============================================================
+   IMATGES — catàleg de drets (igual que abans)
+   ============================================================ */
 function filtraImatges() {
   const q = (filtreImg.text || '').toLowerCase().trim();
   return imageRights.filter(img => {
@@ -1157,7 +1124,7 @@ function obreImatge(img) { currentImg = JSON.parse(JSON.stringify(img)); editing
 async function desaImatge(img) {
   if (!img.titol || !img.titol.trim()) { alert('Cal com a mínim el títol.'); return; }
   if (!img.cobertura || !img.cobertura.trim()) { alert('Cal indicar la cobertura/llicència.'); return; }
-  if (img.link_procedencia && !esURLEstricta(img.link_procedencia)) { alert('L\'enllaç de procedència no és una URL vàlida (ha de començar per http:// o https://).'); return; }
+  if (img.link_procedencia && !esURLEstricta(img.link_procedencia)) { alert('L\'enllaç de procedència no és una URL vàlida.'); return; }
   const c = classificaCobertura(img.cobertura, img.override_cobertura);
   if ((c.estat === 'warn' || c.estat === 'ko') && (!img.credit_obligatori || !img.credit_obligatori.trim())) {
     alert(c.estat === 'warn' ? 'És Creative Commons: cal indicar el crèdit obligatori.' : 'Està protegida: cal indicar el crèdit o permís explícit.');
@@ -1624,14 +1591,12 @@ function renderImatges() {
   diag.append(el('p', { style: 'font-size:16px' }, el('strong', { textContent: c.text })));
   if (img.override_cobertura) diag.append(el('p', { class: 'badge', textContent: '⚠️ Override aplicat' + (img.override_nota ? ' (' + img.override_nota + ')' : '') }));
   card.append(diag);
-
   const diagLegal = el('div', { class: 'mr-diag', style: 'margin-top:14px' });
   diagLegal.append(el('h4', { textContent: 'Compliment legal' }));
   diagLegal.append(el('p', { style: 'font-size:16px;font-weight:700;color:' + (cl.ok ? 'var(--ok)' : 'var(--err)'), textContent: cl.ok ? '✅ COMPLEIX' : '❌ NO COMPLEIX' }));
   if (cl.errors.length) diagLegal.append(el('p', { style: 'color:var(--err);white-space:pre-wrap', textContent: 'Errors:\n' + cl.errors.map(e => '  - ' + e).join('\n') }));
   if (cl.avisos.length) diagLegal.append(el('p', { style: 'color:var(--warn);white-space:pre-wrap', textContent: 'Avisos:\n' + cl.avisos.map(a => '  - ' + a).join('\n') }));
   card.append(diagLegal);
-
   card.append(el('h3', { style: 'margin-top:16px', textContent: 'Informe Chain of Title' }));
   card.append(el('div', { class: 'mr-report', textContent: textInformeImatge(img) }));
   if (img.id) {
@@ -1656,6 +1621,409 @@ function mostraImportador() {
   row.append(el('button', { class: 'btn', textContent: 'Cancel·lar', onclick: () => renderImatges() }));
   card.append(row);
   app.innerHTML = ''; app.append(card);
+}
+
+/* ============================================================
+   FOTOGRAFIES — nou mòdul independent
+   ============================================================ */
+function filtraFotografies() {
+  const q = (filtreFoto.text || '').toLowerCase().trim();
+  return fotografies.filter(img => {
+    if (filtreFoto.cobertura !== 'totes') {
+      const c = classificaCobertura(img.cobertura, img.override_cobertura).estat;
+      if (c !== filtreFoto.cobertura) return false;
+    }
+    if (filtreFoto.estat !== 'tots' && (img.estat_intern || 'pendent') !== filtreFoto.estat) return false;
+    if (filtreFoto.tipus !== 'tots' && (img.tipus || '') !== filtreFoto.tipus) return false;
+    if (filtreFoto.compliment !== 'tots') {
+      const ok = complimentLegal(img).ok;
+      if (filtreFoto.compliment === 'ok' && !ok) return false;
+      if (filtreFoto.compliment === 'ko' && ok) return false;
+    }
+    if (!q) return true;
+    const blob = [img.titol, img.descripcio, img.autor, img.etiquetes, img.notes, img.link_procedencia, img.cobertura, img.capitol, img.rellevancia].filter(Boolean).join(' ').toLowerCase();
+    return blob.includes(q);
+  });
+}
+function fotografiesSeleccionades() { return fotografies.filter(x => seleccioFoto.has(x.id)); }
+function novaFoto() {
+  currentFoto = { id:null, titol:'', descripcio:'', link_procedencia:'', cobertura:'', any_data:'', tipus:'', autor:'', notes:'', credit_obligatori:'', rellevancia:'', capitol:'', durada_visualitzacio:0, estat_intern:'pendent', etiquetes:'', override_cobertura:'', override_nota:'', vincle_tasca:'', vincle_seccio_id:'', created_by: me };
+  editingFoto = true; render();
+}
+function obreFoto(img) { currentFoto = JSON.parse(JSON.stringify(img)); editingFoto = false; render(); }
+async function desaFoto(img) {
+  if (!img.titol || !img.titol.trim()) { alert('Cal com a mínim el títol.'); return; }
+  if (!img.cobertura || !img.cobertura.trim()) { alert('Cal indicar la cobertura/llicència.'); return; }
+  if (img.link_procedencia && !esURLEstricta(img.link_procedencia)) { alert('L\'enllaç de procedència no és una URL vàlida.'); return; }
+  const c = classificaCobertura(img.cobertura, img.override_cobertura);
+  if ((c.estat === 'warn' || c.estat === 'ko') && (!img.credit_obligatori || !img.credit_obligatori.trim())) {
+    alert(c.estat === 'warn' ? 'És Creative Commons: cal indicar el crèdit obligatori.' : 'Està protegida: cal indicar el crèdit o permís explícit.');
+    return;
+  }
+  const payload = {
+    titol: img.titol, descripcio: img.descripcio || '', link_procedencia: img.link_procedencia || '', cobertura: img.cobertura || '',
+    any_data: img.any_data || '', tipus: img.tipus || '', autor: img.autor || '',
+    notes: img.notes || '', credit_obligatori: img.credit_obligatori || '',
+    rellevancia: img.rellevancia || '', capitol: img.capitol || '',
+    durada_visualitzacio: Number(img.durada_visualitzacio) || 0,
+    estat_intern: img.estat_intern || 'pendent', etiquetes: img.etiquetes || '',
+    override_cobertura: img.override_cobertura || '', override_nota: img.override_nota || '',
+    vincle_tasca: img.vincle_tasca || '', vincle_seccio_id: img.vincle_seccio_id || '',
+    updated_at: new Date().toISOString(), updated_by: me
+  };
+  if (img.id) {
+    const r = await db.from('fotografies').update(payload).eq('id', img.id).select().single();
+    if (r.error) { alert('Error: ' + r.error.message); return; }
+    const i = fotografies.findIndex(x => x.id === img.id);
+    if (i >= 0) fotografies[i] = r.data; else fotografies.unshift(r.data);
+    currentFoto = r.data;
+  } else {
+    payload.created_by = me;
+    const r = await db.from('fotografies').insert(payload).select().single();
+    if (r.error) { alert('Error: ' + r.error.message); return; }
+    fotografies.unshift(r.data); currentFoto = r.data;
+  }
+  editingFoto = false;
+}
+async function esborraFoto(img) {
+  if (!img.id) { currentFoto = null; editingFoto = false; render(); return; }
+  if (!confirm('Esborrar "' + (img.titol || '') + '"?')) return;
+  const r = await db.from('fotografies').delete().eq('id', img.id);
+  if (r.error) { alert('Error: ' + r.error.message); return; }
+  fotografies = fotografies.filter(x => x.id !== img.id);
+  seleccioFoto.delete(img.id); currentFoto = null; editingFoto = false; render();
+}
+async function importaFotografies(text) {
+  if (!text || !text.trim()) { alert('Enganxa primer les files.'); return; }
+  const files = parsejaCSV(text);
+  if (files.length < 2) { alert('Cal capçalera + almenys una fila.'); return; }
+  const capcalera = files[0].map(normalitzaCapcalera);
+  if (!capcalera.includes('titol')) { alert('No s\'ha detectat la columna "títol". Revisa la capçalera.'); return; }
+  const dades = [];
+  for (let i = 1; i < files.length; i++) {
+    const obj = { estat_intern: 'pendent', created_by: me, updated_by: me, updated_at: new Date().toISOString() };
+    files[i].forEach((v, j) => { const k = capcalera[j]; if (k) obj[k] = v; });
+    if (obj.titol && obj.titol.trim()) dades.push(obj);
+  }
+  if (!dades.length) { alert('Cap fila vàlida.'); return; }
+  if (!confirm('Importar ' + dades.length + ' fotografies? Aquesta acció no es pot desfer.')) return;
+  const r = await db.from('fotografies').insert(dades).select();
+  if (r.error) { alert('Error important: ' + r.error.message); return; }
+  fotografies = (r.data || []).concat(fotografies);
+  alert('✅ ' + r.data.length + ' fotografies importades.');
+  render();
+}
+
+function textInformeFoto(img) {
+  const c = classificaCobertura(img.cobertura, img.override_cobertura);
+  const cl = complimentLegal(img);
+  const linia = '===========================================================';
+  const liniaCurta = '-----------------------------------------------------------';
+  const avui = new Date();
+  const camps = [];
+  camps.push('Títol: "' + (img.titol || '—') + '"');
+  if (img.descripcio) camps.push('Descripció: ' + img.descripcio);
+  if (img.autor) camps.push('Autor/Fotògraf: ' + img.autor);
+  if (img.any_data) camps.push('Any/Data: ' + img.any_data);
+  if (img.tipus) camps.push('Tipus: ' + img.tipus);
+  if (img.link_procedencia) camps.push('Enllaç de procedència: ' + img.link_procedencia);
+  if (img.estat_intern) camps.push('Estat intern: ' + img.estat_intern);
+  if (img.capitol) camps.push('Capítol: ' + img.capitol);
+  if (img.rellevancia) camps.push('Rellevància: ' + img.rellevancia);
+  if (img.durada_visualitzacio) camps.push('Durada de visualització: ' + img.durada_visualitzacio + ' s');
+  if (img.vincle_tasca) camps.push('Vincle amb producció: ' + img.vincle_tasca);
+  const diag = [];
+  diag.push('Classificació: ' + c.text);
+  if (img.override_cobertura) diag.push('Override aplicat: ' + img.override_cobertura + (img.override_nota ? ' — ' + img.override_nota : ''));
+  if (img.etiquetes) diag.push('Etiquetes: ' + img.etiquetes);
+  if (img.notes) diag.push('Notes: ' + img.notes);
+  const compliment = [];
+  compliment.push('Llicència: ' + (img.cobertura || '(no informat)'));
+  compliment.push('Crèdit obligatori: ' + (img.credit_obligatori || '(no informat)'));
+  compliment.push('Resultat: ' + (cl.ok ? '✅ COMPLEIX' : '❌ NO COMPLEIX'));
+  if (cl.errors.length) compliment.push('Errors:\n' + cl.errors.map(e => '  - ' + e).join('\n'));
+  if (cl.avisos.length) compliment.push('Avisos:\n' + cl.avisos.map(a => '  - ' + a).join('\n'));
+  return [linia, 'BADALONA COMUNICACIÓ · FITXA DE FOTOGRAFIA','Documental "Darrere el drac"', linia,'Data: ' + avui.toLocaleDateString('ca-ES', { day: '2-digit', month: 'long', year: 'numeric' }),'','DADES DE LA FOTOGRAFIA', liniaCurta].concat(camps).concat(['','COBERTURA DECLARADA', liniaCurta, img.cobertura || '(no informat)','','DIAGNÒSTIC', liniaCurta]).concat(diag).concat(['','COMPLIMENT LEGAL', liniaCurta]).concat(compliment).join('\n');
+}
+
+function textInformeFotografiesAgregat(imgs) {
+  const linia = '===========================================================';
+  const liniaCurta = '-----------------------------------------------------------';
+  const avui = new Date();
+  const cnt = { ok:0, warn:0, ko:0, unk:0 };
+  imgs.forEach(i => { const c = classificaCobertura(i.cobertura, i.override_cobertura).estat; cnt[c] = (cnt[c]||0)+1; });
+  const procedencia = {};
+  imgs.forEach(i => { const arxiu = extrauArxiu(i.link_procedencia, i.cobertura) || 'Desconegut'; procedencia[arxiu] = (procedencia[arxiu] || 0) + 1; });
+  const procedenciaOrdenada = Object.entries(procedencia).sort((a, b) => b[1] - a[1]);
+  const okLegal = imgs.filter(i => complimentLegal(i).ok).length;
+  const koLegal = imgs.length - okLegal;
+  const out = [];
+  out.push(linia, 'BADALONA COMUNICACIÓ · INFORME AGREGAT DE FOTOGRAFIES', 'Documental "Darrere el drac"', linia, 'Data: ' + avui.toLocaleDateString('ca-ES', { day: '2-digit', month: 'long', year: 'numeric' }), 'Total fotografies: ' + imgs.length, '');
+  out.push('ÍNDEX', liniaCurta, '  1. Resum executiu', '  2. Guia de cobertures legals', '  3. Resum per procedència', '  4. Llistat de referències', '  5. Fitxes individuals (' + imgs.length + ')', '');
+  out.push('1. RESUM EXECUTIU', liniaCurta, '🟢 Lliures: ' + cnt.ok, '🟡 CC (atribució): ' + cnt.warn, '🔴 Protegides: ' + cnt.ko, '⚪ Desconegudes: ' + cnt.unk, '✅ Compleixen legalment: ' + okLegal, '❌ No compleixen: ' + koLegal, '');
+  if (koLegal > 0) {
+    out.push('FITXES QUE NO COMPLEIXEN', liniaCurta);
+    imgs.forEach((img, i) => {
+      const cl = complimentLegal(img);
+      if (!cl.ok) out.push('  [' + (i+1) + '] ' + (img.titol || '(sense títol)') + ' → ' + cl.errors.join(' · '));
+    });
+    out.push('');
+  }
+  out.push('2. GUIA DE COBERTURES LEGALS', liniaCurta, ANNEX_COBERTURES, '');
+  out.push('3. RESUM PER PROCEDÈNCIA', liniaCurta, 'Distribució de les fotografies segons el seu arxiu d\'origen:', '');
+  procedenciaOrdenada.forEach(([arxiu, n]) => { const punts = '.'.repeat(Math.max(2, 40 - arxiu.length)); out.push('  ' + arxiu + ' ' + punts + ' ' + n + (n === 1 ? ' fotografia' : ' fotografies')); });
+  out.push('', '  Total: ' + imgs.length + ' fotografies.');
+  out.push('', '4. LLISTAT DE REFERÈNCIES', liniaCurta);
+  imgs.forEach((img, i) => { const c = classificaCobertura(img.cobertura, img.override_cobertura); const cl = complimentLegal(img); out.push(String(i+1).padStart(3,' ') + '. ' + (img.titol || '—') + '  (' + (img.any_data || '—') + ')  →  ' + c.short + (cl.ok ? ' ✅' : ' ❌')); });
+  out.push('', '5. FITXES INDIVIDUALS', liniaCurta);
+  imgs.forEach((img, i) => { out.push('', '╔══════════════════════════════════════════════════════════╗', '║ FITXA ' + String(i+1).padStart(3,'0') + ' / ' + String(imgs.length).padStart(3,'0'), '╚══════════════════════════════════════════════════════════╝', textInformeFoto(img)); });
+  return out.join('\n');
+}
+
+function textResumFotografies(imgs) {
+  const linia = '===========================================================';
+  const liniaCurta = '-----------------------------------------------------------';
+  const avui = new Date();
+  const cnt = { ok:0, warn:0, ko:0, unk:0 };
+  const perEstat = {};
+  imgs.forEach(i => { const c = classificaCobertura(i.cobertura, i.override_cobertura).estat; cnt[c] = (cnt[c]||0)+1; const e = i.estat_intern || 'pendent'; perEstat[e] = (perEstat[e]||0)+1; });
+  const procedencia = {};
+  imgs.forEach(i => { const arxiu = extrauArxiu(i.link_procedencia, i.cobertura) || 'Desconegut'; procedencia[arxiu] = (procedencia[arxiu] || 0) + 1; });
+  const procedenciaOrdenada = Object.entries(procedencia).sort((a, b) => b[1] - a[1]);
+  const okLegal = imgs.filter(i => complimentLegal(i).ok).length;
+  const koLegal = imgs.length - okLegal;
+  const out = [linia, 'BADALONA COMUNICACIÓ · RESUM DE FOTOGRAFIES','Documental "Darrere el drac"', linia,'Data: ' + avui.toLocaleDateString('ca-ES'),'Total fotografies: ' + imgs.length, '','RESUM PER COBERTURA', liniaCurta,'🟢 Lliures: ' + cnt.ok,'🟡 CC: ' + cnt.warn,'🔴 Protegides: ' + cnt.ko,'⚪ Desconegudes: ' + cnt.unk, '','COMPLIMENT LEGAL', liniaCurta,'✅ Compleixen: ' + okLegal, '❌ No compleixen: ' + koLegal, '','RESUM PER ESTAT INTERN', liniaCurta];
+  ESTATS_INTERNS.forEach(([k,l]) => { if (perEstat[k]) out.push(l + ': ' + perEstat[k]); });
+  out.push('', 'RESUM PER PROCEDÈNCIA', liniaCurta);
+  procedenciaOrdenada.forEach(([arxiu, n]) => { const punts = '.'.repeat(Math.max(2, 40 - arxiu.length)); out.push('  ' + arxiu + ' ' + punts + ' ' + n + (n === 1 ? ' fotografia' : ' fotografies')); });
+  out.push('', 'LLISTAT', liniaCurta);
+  imgs.forEach((img,i) => { const c = classificaCobertura(img.cobertura, img.override_cobertura); const cl = complimentLegal(img); out.push(String(i+1).padStart(3,' ') + '. ' + (img.titol || '—') + '  (' + (img.any_data || '—') + ')  →  ' + c.short + (cl.ok ? ' ✅' : ' ❌')); });
+  out.push('', ANNEX_COBERTURES);
+  return out.join('\n');
+}
+
+function renderFotografies() {
+  const app = $('#app'); app.innerHTML = '';
+  if (!currentFoto) {
+    const card = el('div', { class: 'card' });
+    card.append(el('div', { class: 'row', style: 'justify-content:space-between;align-items:center;margin:0' }, [
+      el('h2', { textContent: '📸 Fotografies', style: 'margin:0' }),
+      el('div', { class: 'row', style: 'margin:0' }, [
+        el('button', { class: 'btn', textContent: '📥 Importar', onclick: () => mostraImportadorFoto() }),
+        el('button', { class: 'btn p', textContent: '+ Nova fotografia', onclick: () => novaFoto() })
+      ])
+    ]));
+    card.append(el('div', { class: 'badge', style: 'margin-top:6px', textContent: 'Fitxes tècniques de fotografies del documental. Total: ' + fotografies.length + ' registres.' }));
+    const okLegalTotal = fotografies.filter(i => complimentLegal(i).ok).length;
+    const koLegalTotal = fotografies.length - okLegalTotal;
+    card.append(el('div', { class: 'row', style: 'margin-top:8px;font-size:13px' }, [
+      el('span', { style: 'color:var(--ok);font-weight:600', textContent: '✅ ' + okLegalTotal + ' compleixen' }),
+      el('span', { style: 'color:var(--err);font-weight:600', textContent: '❌ ' + koLegalTotal + ' no compleixen' })
+    ]));
+    const filtres = el('div', { class: 'img-toolbar' });
+    const inp = el('input', { type: 'text', value: filtreFoto.text, placeholder: '🔍 Cercar per títol, descripció, autor, notes, etiquetes...' });
+    inp.addEventListener('input', () => { filtreFoto.text = inp.value; render(); });
+    filtres.append(inp);
+    filtres.append(el('select', { onchange: e => { filtreFoto.cobertura = e.target.value; render(); } }, [
+      el('option', { value: 'totes', textContent: 'Cobertura: totes', selected: filtreFoto.cobertura === 'totes' }),
+      el('option', { value: 'ok', textContent: '🟢 Lliures', selected: filtreFoto.cobertura === 'ok' }),
+      el('option', { value: 'warn', textContent: '🟡 CC', selected: filtreFoto.cobertura === 'warn' }),
+      el('option', { value: 'ko', textContent: '🔴 Protegides', selected: filtreFoto.cobertura === 'ko' }),
+      el('option', { value: 'unk', textContent: '⚪ Desconegudes', selected: filtreFoto.cobertura === 'unk' })
+    ]));
+    filtres.append(el('select', { onchange: e => { filtreFoto.estat = e.target.value; render(); } }, [el('option', { value: 'tots', textContent: 'Estat: tots', selected: filtreFoto.estat === 'tots' })].concat(ESTATS_INTERNS.map(([k,l]) => el('option', { value: k, textContent: l, selected: filtreFoto.estat === k })))));
+    filtres.append(el('select', { onchange: e => { filtreFoto.tipus = e.target.value; render(); } }, [el('option', { value: 'tots', textContent: 'Tipus: tots', selected: filtreFoto.tipus === 'tots' })].concat(TIPUS_IMG.map(t => el('option', { value: t, textContent: t, selected: filtreFoto.tipus === t })))));
+    filtres.append(el('select', { onchange: e => { filtreFoto.compliment = e.target.value; render(); } }, [
+      el('option', { value: 'tots', textContent: 'Compliment: tots', selected: filtreFoto.compliment === 'tots' }),
+      el('option', { value: 'ok', textContent: '✅ Només compleixen', selected: filtreFoto.compliment === 'ok' }),
+      el('option', { value: 'ko', textContent: '❌ Només no compleixen', selected: filtreFoto.compliment === 'ko' })
+    ]));
+    card.append(filtres);
+    const llistaFiltrada = filtraFotografies();
+    if (!llistaFiltrada.length) {
+      card.append(el('div', { class: 'agenda-empty', textContent: fotografies.length ? 'Cap fotografia amb aquest filtre.' : 'Cap fotografia encara. Prem "+ Nova fotografia" o "📥 Importar".' }));
+    } else {
+      const bar = el('div', { class: 'mr-select-bar' });
+      const n = seleccioFoto.size;
+      bar.append(el('span', { class: 'badge', textContent: n ? '📌 ' + n + ' seleccionada' + (n>1?'es':'') : 'Marca fotografies per exportar.' }));
+      const btns = el('div', { class: 'row', style: 'margin:0' });
+      btns.append(el('button', { class: 'btn s', textContent: '✅ Totes (filtrades)', onclick: () => { llistaFiltrada.forEach(i => seleccioFoto.add(i.id)); render(); } }));
+      btns.append(el('button', { class: 'btn s', textContent: '⬜ Cap', onclick: () => { seleccioFoto.clear(); render(); } }));
+      btns.append(el('button', { class: 'btn p s', textContent: '✅ Aprovar seleccionades', onclick: async () => {
+        const sel = fotografiesSeleccionades();
+        if (!sel.length) { alert('No hi ha cap fotografia seleccionada.'); return; }
+        const ko = sel.filter(i => !complimentLegal(i).ok);
+        if (ko.length) { alert('No es poden aprovar ' + ko.length + ' fotografies que no compleixen:\n\n' + ko.map(i => '· ' + (i.titol || '(sense títol)')).join('\n')); return; }
+        if (!confirm('Aprovar ' + sel.length + ' fotografies?')) return;
+        for (const img of sel) { const r = await db.from('fotografies').update({ estat_intern: 'aprovada', updated_at: new Date().toISOString() }).eq('id', img.id); if (!r.error) img.estat_intern = 'aprovada'; }
+        alert('✅ ' + sel.length + ' fotografies aprovades.'); seleccioFoto.clear(); render();
+      } }));
+      if (n > 0) {
+        btns.append(el('button', { class: 'btn s', textContent: '📋 Informe complet', onclick: () => { const s = fotografiesSeleccionades(); descarregaTxt(textInformeFotografiesAgregat(s), 'Informe_Fotografies_' + new Date().toISOString().slice(0,10) + '_' + s.length + '.txt'); } }));
+        btns.append(el('button', { class: 'btn p s', textContent: '📄 PDF complet', onclick: () => { const s = fotografiesSeleccionades(); obrePdf(textInformeFotografiesAgregat(s), 'Informe agregat de fotografies'); } }));
+        btns.append(el('button', { class: 'btn s', textContent: '📋 Resum', onclick: () => { const s = fotografiesSeleccionades(); descarregaTxt(textResumFotografies(s), 'Resum_Fotografies_' + new Date().toISOString().slice(0,10) + '.txt'); } }));
+        btns.append(el('button', { class: 'btn p s', textContent: '📊 PDF resum', onclick: () => { const s = fotografiesSeleccionades(); obrePdf(textResumFotografies(s), 'Resum de fotografies'); } }));
+      }
+      bar.append(btns);
+      card.append(bar);
+      const grid = el('div', { class: 'img-grid' });
+      llistaFiltrada.forEach(img => {
+        const c = classificaCobertura(img.cobertura, img.override_cobertura);
+        const cl = complimentLegal(img);
+        const marcat = seleccioFoto.has(img.id);
+        const cardI = el('div', { class: 'img-card', style: marcat ? 'border-color:var(--ac);box-shadow:0 0 0 2px rgba(180,71,31,.2)' : '' });
+        if (esURLImatge(img.link_procedencia)) cardI.append(el('img', { class: 'img-thumb', src: img.link_procedencia, loading: 'lazy', onerror: (ev) => { ev.target.style.display = 'none'; } }));
+        else cardI.append(el('div', { class: 'img-thumb-placeholder', textContent: '📸' }));
+        const body = el('div', { class: 'img-body' });
+        const head = el('div', { style: 'display:flex;gap:6px;align-items:flex-start' });
+        const cb = el('input', { type: 'checkbox', checked: marcat, style: 'width:16px;height:16px' });
+        cb.addEventListener('change', (e) => { e.stopPropagation(); if (cb.checked) seleccioFoto.add(img.id); else seleccioFoto.delete(img.id); render(); });
+        head.append(cb);
+        head.append(el('div', { class: 'img-title', style: 'flex:1', textContent: img.titol || '(sense títol)' }));
+        body.append(head);
+        body.append(el('div', { class: 'img-meta', textContent: [img.any_data, img.tipus, img.autor].filter(Boolean).join(' · ') }));
+        const pills = el('div', { style: 'display:flex;flex-wrap:wrap;gap:4px;margin-top:4px' });
+        pills.append(el('span', { class: 'img-pill ' + c.estat, textContent: c.short }));
+        pills.append(el('span', { class: 'img-pill ' + (cl.ok ? 'legal-ok' : 'legal-ko'), textContent: cl.ok ? '✅ Legal' : '❌ No legal' }));
+        body.append(pills);
+        const acts = el('div', { class: 'img-actions' });
+        if (img.link_procedencia) acts.append(el('button', { class: 'btn', textContent: '🔗 Obrir', onclick: () => window.open(img.link_procedencia, '_blank') }));
+        acts.append(el('button', { class: 'btn p', textContent: '⚙️ Fitxa', onclick: () => obreFoto(img) }));
+        body.append(acts);
+        cardI.append(body);
+        grid.append(cardI);
+      });
+      card.append(grid);
+    }
+    app.append(card);
+    return;
+  }
+  const img = currentFoto;
+  const c = classificaCobertura(img.cobertura, img.override_cobertura);
+  const cl = complimentLegal(img);
+  const card = el('div', { class: 'card' });
+  const top = el('div', { class: 'row', style: 'justify-content:space-between;align-items:center;margin:0 0 12px' });
+  top.append(el('button', { class: 'btn', textContent: '← Tornar', onclick: () => { currentFoto = null; editingFoto = false; render(); } }));
+  top.append(el('div', { class: 'row', style: 'margin:0' }, [
+    el('button', { class: 'btn', textContent: editingFoto ? '👁️ Veure' : '✏️ Editar', onclick: () => { editingFoto = !editingFoto; render(); } }),
+    el('button', { class: 'btn p', textContent: '💾 Desar', onclick: async () => { await desaFoto(img); render(); } }),
+    el('button', { class: 'btn', textContent: '📋 Copiar informe', onclick: async () => { try { await navigator.clipboard.writeText(textInformeFoto(img)); alert('✅ Copiat'); } catch(e){ alert('Error'); } } }),
+    el('button', { class: 'btn', textContent: '📄 .txt', onclick: () => descarregaTxt(textInformeFoto(img), 'Informe_Foto_' + (img.titol || '').replace(/[^a-z0-9._-]+/gi,'_') + '.txt') }),
+    el('button', { class: 'btn', textContent: '📄 PDF', onclick: () => obrePdf(textInformeFoto(img), 'Fitxa de fotografia · ' + img.titol) }),
+    img.id ? el('button', { class: 'btn d', textContent: '🗑️', onclick: () => esborraFoto(img) }) : ''
+  ].filter(Boolean)));
+  card.append(top);
+  card.append(el('h2', { textContent: img.titol || 'Nova fotografia', style: 'margin:0 0 10px' }));
+  if (esURLImatge(img.link_procedencia)) card.append(el('img', { src: img.link_procedencia, style: 'max-width:100%;max-height:340px;border-radius:8px;margin-bottom:12px', loading: 'lazy' }));
+  const form = el('div', { class: 'mr-form' });
+  const camp = (label, key, type, ph) => {
+    const l = el('label');
+    l.append(el('span', { textContent: label }));
+    const inp = el('input', { type: type || 'text', value: img[key] == null ? '' : img[key], placeholder: ph || '' });
+    inp.disabled = !editingFoto;
+    inp.addEventListener('input', () => img[key] = (type === 'number' ? (inp.value === '' ? 0 : Number(inp.value)) : inp.value));
+    l.append(inp); return l;
+  };
+  form.append(camp('Títol', 'titol'));
+  form.append(camp('Enllaç de procedència', 'link_procedencia', 'url'));
+  form.append(camp('Autor / Fotògraf', 'autor'));
+  form.append(camp('Any / Data', 'any_data', 'text', '1898, c. 1898...'));
+  form.append(camp('Etiquetes', 'etiquetes', 'text', 'separades per comes'));
+  form.append(camp('Vincle amb producció', 'vincle_tasca', 'text', 'escena 3, entrevista Joan...'));
+  form.append(camp('Capítol', 'capitol', 'text', 'capítol 3'));
+  form.append(camp('Rellevància', 'rellevancia', 'text', 'alta, mitjana, baixa...'));
+  form.append(camp('Durada visualització (s)', 'durada_visualitzacio', 'number'));
+  const lT = el('label'); lT.append(el('span', { textContent: 'Tipus' }));
+  const selT = el('select', { onchange: e => img.tipus = e.target.value }, [el('option', { value: '', textContent: '—' })].concat(TIPUS_IMG.map(t => el('option', { value: t, textContent: t, selected: img.tipus === t }))));
+  selT.disabled = !editingFoto; lT.append(selT); form.append(lT);
+  const lE = el('label'); lE.append(el('span', { textContent: 'Estat intern' }));
+  const selE = el('select', { onchange: e => img.estat_intern = e.target.value }, ESTATS_INTERNS.map(([k,l]) => el('option', { value: k, textContent: l, selected: (img.estat_intern||'pendent') === k })));
+  selE.disabled = !editingFoto; lE.append(selE); form.append(lE);
+  const lD = el('label', { class: 'full' }); lD.append(el('span', { textContent: 'Descripció breu' }));
+  const taD = el('textarea', { value: img.descripcio || '', placeholder: 'Descripció de la fotografia...', style: 'min-height:70px' });
+  taD.disabled = !editingFoto; taD.addEventListener('input', () => img.descripcio = taD.value);
+  lD.append(taD); form.append(lD);
+  const lC = el('label', { class: 'full' }); lC.append(el('span', { textContent: 'Cobertura (text original)' }));
+  const taC = el('textarea', { value: img.cobertura || '', placeholder: 'Domini Públic (Public Domain), CC BY-SA 4.0, Tots els drets reservats...' });
+  taC.disabled = !editingFoto; taC.addEventListener('input', () => { img.cobertura = taC.value; });
+  lC.append(taC); form.append(lC);
+  const lCr = el('label', { class: 'full' }); lCr.append(el('span', { textContent: 'Crèdit obligatori (text exacte que ha d\'aparèixer als crèdits)' }));
+  const iCr = el('input', { type: 'text', value: img.credit_obligatori || '', placeholder: '"Autor, any. Font: XXX (Llicència)."' });
+  iCr.disabled = !editingFoto; iCr.addEventListener('input', () => img.credit_obligatori = iCr.value);
+  lCr.append(iCr); form.append(lCr);
+  const lN = el('label', { class: 'full' }); lN.append(el('span', { textContent: 'Notes' }));
+  const taN = el('textarea', { value: img.notes || '' });
+  taN.disabled = !editingFoto; taN.addEventListener('input', () => img.notes = taN.value);
+  lN.append(taN); form.append(lN);
+  card.append(form);
+  if (editingFoto) {
+    const ov = el('div', { class: 'mr-override' });
+    ov.append(el('h4', { textContent: '⚖️ Override manual de cobertura' }));
+    const grid = el('div', { class: 'mr-form' });
+    const lO = el('label'); lO.append(el('span', { textContent: 'Forçar classificació' }));
+    lO.append(el('select', { onchange: e => { img.override_cobertura = e.target.value; render(); } }, [
+      el('option', { value: '', textContent: '— Automàtic —', selected: !img.override_cobertura }),
+      el('option', { value: 'ok', textContent: '🟢 Forçar LLIURE', selected: img.override_cobertura==='ok' }),
+      el('option', { value: 'warn', textContent: '🟡 Forçar CC', selected: img.override_cobertura==='warn' }),
+      el('option', { value: 'ko', textContent: '🔴 Forçar PROTEGIT', selected: img.override_cobertura==='ko' }),
+      el('option', { value: 'unk', textContent: '⚪ Forçar DESCONEGUT', selected: img.override_cobertura==='unk' })
+    ]));
+    grid.append(lO);
+    const lN2 = el('label', { class: 'full' }); lN2.append(el('span', { textContent: 'Motiu' }));
+    const iN = el('input', { type: 'text', value: img.override_nota || '' }); iN.addEventListener('input', () => img.override_nota = iN.value);
+    lN2.append(iN); grid.append(lN2);
+    ov.append(grid); card.append(ov);
+  }
+  const diag = el('div', { class: 'mr-diag' });
+  diag.append(el('h4', { textContent: 'Classificació de cobertura' }));
+  diag.append(el('p', { style: 'font-size:16px' }, el('strong', { textContent: c.text })));
+  if (img.override_cobertura) diag.append(el('p', { class: 'badge', textContent: '⚠️ Override aplicat' + (img.override_nota ? ' (' + img.override_nota + ')' : '') }));
+  card.append(diag);
+  const diagLegal = el('div', { class: 'mr-diag', style: 'margin-top:14px' });
+  diagLegal.append(el('h4', { textContent: 'Compliment legal' }));
+  diagLegal.append(el('p', { style: 'font-size:16px;font-weight:700;color:' + (cl.ok ? 'var(--ok)' : 'var(--err)'), textContent: cl.ok ? '✅ COMPLEIX' : '❌ NO COMPLEIX' }));
+  if (cl.errors.length) diagLegal.append(el('p', { style: 'color:var(--err);white-space:pre-wrap', textContent: 'Errors:\n' + cl.errors.map(e => '  - ' + e).join('\n') }));
+  if (cl.avisos.length) diagLegal.append(el('p', { style: 'color:var(--warn);white-space:pre-wrap', textContent: 'Avisos:\n' + cl.avisos.map(a => '  - ' + a).join('\n') }));
+  card.append(diagLegal);
+  card.append(el('h3', { style: 'margin-top:16px', textContent: 'Informe de la fotografia' }));
+  card.append(el('div', { class: 'mr-report', textContent: textInformeFoto(img) }));
+  if (img.id) {
+    const parts = [];
+    if (img.created_by) parts.push('Creat per ' + img.created_by);
+    if (img.updated_by) parts.push('Modificat per ' + img.updated_by);
+    if (parts.length) card.append(el('div', { class: 'mr-audit', textContent: '🔍 ' + parts.join(' · ') }));
+  }
+  app.append(card);
+}
+
+function mostraImportadorFoto() {
+  const app = $('#app');
+  const card = el('div', { class: 'card' });
+  card.append(el('h2', { textContent: '📥 Importar fotografies des d\'Excel' }));
+  card.append(el('div', { class: 'badge', textContent: 'Enganxa aquí les files del teu Excel (amb la fila de capçalera). Detecto automàticament les columnes: títol, descripció, link procedència, cobertura/llicència, crèdit obligatori, any, tipus, autor, notes, etiquetes, capítol, rellevància, durada.' }));
+  const box = el('div', { class: 'img-import' });
+  const ta = el('textarea', { placeholder: 'TITOL\tDESCRIPCIO\tLINK\tLLICENCIA\tCREDIT\tAUTOR\tANY\tCAPITOL\nChing Ling Foo\tPostal promocional...\thttps://...\tDomini Públic\tChing Ling Foo, 1898...\tDesconegut\t1898\tCapítol 1' });
+  box.append(ta); card.append(box);
+  const row = el('div', { class: 'row' });
+  row.append(el('button', { class: 'btn p', textContent: '📥 Importar', onclick: async () => { await importaFotografies(ta.value); } }));
+  row.append(el('button', { class: 'btn', textContent: 'Cancel·lar', onclick: () => renderFotografies() }));
+  card.append(row);
+  app.innerHTML = ''; app.append(card);
+}
+
+function extrauArxiu(url, llicencia) {
+  const llic = (llicencia || '').toLowerCase();
+  if (/prelinger/i.test(llic)) return 'Prelinger Archives';
+  if (/eye filmmuseum/i.test(llic)) return 'Eye Filmmuseum';
+  if (/national archives/i.test(llic)) return 'National Archives';
+  if (/musée albert-kahn|musee albert-kahn/i.test(llic)) return 'Musée Albert-Kahn';
+  if (!url) return '';
+  try {
+    const u = new URL(url); const h = u.hostname.replace(/^www\./, '');
+    const map = { 'commons.wikimedia.org': 'Wikimedia Commons','upload.wikimedia.org': 'Wikimedia Commons','archive.org': 'Internet Archive','bne.es': 'Biblioteca Nacional de España','bdh.bne.es': 'Biblioteca Digital Hispánica (BNE)','europeana.eu': 'Europeana','loc.gov': 'Library of Congress','flickr.com': 'Flickr Commons','youtube.com': 'YouTube','vimeo.com': 'Vimeo' };
+    for (const k in map) if (h.includes(k)) return map[k];
+    return h;
+  } catch(e) { return ''; }
 }
 
 function textCreditsFinals() {
@@ -1692,20 +2060,6 @@ function textCreditsTecnics() {
   const cats = Object.keys(grups).sort(); const linies = [];
   cats.forEach(cat => { linies.push(cat + ':'); grups[cat].forEach(c => linies.push('  ' + (c.nom || '—'))); linies.push(''); });
   return linies.join('\n').trim();
-}
-function extrauArxiu(url, llicencia) {
-  const llic = (llicencia || '').toLowerCase();
-  if (/prelinger/i.test(llic)) return 'Prelinger Archives';
-  if (/eye filmmuseum/i.test(llic)) return 'Eye Filmmuseum';
-  if (/national archives/i.test(llic)) return 'National Archives';
-  if (/musée albert-kahn|musee albert-kahn/i.test(llic)) return 'Musée Albert-Kahn';
-  if (!url) return '';
-  try {
-    const u = new URL(url); const h = u.hostname.replace(/^www\./, '');
-    const map = { 'commons.wikimedia.org': 'Wikimedia Commons','upload.wikimedia.org': 'Wikimedia Commons','archive.org': 'Internet Archive','bne.es': 'Biblioteca Nacional de España','bdh.bne.es': 'Biblioteca Digital Hispánica (BNE)','europeana.eu': 'Europeana','loc.gov': 'Library of Congress','flickr.com': 'Flickr Commons','youtube.com': 'YouTube','vimeo.com': 'Vimeo' };
-    for (const k in map) if (h.includes(k)) return map[k];
-    return h;
-  } catch(e) { return ''; }
 }
 function textCreditsInforme() {
   const linia = '===========================================================';
@@ -1762,9 +2116,7 @@ function renderCredits() {
     const card = el('div', { class: 'card' });
     card.append(el('div', { class: 'row', style: 'justify-content:space-between;align-items:center;margin:0' }, [
       el('h2', { textContent: '📜 Crèdits del documental', style: 'margin:0' }),
-      el('div', { class: 'row', style: 'margin:0' }, [
-        el('button', { class: 'btn', textContent: '🔄 Autogenerar', onclick: () => autoGeneraCredits() })
-      ])
+      el('div', { class: 'row', style: 'margin:0' }, [el('button', { class: 'btn', textContent: '🔄 Autogenerar', onclick: () => autoGeneraCredits() })])
     ]));
     card.append(el('div', { class: 'badge', style: 'margin-top:6px', textContent: 'Llista de crèdits del documental: tècnics, imatges i música.' }));
     const fraseBar = el('div', { class: 'cred-frase-bar', style: 'flex-direction:column;align-items:stretch;gap:6px' });
@@ -1915,6 +2267,16 @@ async function autoGeneraCredits() {
     if ((img.estat_intern || '') !== 'aprovada') return;
     const c = classificaCobertura(img.cobertura, img.override_cobertura); if (c.estat !== 'ok') return;
     const arxiu = extrauArxiu(img.link_procedencia, img.cobertura) || 'Arxiu d\'imatge';
+    const atrib = img.autor || 'Anònim';
+    const key = 'imatge|' + arxiu.toLowerCase() + '|' + atrib.toLowerCase();
+    if (existents.has(key)) return;
+    existents.add(key);
+    nous.push({ ordre: credits.length + nous.length, tipus: 'imatge', arxiu, atribucio: atrib, titol: img.titol || '', any_text: img.any_data || '', frase: '', nota: '', created_by: me, updated_by: me });
+  });
+  fotografies.forEach(img => {
+    if ((img.estat_intern || '') !== 'aprovada') return;
+    const c = classificaCobertura(img.cobertura, img.override_cobertura); if (c.estat !== 'ok') return;
+    const arxiu = extrauArxiu(img.link_procedencia, img.cobertura) || 'Arxiu de fotografia';
     const atrib = img.autor || 'Anònim';
     const key = 'imatge|' + arxiu.toLowerCase() + '|' + atrib.toLowerCase();
     if (existents.has(key)) return;
@@ -2420,12 +2782,13 @@ function inicialitzaCercador() {
   document.addEventListener('click', (e) => { if (!e.target.closest('.search-wrap')) results.classList.remove('open'); });
 }
 function cercaGlobal(q) {
-  const r = { tasques: [], documents: [], fitxers: [], drets: [], imatges: [], credits: [], tecnics: [], dietes: [] };
+  const r = { tasques: [], documents: [], fitxers: [], drets: [], imatges: [], fotografies: [], credits: [], tecnics: [], dietes: [] };
   secs.forEach(s => (s.tasks || []).forEach(k => { const blob = [k.t, k.k, k.n, tasquesPersones(k).join(' ')].filter(Boolean).join(' ').toLowerCase(); if (blob.includes(q)) r.tasques.push({ tasca: k, seccio: s }); }));
   docs.forEach(d => { const blob = [d.title, (d.content || '').replace(/<[^>]+>/g, ' ')].join(' ').toLowerCase(); if (blob.includes(q)) r.documents.push(d); });
   secs.forEach(s => (s.files || []).forEach(f => { if ((f.name || '').toLowerCase().includes(q)) r.fitxers.push({ fitxer: f, seccio: s }); }));
   musicRights.forEach(c => { const blob = [c.titulo, c.interprete, c.autor, c.referencia, c.notas].filter(Boolean).join(' ').toLowerCase(); if (blob.includes(q)) r.drets.push(c); });
   imageRights.forEach(i => { const blob = [i.titol, i.descripcio, i.autor, i.etiquetes, i.notes, i.cobertura].filter(Boolean).join(' ').toLowerCase(); if (blob.includes(q)) r.imatges.push(i); });
+  fotografies.forEach(i => { const blob = [i.titol, i.descripcio, i.autor, i.etiquetes, i.notes, i.cobertura, i.capitol, i.rellevancia].filter(Boolean).join(' ').toLowerCase(); if (blob.includes(q)) r.fotografies.push(i); });
   credits.forEach(c => { const blob = [c.arxiu, c.atribucio, c.titol, c.nota].filter(Boolean).join(' ').toLowerCase(); if (blob.includes(q)) r.credits.push(c); });
   creditsTecnics.forEach(c => { const blob = [c.categoria, c.nom].filter(Boolean).join(' ').toLowerCase(); if (blob.includes(q)) r.tecnics.push(c); });
   secs.forEach(s => (s.budget || []).forEach(p => (p.dietes || []).forEach(d => { const blob = [d.concepte, d.persona, (d.persones_noms||[]).join(' '), d.tipus, d.notes, p.c].filter(Boolean).join(' ').toLowerCase(); if (blob.includes(q)) r.dietes.push({ ...d, __partida: p.c, __seccio: s.id }); })));
@@ -2433,13 +2796,14 @@ function cercaGlobal(q) {
 }
 function mostraResultats(r) {
   const box = $('#search-results'); box.innerHTML = '';
-  const total = r.tasques.length + r.documents.length + r.fitxers.length + r.drets.length + r.imatges.length + r.credits.length + r.tecnics.length + r.dietes.length;
+  const total = r.tasques.length + r.documents.length + r.fitxers.length + r.drets.length + r.imatges.length + r.fotografies.length + r.credits.length + r.tecnics.length + r.dietes.length;
   if (!total) { box.append(el('div', { class: 'search-empty', textContent: 'Cap resultat.' })); box.classList.add('open'); return; }
   const addGrup = (titol, items, clickFn, labelFn) => {
     if (!items.length) return;
     box.append(el('div', { class: 'search-group', textContent: titol + ' (' + items.length + ')' }));
     items.slice(0, 10).forEach(it => { const { title, meta } = labelFn(it); box.append(el('div', { class: 'search-result', onclick: () => { box.classList.remove('open'); $('#search-input').value = ''; clickFn(it); } }, [el('div', { class: 'title', textContent: title }), el('div', { class: 'meta', textContent: meta })])); });
   };
+  addGrup('📸 Fotografies', r.fotografies, (i) => { currentFoto = i; editingFoto = false; goto('fotografies'); }, (i) => ({ title: i.titol || '(sense títol)', meta: [i.any_data, i.tipus, i.autor].filter(Boolean).join(' · ') }));
   addGrup('🍽️ Dietes', r.dietes, (d) => { const bsec = secs.find(x => isBudgetSec(x)); if (bsec) goto(bsec.id); }, (d) => ({ title: (d.concepte || '(sense concepte)') + ' · ' + (d.persona || ''), meta: [d.data, d.tipus, eur(dietaImport(d)), d.__partida].filter(Boolean).join(' · ') }));
   addGrup('📋 Crèdits tècnics', r.tecnics, (c) => goto('credits'), (c) => ({ title: c.nom || '(sense nom)', meta: c.categoria || '—' }));
   addGrup('🎼 Drets musicals', r.drets, (c) => { currentMR = c; editingMR = false; goto('drets'); }, (c) => ({ title: c.titulo || '(sense títol)', meta: [c.referencia, c.interprete, c.ano_grabacion].filter(Boolean).join(' · ') }));
@@ -2449,515 +2813,6 @@ function mostraResultats(r) {
   addGrup('📚 Documents', r.documents, (d) => { currentDoc = d; goto(secs.find(x => /^gui[oó]$/i.test(x.name))?.id || 'cal'); }, (d) => ({ title: d.title || 'Sense títol', meta: d.folder }));
   addGrup('📎 Fitxers', r.fitxers, (x) => goto(x.seccio.id), (x) => ({ title: x.fitxer.name, meta: x.seccio.name }));
   box.classList.add('open');
-}
-
-/* ============================================================
-   RENDER BUDGET
-   ============================================================ */
-function renderBudget(s) {
-  s.budget = s.budget || [];
-  let calDesar = false;
-  s.budget.forEach((p, i) => {
-    if (typeof p.pos !== 'number') { p.pos = i; calDesar = true; }
-    if (!Array.isArray(p.jornades)) { p.jornades = []; calDesar = true; }
-    if (!Array.isArray(p.dietes)) { p.dietes = []; calDesar = true; }
-    p.jornades.forEach(j => {
-      if (!Array.isArray(j.persones_noms)) { j.persones_noms = Number(j.persones) > 0 ? Array(Number(j.persones)).fill('?').map((_, k) => 'Persona ' + (k+1)) : []; delete j.persones; calDesar = true; }
-      if (typeof j.es_laborable !== 'boolean') { j.es_laborable = true; calDesar = true; }
-    });
-    p.dietes.forEach(d => {
-      if (!Array.isArray(d.persones_noms)) { d.persones_noms = d.persona ? String(d.persona).split(',').map(x => x.trim()).filter(Boolean) : []; calDesar = true; }
-      if (typeof d.dies !== 'number') { d.dies = 0; calDesar = true; }
-    });
-    if (typeof p.admet_jornades !== 'boolean') { p.admet_jornades = PARTIDES_AMB_JORNADES.test(p.c || ''); calDesar = true; }
-    if (typeof p.admet_dietes !== 'boolean') { p.admet_dietes = PARTIDES_AMB_DIETES.test(p.c || ''); calDesar = true; }
-  });
-  s.budget.sort((a, b) => (a.pos || 0) - (b.pos || 0));
-  if (calDesar) save(s);
-
-  const dSoundtrack = calculaDretsSoundtrack();
-  const wrap = el('div', { class: 'card' });
-  wrap.append(el('div', { class: 'row', style: 'justify-content:space-between;margin:0 0 8px;align-items:center' }, [
-    el('h3', { textContent: 'Full de pressupost', style: 'margin:0' }),
-    el('div', { class: 'row', style: 'margin:0' }, [
-      editing ? el('button', { class: 'btn s', textContent: '📥 Recarregar', onclick: () => {
-        if (!confirm('Sobreescriure amb les 22 partides inicials?')) return;
-        s.budget = JSON.parse(JSON.stringify(PARTIDES_INICIALS));
-        s.budget.forEach((p, i) => { p.pos = i; p.jornades = []; p.dietes = []; p.admet_jornades = PARTIDES_AMB_JORNADES.test(p.c || ''); p.admet_dietes = PARTIDES_AMB_DIETES.test(p.c || ''); });
-        save(s); render();
-      } }) : '',
-      editing ? el('button', { class: 'btn', textContent: '+ Nova partida', onclick: () => {
-        s.budget.push({ c:'', cat:'Altres', p:0, st:'pendent', exp:[], jornades:[], dietes:[], admet_jornades:false, admet_dietes:false, pos: s.budget.length });
-        save(s); render();
-      } }) : ''
-    ].filter(Boolean))
-  ].filter(Boolean)));
-
-  if (!s.budget.length) { wrap.append(el('div', { class: 'badge', textContent: 'Cap partida.' })); return wrap; }
-  if (editing) wrap.append(el('div', { class: 'badge', style: 'margin-bottom:8px', textContent: '💡 Arrossega el ⋮⋮ per reordenar.' }));
-
-  const list = el('div', { class: 'bud-list' });
-  list.append(el('div', { class: 'bud-head' }, [
-    el('div'), el('div', { textContent: 'Concepte' }),
-    el('div', { class: 'hide-s', textContent: 'Tipus' }),
-    el('div', { class: 'bc-num', textContent: 'Previst' }),
-    el('div', { class: 'bc-num', textContent: 'Real' }),
-    el('div', { class: 'hide-s', textContent: 'Estat' }),
-    el('div')
-  ]));
-
-  s.budget.forEach((p, idx) => {
-    const open = !!openBud[idx];
-    const real = realOf(p);
-    const isSoundtrack = /soundtrack/i.test(p.c || '');
-    const row = el('div', { class: 'bud-row' + (open ? ' open' : '') });
-
-    const cellCaret = el('div', { class: 'bc-caret' });
-    if (editing) {
-      const handle = el('span', { class: 'drag-handle', textContent: '⋮⋮', draggable: 'true' });
-      handle.addEventListener('dragstart', (ev) => { ev.dataTransfer.setData('text/plain', String(idx)); ev.dataTransfer.effectAllowed = 'move'; row.classList.add('dragging'); });
-      handle.addEventListener('dragend', () => row.classList.remove('dragging'));
-      cellCaret.append(handle);
-    }
-    cellCaret.append(el('button', { class: 'caret' + (open ? ' open' : ''), textContent: '▶', onclick: () => { openBud[idx] = !openBud[idx]; render(); } }));
-    row.append(cellCaret);
-
-    if (editing) {
-      const cellC = el('div', {});
-      cellC.append(el('input', { type: 'text', value: p.c, oninput: e => { p.c = e.target.value; save(s); } }));
-      const chkJ = el('label', { style: 'display:flex;align-items:center;gap:6px;font-size:11px;color:var(--mut);margin-top:4px;cursor:pointer' });
-      const cbJ = el('input', { type: 'checkbox', checked: !!p.admet_jornades });
-      cbJ.addEventListener('change', () => { p.admet_jornades = cbJ.checked; save(s); render(); });
-      chkJ.append(cbJ, el('span', { textContent: '🎬 Admet jornades especials' }));
-      cellC.append(chkJ);
-      const chkD = el('label', { style: 'display:flex;align-items:center;gap:6px;font-size:11px;color:var(--mut);margin-top:2px;cursor:pointer' });
-      const cbD = el('input', { type: 'checkbox', checked: !!p.admet_dietes });
-      cbD.addEventListener('change', () => { p.admet_dietes = cbD.checked; save(s); render(); });
-      chkD.append(cbD, el('span', { textContent: '🍽️ Admet dietes' }));
-      cellC.append(chkD);
-      row.append(cellC);
-      row.append(el('div', { class: 'hide-s' }, el('select', { onchange: e => { p.cat = e.target.value; save(s); } }, CATS.map(c => el('option', { value: c, textContent: c, selected: (p.cat || 'Altres') === c })))));
-      row.append(el('div', { class: 'bc-num' }, el('input', { type: 'number', value: p.p, min: 0, step: '0.01', style: 'text-align:right', oninput: e => { p.p = Number(e.target.value) || 0; save(s); } })));
-    } else {
-      const concepteCell = el('div', { textContent: p.c || '(sense nom)' });
-      if (isSoundtrack && dSoundtrack.existeix && dSoundtrack.pendent > 0) concepteCell.append(el('span', { class: 'budget-badge', textContent: '🎼 ' + eur(dSoundtrack.pendent) + ' pendents en drets musicals' }));
-      if (p.admet_jornades && (p.jornades || []).length) { const pend = pendentJornadesOf(p); if (pend > 0) concepteCell.append(el('span', { class: 'budget-badge', textContent: '🎬 ' + eur(pend) + ' pendents de cobrar' })); }
-      if (p.admet_dietes && (p.dietes || []).length) { const pendD = pendentDietesOf(p); if (pendD > 0) concepteCell.append(el('span', { class: 'budget-badge', textContent: '🍽️ ' + eur(pendD) + ' en dietes pendents' })); }
-      row.append(concepteCell);
-      row.append(el('div', { class: 'hide-s' }, el('span', { class: 'cat-pill', textContent: p.cat || 'Altres' })));
-      row.append(el('div', { class: 'bc-num', textContent: eur(p.p) }));
-    }
-
-    let realMostrat = real;
-    if (isSoundtrack && dSoundtrack.existeix && dSoundtrack.pagat > 0) realMostrat = real + dSoundtrack.pagat;
-    row.append(el('div', { class: 'bc-num strong', textContent: eur(realMostrat) }));
-
-    let estatMostrar = p.st || 'pendent';
-    if (isSoundtrack && dSoundtrack.existeix && dSoundtrack.pagat > 0) estatMostrar = 'pagat';
-
-    if (editing) {
-      row.append(el('div', { class: 'hide-s' }, el('select', { onchange: e => { p.st = e.target.value; save(s); } }, STATS.map(([v, l]) => el('option', { value: v, textContent: l, selected: (p.st || 'pendent') === v })))));
-    } else {
-      row.append(el('div', { class: 'hide-s' }, el('span', { class: 'st-pill ' + stClass(estatMostrar), textContent: stLabel(estatMostrar) })));
-    }
-
-    row.append(el('div', { class: 'bc-x' }, editing ? el('button', { class: 'x', textContent: '×', onclick: () => {
-      if (confirm('Eliminar?')) { s.budget.splice(idx, 1); s.budget.forEach((q,i)=>q.pos=i); save(s); render(); }
-    } }) : ''));
-
-    if (editing) {
-      row.addEventListener('dragover', (ev) => { ev.preventDefault(); row.classList.add('drop-target'); });
-      row.addEventListener('dragleave', () => row.classList.remove('drop-target'));
-      row.addEventListener('drop', (ev) => {
-        ev.preventDefault(); row.classList.remove('drop-target');
-        const from = parseInt(ev.dataTransfer.getData('text/plain'), 10);
-        if (!isNaN(from)) mouPartidaA(s, from, idx);
-      });
-    }
-    list.append(row);
-
-    if (p.admet_jornades && (p.jornades || []).length) {
-      const grupsResum = agrupaJornadesPerMes(p.jornades);
-      const keysResum = ordenaMesos(Object.keys(grupsResum));
-      if (keysResum.length > 0) {
-        const sublinia = el('div', { style: 'padding:6px 10px 6px 46px;font-size:12px;background:rgba(122,90,166,.03)' });
-        keysResum.forEach(mk => {
-          const arr = grupsResum[mk];
-          const pendent = pendentMes(arr); const total = totalMes(arr); const numJornades = arr.length; const cobrat = pendent === 0;
-          const liniaMes = el('div', { style: 'display:flex;align-items:center;gap:8px;padding:3px 0;border-bottom:1px dashed var(--bd)' });
-          liniaMes.append(el('span', { style: 'font-weight:600;min-width:120px;text-transform:capitalize', textContent: '🎬 ' + nomMes(mk) }));
-          liniaMes.append(el('span', { style: 'font-size:11px;color:var(--mut);min-width:60px', textContent: '(' + numJornades + ' jornada' + (numJornades === 1 ? '' : 'es') + ')' }));
-          liniaMes.append(el('span', { style: 'font-variant-numeric:tabular-nums;min-width:80px;text-align:right', textContent: eur(total) }));
-          if (cobrat) liniaMes.append(el('span', { style: 'font-variant-numeric:tabular-nums;min-width:100px;text-align:right;color:var(--ok);font-weight:600', textContent: '🟢 Cobrat' }));
-          else liniaMes.append(el('span', { style: 'font-variant-numeric:tabular-nums;min-width:100px;text-align:right;color:var(--warn);font-weight:600', textContent: '🟡 ' + eur(pendent) + ' pendent' }));
-          liniaMes.append(el('span', { style: 'min-width:110px' }));
-          sublinia.append(liniaMes);
-        });
-        list.append(el('div', { style: 'background:rgba(122,90,166,.03);border-bottom:1px solid var(--bd)' }, sublinia));
-      }
-    }
-
-    if (p.admet_dietes && (p.dietes || []).length) {
-      const grupsResumD = agrupaDietesPerMes(p.dietes);
-      const keysResumD = ordenaMesos(Object.keys(grupsResumD));
-      if (keysResumD.length > 0) {
-        const subliniaD = el('div', { style: 'padding:6px 10px 6px 46px;font-size:12px;background:rgba(138,90,43,.04)' });
-        keysResumD.forEach(mk => {
-          const arr = grupsResumD[mk];
-          const pendent = pendentDietesMes(arr);
-          const total = totalDietesMes(arr);
-          const numDietes = arr.length;
-          const cobrat = pendent === 0;
-          const titolMes = (arr[0] && arr[0].__titolMes) || nomMesDieta(mk);
-          const liniaMes = el('div', { style: 'display:flex;align-items:center;gap:8px;padding:3px 0;border-bottom:1px dashed var(--bd)' });
-          liniaMes.append(el('span', { style: 'font-weight:600;min-width:120px;text-transform:capitalize', textContent: '🍽️ ' + titolMes }));
-          liniaMes.append(el('span', { style: 'font-size:11px;color:var(--mut);min-width:60px', textContent: '(' + numDietes + ' dieta' + (numDietes === 1 ? '' : 'es') + ')' }));
-          liniaMes.append(el('span', { style: 'font-variant-numeric:tabular-nums;min-width:80px;text-align:right', textContent: eur(total) }));
-          if (cobrat) liniaMes.append(el('span', { style: 'font-variant-numeric:tabular-nums;min-width:100px;text-align:right;color:var(--ok);font-weight:600', textContent: '🟢 Cobrat' }));
-          else liniaMes.append(el('span', { style: 'font-variant-numeric:tabular-nums;min-width:100px;text-align:right;color:var(--warn);font-weight:600', textContent: '🟡 ' + eur(pendent) + ' pendent' }));
-          liniaMes.append(el('span', { style: 'min-width:110px' }));
-          subliniaD.append(liniaMes);
-        });
-        list.append(el('div', { style: 'background:rgba(138,90,43,.04);border-bottom:1px solid var(--bd)' }, subliniaD));
-      }
-    }
-
-    if (open) {
-      const box = el('div', { class: 'exp-box' });
-      (p.exp || []).forEach((e, ei) => {
-        const item = el('div', { class: 'exp-item' });
-        if (editing) {
-          item.append(el('input', { type: 'date', class: 'd', value: e.d || '', oninput: ev => { e.d = ev.target.value; save(s); } }));
-          item.append(el('input', { type: 'text', class: 't', value: e.t || '', oninput: ev => { e.t = ev.target.value; save(s); } }));
-          item.append(el('input', { type: 'number', class: 'a', value: e.a || 0, oninput: ev => { e.a = Number(ev.target.value) || 0; save(s); } }));
-          item.append(el('button', { class: 'x', textContent: '×', onclick: () => { p.exp.splice(ei, 1); save(s); render(); } }));
-        } else {
-          item.append(el('span', { class: 'exp-date', textContent: e.d ? fmt(e.d) : '—' }));
-          item.append(el('span', { class: 'exp-name', textContent: e.t || '(sense concepte)' }));
-          item.append(el('span', { class: 'exp-amt', textContent: eur(e.a) }));
-        }
-        box.append(item);
-      });
-      if (!(p.exp || []).length) box.append(el('div', { class: 'badge', textContent: 'Cap despesa.' }));
-      if (editing) box.append(el('button', { class: 'btn s', textContent: '+ Afegir despesa', onclick: () => { p.exp = p.exp || []; p.exp.push({ d:'', t:'', a:0 }); save(s); render(); } }));
-      list.append(box);
-
-      if (p.admet_dietes) list.append(renderBlocDietes(s, p, idx));
-
-      if (p.admet_jornades) {
-        const jbox = el('div', { class: 'jorn-box' });
-        jbox.append(el('h4', { class: 'jorn-title', textContent: '🎬 Jornades especials' }));
-        const grups = agrupaJornadesPerMes(p.jornades);
-        const keys  = ordenaMesos(Object.keys(grups));
-        const totalPartida   = keys.reduce((a, k) => a + totalMes(grups[k]), 0);
-        const cobratPartida  = keys.reduce((a, k) => a + cobratMes(grups[k]), 0);
-        const pendentPartida = totalPartida - cobratPartida;
-        if (totalPartida > 0) jbox.append(el('div', { class: 'jorn-summary' }, [el('span', { textContent: 'Total jornades: ' + eur(totalPartida) }), el('span', { class: 'jorn-cobrat', textContent: 'Cobrat: ' + eur(cobratPartida) }), el('span', { class: 'jorn-pendent', textContent: 'Pendent: ' + eur(pendentPartida) })]));
-        if (!keys.length) jbox.append(el('div', { class: 'badge', textContent: 'Cap jornada encara.' }));
-        keys.forEach(mk => {
-          const arr = grups[mk];
-          const tM = totalMes(arr), cM = cobratMes(arr), nJ = arr.length;
-          const obert = !!(openMes[idx] && openMes[idx][mk]);
-          const header = el('div', { class: 'jorn-mes-head' + (obert ? ' open' : '') });
-          header.append(el('span', { class: 'jorn-caret', textContent: obert ? '▼' : '▶' }));
-          header.append(el('span', { class: 'jorn-mes-nom', textContent: nomMes(mk) }));
-          header.append(el('span', { class: 'jorn-mes-count', textContent: '(' + nJ + ' jornada' + (nJ === 1 ? '' : 'es') + ')' }));
-          header.append(el('span', { class: 'jorn-mes-total', textContent: eur(tM) }));
-          header.append(el('span', { class: 'jorn-mes-cobrat', textContent: '(' + eur(cM) + ' cobrats)' }));
-          header.addEventListener('click', () => { openMes[idx] = openMes[idx] || {}; openMes[idx][mk] = !obert; render(); });
-          jbox.append(header);
-          if (obert) {
-            const taula = el('div', { class: 'jorn-taula' });
-            taula.append(el('div', { class: 'jorn-row jorn-head' }, [el('div', { textContent: 'Data' }), el('div', { textContent: 'Hores' }), el('div', { textContent: 'Laborable?' }), el('div', { textContent: 'Persones' }), el('div', { textContent: 'Concepte' }), el('div', { class: 'jorn-num', textContent: 'Preu unit.' }), el('div', { class: 'jorn-num', textContent: 'Pers.' }), el('div', { class: 'jorn-num', textContent: 'Total' }), el('div', { textContent: 'Cobrat' }), el('div')]));
-            arr.forEach(j => {
-              const jrow = el('div', { class: 'jorn-row' + (j.cobrat ? ' done' : '') });
-              const tipusCalc = calculaTipusJornada(j.hores, j.es_laborable);
-              const inpData = el('input', { type: 'date', value: j.data || '' }); inpData.disabled = !editing;
-              inpData.addEventListener('change', () => { j.data = inpData.value; save(s); render(); });
-              jrow.append(el('div', {}, inpData));
-              const inpH = el('input', { type: 'number', value: j.hores || 0, min: 0, step: 0.25, style: 'width:70px' }); inpH.disabled = !editing;
-              inpH.addEventListener('input', () => { j.hores = Number(inpH.value) || 0; save(s); });
-              jrow.append(el('div', {}, inpH));
-              const selLab = el('select', { style: 'min-width:110px' }, [el('option', { value: 'true', textContent: 'Dia laborable', selected: j.es_laborable !== false }), el('option', { value: 'false', textContent: 'Dia NO laborable', selected: j.es_laborable === false })]);
-              selLab.disabled = !editing;
-              selLab.addEventListener('change', () => { j.es_laborable = selLab.value === 'true'; save(s); render(); });
-              jrow.append(el('div', {}, selLab));
-              const btnPers = el('button', { class: 'btn s', style: 'min-width:110px;text-align:left', textContent: (j.persones_noms && j.persones_noms.length) ? j.persones_noms.join(', ') + ' (' + j.persones_noms.length + ')' : '— Triar persones —' });
-              if (!editing) btnPers.disabled = true;
-              btnPers.addEventListener('click', (ev) => {
-                ev.stopPropagation();
-                if (btnPers._dropdown && document.body.contains(btnPers._dropdown)) { btnPers._dropdown.remove(); btnPers._dropdown = null; return; }
-                const dd = el('div', { style: 'position:absolute;z-index:100;background:var(--card);border:1px solid var(--bd);border-radius:8px;padding:8px;box-shadow:0 8px 24px rgba(0,0,0,.15);min-width:180px' });
-                peopleNames().forEach(nom => {
-                  const checked = (j.persones_noms || []).includes(nom);
-                  const lbl = el('label', { style: 'display:flex;align-items:center;gap:8px;padding:4px 6px;border-radius:6px;cursor:pointer;font-size:13px;' + (checked ? 'background:rgba(180,71,31,.1);color:var(--ac);font-weight:600' : '') });
-                  const cb = el('input', { type: 'checkbox', checked });
-                  cb.addEventListener('change', () => { j.persones_noms = j.persones_noms || []; if (cb.checked) { if (!j.persones_noms.includes(nom)) j.persones_noms.push(nom); } else { j.persones_noms = j.persones_noms.filter(x => x !== nom); } save(s); render(); });
-                  lbl.append(cb, el('span', { textContent: nom })); dd.append(lbl);
-                });
-                document.body.appendChild(dd);
-                const rect = btnPers.getBoundingClientRect();
-                dd.style.left = rect.left + 'px'; dd.style.top = (rect.bottom + 4) + 'px';
-                btnPers._dropdown = dd;
-                const closeDD = (e) => { if (dd.contains(e.target) || e.target === btnPers) return; dd.remove(); btnPers._dropdown = null; document.removeEventListener('click', closeDD, true); };
-                setTimeout(() => document.addEventListener('click', closeDD, true), 0);
-              });
-              jrow.append(el('div', {}, btnPers));
-              const inpC = el('input', { type: 'text', value: j.concepte || '', placeholder: 'Reunió, guió...' }); inpC.disabled = !editing;
-              inpC.addEventListener('input', () => { j.concepte = inpC.value; save(s); });
-              jrow.append(el('div', {}, inpC));
-              const preuUnit = tipusCalc && tipusCalc !== 'fora_de_rang' ? (PREUS_JORNADA[tipusCalc] || 0) : 0;
-              jrow.append(el('div', { class: 'jorn-num', textContent: preuUnit ? eur(preuUnit) : '—' }));
-              const nPers = (j.persones_noms || []).length;
-              jrow.append(el('div', { class: 'jorn-num', textContent: String(nPers) }));
-              const totalJornada = preuUnit * nPers;
-              jrow.append(el('div', { class: 'jorn-num', style: 'font-weight:700;' + (j.cobrat ? '' : 'color:var(--mut);opacity:.65'), textContent: totalJornada > 0 ? eur(totalJornada) : '—' }));
-              const cbC = el('input', { type: 'checkbox', checked: !!j.cobrat }); cbC.disabled = !editing;
-              cbC.addEventListener('change', () => { j.cobrat = cbC.checked; save(s); render(); });
-              if (j.cobrat && !editing) jrow.append(el('div', { style: 'text-align:center;font-size:16px', title: 'Cobrat', textContent: '✅' }));
-              else jrow.append(el('div', { style: 'text-align:center' }, cbC));
-              jrow.append(el('div', { style: 'text-align:center' }, editing ? el('button', { class: 'x', textContent: '×', onclick: () => { if (!confirm('Esborrar aquesta jornada?')) return; p.jornades = p.jornades.filter(x => x !== j); save(s); render(); } }) : ''));
-              const badgeRow = el('div', { style: 'grid-column:1/-1;padding:2px 0 4px 6px;font-size:11px;' + (j.cobrat ? 'color:var(--ok)' : 'color:var(--warn)') });
-              if (tipusCalc === 'fora_de_rang') { badgeRow.textContent = '❌ Les hores indicades no compleixen el quadre legal per a aquest tipus de dia.'; badgeRow.style.color = 'var(--err)'; }
-              else if (tipusCalc) { badgeRow.textContent = ETIQ_JORNADA[tipusCalc] + ' (' + (j.es_laborable !== false ? 'laborable' : 'no laborable') + ') · ' + (j.cobrat ? '🟢 Cobrat' : '🟡 Pendent de cobrar'); }
-              else { badgeRow.textContent = '⚠️ Introdueix les hores per calcular la compensació.'; }
-              taula.append(jrow); taula.append(badgeRow);
-            });
-            const tMes = totalMes(arr), cMes = cobratMes(arr), pMes = pendentMes(arr);
-            const resumMes = el('div', { style: 'margin-top:10px;padding:10px 12px;background:var(--card);border:1px solid var(--bd);border-radius:8px;font-size:13px;display:grid;grid-template-columns:1fr auto;gap:4px 16px' });
-            resumMes.append(el('span', { textContent: 'Total mes', style: 'font-weight:600' }), el('span', { textContent: eur(tMes), style: 'text-align:right;font-weight:700' }), el('span', { textContent: '├─ Cobrat (suma al Real)', style: 'color:var(--ok)' }), el('span', { textContent: eur(cMes), style: 'text-align:right;color:var(--ok);font-weight:600' }), el('span', { textContent: '└─ Pendent de cobrar', style: 'color:var(--warn)' }), el('span', { textContent: eur(pMes), style: 'text-align:right;color:var(--warn);font-weight:600' }));
-            taula.append(resumMes);
-            if (editing) taula.append(el('div', { class: 'row', style: 'margin-top:6px' }, el('button', { class: 'btn s', textContent: '+ Afegir jornada', onclick: () => {
-              const dataDefault = (mk && mk !== 'sense-data') ? (mk + '-' + String(new Date().getDate()).padStart(2, '0')) : avuiISO();
-              p.jornades = p.jornades || [];
-              p.jornades.push({ id: 'j' + Date.now().toString(36), data: dataDefault, hores: 2, es_laborable: true, persones_noms: [], concepte: '', cobrat: false });
-              openMes[idx] = openMes[idx] || {}; openMes[idx][mk] = true; save(s); render();
-            } })));
-            jbox.append(taula);
-          }
-        });
-        if (editing) jbox.append(el('div', { class: 'row', style: 'margin-top:8px' }, el('button', { class: 'btn s', textContent: '+ Nova jornada en un altre mes', onclick: () => {
-          const ara = new Date();
-          const valor = prompt('Mes (YYYY-MM):', ara.getFullYear() + '-' + String(ara.getMonth() + 1).padStart(2, '0'));
-          if (!valor || !/^\d{4}-\d{2}$/.test(valor)) return;
-          p.jornades = p.jornades || [];
-          p.jornades.push({ id: 'j' + Date.now().toString(36), data: valor + '-01', hores: 2, es_laborable: true, perssones_noms: [], concepte: '', cobrat: false });
-          openMes[idx] = openMes[idx] || {}; openMes[idx][valor] = true; save(s); render();
-        } })));
-        jbox.append(el('div', { class: 'badge', style: 'margin-top:6px', textContent: 'Les jornades cobrades sumen al Real. Les pendents es mostren però no sumen.' }));
-        list.append(jbox);
-      }
-    }
-  });
-
-  wrap.append(list);
-
-  const totalP = s.budget.reduce((a, p) => a + (Number(p.p) || 0), 0);
-  const totalR = s.budget.reduce((a, p) => { let base = realOf(p); if (/soundtrack/i.test(p.c || '') && dSoundtrack.existeix && dSoundtrack.pagat > 0) base += dSoundtrack.pagat; return a + base; }, 0);
-  const pendentsJorn = s.budget.reduce((a, p) => a + pendentJornadesOf(p), 0);
-  const pendentsDietes = s.budget.reduce((a, p) => a + pendentDietesOf(p), 0);
-  const pendentsSoundtrack = dSoundtrack.existeix ? dSoundtrack.pendent : 0;
-  const totalPendent = pendentsJorn + pendentsDietes + pendentsSoundtrack;
-  const totalRealComplert = totalR + totalPendent;
-  const diff = totalRealComplert - totalP;
-
-  const sum = el('div', { class: 'summary', style: 'margin-top:16px;padding-top:14px;border-top:2px solid var(--bd)' });
-  sum.append(el('div', { class: 'lbl' }, [el('div', { textContent: 'Total previst' }), el('div', { class: 'badge', style: 'font-size:10px;font-weight:normal;margin-top:-2px', textContent: 'El que teníeu pensat gastar.' })]));
-  sum.append(el('div', { class: 'val big', textContent: eur(totalP) }));
-  sum.append(el('div', { class: 'lbl' }, [el('div', { textContent: 'Total real' }), el('div', { class: 'badge', style: 'font-size:10px;font-weight:normal;margin-top:-2px', textContent: 'El que heu pagat + el que teniu compromès a pagar.' })]));
-  sum.append(el('div', { class: 'val big', textContent: eur(totalRealComplert) }));
-  if (totalPendent > 0) {
-    sum.append(el('div', { class: 'lbl' }, [el('div', { textContent: '├─ Del qual, pendent de pagar/cobrar' }), el('div', { class: 'badge', style: 'font-size:10px;font-weight:normal;margin-top:-2px', textContent: 'Jornades, dietes i drets (Soundtrack) encara per tancar.' })]));
-    sum.append(el('div', { class: 'val', style: 'color:var(--warn);font-weight:700', textContent: eur(totalPendent) }));
-    if (pendentsJorn > 0) { sum.append(el('div', { class: 'lbl', style: 'padding-left:14px' }, [el('div', { textContent: '· Jornades pendents' })])); sum.append(el('div', { class: 'val', style: 'color:var(--warn)', textContent: eur(pendentsJorn) })); }
-    if (pendentsDietes > 0) { sum.append(el('div', { class: 'lbl', style: 'padding-left:14px' }, [el('div', { textContent: '· Dietes pendents' })])); sum.append(el('div', { class: 'val', style: 'color:var(--warn)', textContent: eur(pendentsDietes) })); }
-    if (pendentsSoundtrack > 0) { sum.append(el('div', { class: 'lbl', style: 'padding-left:14px' }, [el('div', { textContent: '· Drets Soundtrack pendents' })])); sum.append(el('div', { class: 'val', style: 'color:var(--warn)', textContent: eur(pendentsSoundtrack) })); }
-  }
-  sum.append(el('div', { class: 'lbl' }, [el('div', { textContent: 'Diferència' }), el('div', { class: 'badge', style: 'font-size:10px;font-weight:normal;margin-top:-2px', textContent: 'Marge restant respecte al previst.' })]));
-  sum.append(el('div', { class: 'val big ' + (diff > 0 ? 'pos' : diff < 0 ? 'neg' : ''), textContent: (diff > 0 ? '+' : '') + eur(diff) }));
-
-  wrap.append(sum);
-  return wrap;
-}
-
-/* ============================================================
-   BLOC DIETES
-   ============================================================ */
-function renderBlocDietes(s, p, idx) {
-  const dbox = el('div', { class: 'diet-box' });
-  dbox.append(el('h4', { class: 'diet-title', textContent: '🍽️ Dietes' }));
-
-  const grups = agrupaDietesPerMes(p.dietes);
-  const keys = ordenaMesos(Object.keys(grups));
-  const totalPartida = keys.reduce((a, k) => a + totalDietesMes(grups[k]), 0);
-  const cobratPartida = keys.reduce((a, k) => a + cobratDietesMes(grups[k]), 0);
-  const pendentPartida = totalPartida - cobratPartida;
-
-  if (totalPartida > 0) dbox.append(el('div', { class: 'diet-summary' }, [el('span', { textContent: 'Total dietes: ' + eur(totalPartida) }), el('span', { class: 'diet-cobrat', textContent: 'Cobrat: ' + eur(cobratPartida) }), el('span', { class: 'diet-pendent', textContent: 'Pendent: ' + eur(pendentPartida) })]));
-  if (!keys.length) dbox.append(el('div', { class: 'badge', textContent: 'Cap dieta encara.' }));
-
-  keys.forEach(mk => {
-    const arr = grups[mk];
-    const any = Number(mk.split('-')[0]);
-    const mes = Number(mk.split('-')[1]);
-    const tM = totalDietesMes(arr), cM = cobratDietesMes(arr), pM = pendentDietesMes(arr);
-    const nD = arr.length;
-    const obert = !!(openDietMes[idx] && openDietMes[idx][mk]);
-    const titol = (arr[0] && arr[0].__titolMes) || nomMesDieta(mk);
-
-    const header = el('div', { class: 'diet-mes-head' });
-    header.append(el('span', { class: 'diet-caret', textContent: obert ? '▼' : '▶', onclick: () => { openDietMes[idx] = openDietMes[idx] || {}; openDietMes[idx][mk] = !obert; render(); } }));
-    const inpTitol = el('input', { type: 'text', class: 'diet-titol-input', value: titol, title: 'Títol editable del mes' });
-    inpTitol.addEventListener('change', async () => {
-      const nou = inpTitol.value.trim();
-      if (!nou) { inpTitol.value = titol; return; }
-      await desaDietaMes(any, mes, nou);
-      arr.forEach(d => { d.__titolMes = nou; });
-      save(s); render();
-    });
-    header.append(inpTitol);
-    header.append(el('span', { class: 'diet-mes-count', textContent: '(' + nD + ' dieta' + (nD === 1 ? '' : 'es') + ')' }));
-    header.append(el('span', { class: 'diet-mes-total', textContent: eur(tM) }));
-    if (pM === 0) header.append(el('span', { style: 'color:var(--ok);font-weight:600;font-size:12px', textContent: '🟢 Cobrat' }));
-    else header.append(el('span', { style: 'color:var(--warn);font-weight:600;font-size:12px', textContent: '🟡 ' + eur(pM) + ' pendent' }));
-    if (pM > 0) {
-      header.append(el('button', { class: 'btn s', textContent: '✅ Cobrar totes', onclick: () => {
-        if (!confirm('Marcar com a cobrades ' + arr.filter(d => d.estat !== 'cobrat').length + ' dietes pendents de ' + nomMesDieta(mk) + '?')) return;
-        arr.forEach(d => { if (d.estat !== 'cobrat') d.estat = 'cobrat'; });
-        save(s); render();
-      } }));
-    }
-    if (editing) {
-      header.append(el('button', { class: 'btn s', textContent: '＋', title: 'Afegir dieta en aquest mes', onclick: () => {
-        p.dietes = p.dietes || [];
-        p.dietes.push({ id: 'd' + Date.now().toString(36), data: (mk && mk !== 'sense-data' ? mk + '-' + String(new Date().getDate()).padStart(2,'0') : avuiISO()), persona:'', persones_noms:[], concepte:'', tipus:'apat', import:0, km:0, preu_km:DIETES_PREU_KM_DEFECTE, dies:0, estat:'pendent', notes:'', __titolMes: titol });
-        openDietMes[idx] = openDietMes[idx] || {}; openDietMes[idx][mk] = true;
-        save(s); render();
-      } }));
-    }
-    dbox.append(header);
-
-    if (obert) {
-      const taula = el('div', { class: 'diet-taula' });
-      taula.append(el('div', { class: 'diet-row diet-head' }, [el('div', { textContent: 'Data' }), el('div', { textContent: 'Persones' }), el('div', { textContent: 'Concepte' }), el('div', { textContent: 'Tipus' }), el('div', { class: 'diet-num', textContent: 'Import' }), el('div', { textContent: 'Notes' }), el('div', { textContent: 'Estat' }), el('div')]));
-      arr.forEach(d => {
-        const row = el('div', { class: 'diet-row' + (d.estat === 'cobrat' ? ' done' : '') });
-
-        const inpData = el('input', { type: 'date', value: d.data || '' });
-        inpData.disabled = !editing;
-        inpData.addEventListener('change', () => { d.data = inpData.value; save(s); render(); });
-        row.append(el('div', {}, inpData));
-
-        if (!Array.isArray(d.persones_noms)) d.persones_noms = d.persona ? String(d.persona).split(',').map(x => x.trim()).filter(Boolean) : [];
-        const btnPers = el('button', { class: 'btn s', style: 'min-width:110px;text-align:left', textContent: d.persones_noms.length ? d.persones_noms.join(', ') + ' (' + d.persones_noms.length + ')' : '— Triar persones —' });
-        if (!editing) btnPers.disabled = true;
-        btnPers.addEventListener('click', (ev) => {
-          ev.stopPropagation();
-          if (btnPers._dropdown && document.body.contains(btnPers._dropdown)) { btnPers._dropdown.remove(); btnPers._dropdown = null; return; }
-          const dd = el('div', { style: 'position:absolute;z-index:100;background:var(--card);border:1px solid var(--bd);border-radius:8px;padding:8px;box-shadow:0 8px 24px rgba(0,0,0,.15);min-width:180px' });
-          const noms = peopleNames();
-          if (!noms.length) {
-            dd.append(el('div', { style: 'padding:6px 8px;font-size:12px;color:var(--mut)', textContent: 'No hi ha cap persona a l\'equip.' }));
-          } else {
-            noms.forEach(nom => {
-              const checked = (d.persones_noms || []).includes(nom);
-              const lbl = el('label', { style: 'display:flex;align-items:center;gap:8px;padding:4px 6px;border-radius:6px;cursor:pointer;font-size:13px;' + (checked ? 'background:rgba(180,71,31,.1);color:var(--ac);font-weight:600' : '') });
-              const cb = el('input', { type: 'checkbox', checked });
-              cb.addEventListener('change', () => {
-                d.persones_noms = d.persones_noms || [];
-                if (cb.checked) { if (!d.persones_noms.includes(nom)) d.persones_noms.push(nom); }
-                else { d.persones_noms = d.persones_noms.filter(x => x !== nom); }
-                d.persona = d.persones_noms.join(', ');
-                save(s); render();
-              });
-              lbl.append(cb, el('span', { textContent: nom }));
-              dd.append(lbl);
-            });
-          }
-          document.body.appendChild(dd);
-          const rect = btnPers.getBoundingClientRect();
-          dd.style.left = rect.left + 'px'; dd.style.top = (rect.bottom + 4) + 'px';
-          btnPers._dropdown = dd;
-          const closeDD = (e) => { if (dd.contains(e.target) || e.target === btnPers) return; dd.remove(); btnPers._dropdown = null; document.removeEventListener('click', closeDD, true); };
-          setTimeout(() => document.addEventListener('click', closeDD, true), 0);
-        });
-        row.append(el('div', {}, btnPers));
-
-        const inpConc = el('input', { type: 'text', value: d.concepte || '', placeholder: 'Dinar, tren...' });
-        inpConc.disabled = !editing;
-        inpConc.addEventListener('input', () => { d.concepte = inpConc.value; save(s); });
-        row.append(el('div', {}, inpConc));
-
-        const selTipus = el('select', {}, TIPUS_DIETA.map(([v,l]) => el('option', { value: v, textContent: l, selected: (d.tipus || 'apat') === v })));
-        selTipus.disabled = !editing;
-        selTipus.addEventListener('change', () => { d.tipus = selTipus.value; save(s); render(); });
-        row.append(el('div', {}, selTipus));
-
-        if (d.tipus === 'quilometratge') {
-          const wrapKm = el('div', { style: 'display:flex;gap:4px;align-items:center' });
-          const inpKm = el('input', { type: 'number', value: d.km || 0, min: 0, step: '0.1', style: 'width:60px' });
-          inpKm.disabled = !editing;
-          inpKm.addEventListener('input', () => { d.km = Number(inpKm.value) || 0; save(s); render(); });
-          const inpPreu = el('input', { type: 'number', value: d.preu_km || DIETES_PREU_KM_DEFECTE, min: 0, step: '0.01', style: 'width:60px' });
-          inpPreu.disabled = !editing;
-          inpPreu.addEventListener('input', () => { d.preu_km = Number(inpPreu.value) || 0; save(s); render(); });
-          wrapKm.append(inpKm, el('span', { textContent: '×', style: 'font-size:11px' }), inpPreu);
-          row.append(el('div', {}, wrapKm));
-        } else if (d.tipus === 'manutencio_pernocta') {
-          const wrapDies = el('div', { style: 'display:flex;flex-wrap:wrap;gap:4px;align-items:center;font-size:11px;color:var(--mut)' });
-          const inpDies = el('input', { type: 'number', value: d.dies || 1, min: 0, step: '1', style: 'width:50px' });
-          inpDies.disabled = !editing;
-          inpDies.addEventListener('input', () => { d.dies = Number(inpDies.value) || 0; save(s); render(); });
-          wrapDies.append(el('span', { textContent: 'dies:' }), inpDies);
-          const nPersAra = (d.persones_noms || []).length;
-          wrapDies.append(el('span', { textContent: '× ' + PREU_MANUTENCIO_PERNOCTA.toFixed(2) + ' €/dia × ' + nPersAra + ' pers.' }));
-          row.append(el('div', {}, wrapDies));
-        } else {
-          const inpImport = el('input', { type: 'number', value: d.import || 0, min: 0, step: '0.01', style: 'width:90px;text-align:right' });
-          inpImport.disabled = !editing;
-          inpImport.addEventListener('input', () => { d.import = Number(inpImport.value) || 0; save(s); });
-          row.append(el('div', { class: 'diet-num' }, inpImport));
-        }
-
-        const inpNotes = el('input', { type: 'text', value: d.notes || '', placeholder: 'Notes...' });
-        inpNotes.disabled = !editing;
-        inpNotes.addEventListener('input', () => { d.notes = inpNotes.value; save(s); });
-        row.append(el('div', {}, inpNotes));
-
-        const cbEstat = el('input', { type: 'checkbox', checked: d.estat === 'cobrat' });
-        cbEstat.disabled = !editing;
-        cbEstat.addEventListener('change', () => { d.estat = cbEstat.checked ? 'cobrat' : 'pendent'; save(s); render(); });
-        row.append(el('div', { style: 'text-align:center;font-size:13px' }, cbEstat));
-
-        row.append(el('div', { style: 'text-align:center' }, editing ? el('button', { class: 'x', textContent: '×', onclick: () => { if (!confirm('Esborrar aquesta dieta?')) return; p.dietes = p.dietes.filter(x => x !== d); save(s); render(); } }) : ''));
-
-        taula.append(row);
-
-        const importCalc = dietaImport(d);
-        taula.append(el('div', { style: 'grid-column:1/-1;font-size:11px;color:var(--mut);padding:0 0 4px 6px' }, [
-          el('span', { textContent: '💰 ' + eur(importCalc) + (d.estat === 'cobrat' ? ' · 🟢 Cobrat' : ' · 🟡 Pendent') })
-        ]));
-      });
-      const resumMes = el('div', { style: 'margin-top:10px;padding:10px 12px;background:var(--card);border:1px solid var(--bd);border-radius:8px;font-size:13px;display:grid;grid-template-columns:1fr auto;gap:4px 16px' });
-      resumMes.append(el('span', { textContent: 'Total mes', style: 'font-weight:600' }), el('span', { textContent: eur(tM), style: 'text-align:right;font-weight:700' }), el('span', { textContent: '├─ Cobrat (suma al Real)', style: 'color:var(--ok)' }), el('span', { textContent: eur(cM), style: 'text-align:right;color:var(--ok);font-weight:600' }), el('span', { textContent: '└─ Pendent de cobrar', style: 'color:var(--warn)' }), el('span', { textContent: eur(pM), style: 'text-align:right;color:var(--warn);font-weight:600' }));
-      taula.append(resumMes);
-      dbox.append(taula);
-    }
-  });
-
-  if (editing) {
-    dbox.append(el('div', { class: 'row', style: 'margin-top:8px' }, el('button', { class: 'btn s', textContent: '+ Nova dieta en un altre mes', onclick: () => {
-      const ara = new Date();
-      const valor = prompt('Mes (YYYY-MM):', ara.getFullYear() + '-' + String(ara.getMonth() + 1).padStart(2, '0'));
-      if (!valor || !/^\d{4}-\d{2}$/.test(valor)) return;
-      p.dietes = p.dietes || [];
-      p.dietes.push({ id: 'd' + Date.now().toString(36), data: valor + '-01', persona:'', persones_noms:[], concepte:'', tipus:'apat', import:0, km:0, preu_km:DIETES_PREU_KM_DEFECTE, dies:0, estat:'pendent', notes:'', __titolMes: nomMesDieta(valor) });
-      openDietMes[idx] = openDietMes[idx] || {}; openDietMes[idx][valor] = true;
-      save(s); render();
-    } })));
-  }
-  dbox.append(el('div', { class: 'badge', style: 'margin-top:6px', textContent: 'Les dietes cobrades sumen al Real. Manutenció amb pernocta: 53,34 €/dia × dies × persones.' }));
-  return dbox;
 }
 
 async function start(user) {
@@ -2982,6 +2837,7 @@ async function start(user) {
   await carregaDocs();
   await carregaMusicRights();
   await carregaImageRights();
+  await carregaFotografies();
   await carregaCredits();
   await carregaCreditsTecnics();
   cur = 'cal'; render();
@@ -3002,6 +2858,7 @@ async function start(user) {
     .on('postgres_changes', { event: '*', schema: 'public', table: 'blocks' }, async () => { await carregaBlocks(); if (cur === 'cal' && !busy()) render(); })
     .on('postgres_changes', { event: '*', schema: 'public', table: 'music_rights' }, async () => { await carregaMusicRights(); if (cur === 'drets' && !busy()) render(); })
     .on('postgres_changes', { event: '*', schema: 'public', table: 'image_rights' }, async () => { await carregaImageRights(); if (cur === 'imatges' && !busy()) render(); })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'fotografies' }, async () => { await carregaFotografies(); if (cur === 'fotografies' && !busy()) render(); })
     .on('postgres_changes', { event: '*', schema: 'public', table: 'credits' }, async () => { await carregaCredits(); if (cur === 'credits' && !busy()) render(); })
     .on('postgres_changes', { event: '*', schema: 'public', table: 'credits_tecnics' }, async () => { await carregaCreditsTecnics(); if (cur === 'credits' && !busy()) render(); })
     .subscribe();
