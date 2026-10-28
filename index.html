@@ -172,7 +172,7 @@ input[type=time]{padding:6px;width:auto}
 .img-import textarea{width:100%;min-height:140px;font:13px/1.4 ui-monospace,monospace}
 .img-pill{display:inline-block;font-size:11px;padding:2px 8px;border-radius:999px;color:#fff}
 .img-pill.ok{background:#2e9e5b}.img-pill.warn{background:#c47b1f}.img-pill.ko{background:#c0392b}.img-pill.unk{background:#a39c8f}
-.img-pill.legal-ok{background:#2e9e5b}.img-pill.legal-ko{background:#c0392b}
+.img-pill.legal-ok{background:#2e9e5b}.img-pill.legal-ko{background:#c0392b}.img-pill.legal-inv{background:var(--warn)}
 .cred-list{display:grid;grid-template-columns:1fr;gap:6px;margin-top:12px}
 .cred-row{background:var(--bg);border:1px solid var(--bd);border-radius:8px;padding:10px 12px;display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center}
 .cred-row.dragging{opacity:.35}
@@ -270,7 +270,7 @@ input[type=time]{padding:6px;width:auto}
     </div>
     <div class="search-wrap">
       <span class="search-icon">🔍</span>
-      <input type="text" class="search-input" id="search-input" placeholder="Cercar tasques, documents, fitxers, drets, imatges, crèdits..." autocomplete="off">
+      <input type="text" class="search-input" id="search-input" placeholder="Cercar tasques, documents, fitxers, drets, imatges, fotografies, crèdits..." autocomplete="off">
       <div class="search-results" id="search-results"></div>
     </div>
     <button class="btn" id="out">Sortir</button>
@@ -428,14 +428,14 @@ let editingMR = false;
 let seleccioMR = new Set();
 const ANNO_ACTUAL = new Date().getFullYear();
 
-/* === IMATGES (es manté exactament igual que abans) === */
+/* === IMATGES (catàleg de drets) === */
 let imageRights = [];
 let currentImg = null;
 let editingImg = false;
 let seleccioImg = new Set();
 let filtreImg = { text: '', cobertura: 'totes', estat: 'tots', tipus: 'tots', compliment: 'tots' };
 
-/* === FOTOGRAFIES (nou mòdul independent) === */
+/* === FOTOGRAFIES (mòdul independent) === */
 let fotografies = [];
 let currentFoto = null;
 let editingFoto = false;
@@ -1068,7 +1068,7 @@ function classificaCobertura(cobertura, override) {
   return { estat: 'unk', text: '⚪ ' + cobertura.slice(0, 60), short: 'ALTRES' };
 }
 
-const ESTATS_INTERNS = [['pendent','🟠 Pendent de revisar'],['revisada','🔵 Revisada'],['aprovada','🟢 Aprovada'],['descartada','🔴 Descartada']];
+const ESTATS_INTERNS = [['pendent','🟠 Pendent de revisar'],['investigant','⏳ Pendent d\'investigar'],['revisada','🔵 Revisada'],['aprovada','🟢 Aprovada'],['descartada','🔴 Descartada']];
 const TIPUS_IMG = ['foto', 'dibuix', 'gravat', 'cartell', 'mapa', 'pintura', 'altra'];
 
 function esURLImatge(url) {
@@ -1090,11 +1090,12 @@ function complimentLegal(img) {
   if (c.estat === 'unk') avisos.push('Cobertura desconeguda: cal verificar-la abans de publicar.');
   if (!img.autor || !img.autor.trim()) avisos.push('No s\'ha informat l\'autor.');
   if (!img.link_procedencia || !img.link_procedencia.trim()) avisos.push('No s\'ha informat l\'enllaç de procedència.');
-  return { ok: errors.length === 0, errors, avisos };
+  const investigant = (img.estat_intern || '') === 'investigant';
+  return { ok: errors.length === 0, errors, avisos, investigant };
 }
 
 /* ============================================================
-   IMATGES — catàleg de drets (igual que abans)
+   IMATGES — catàleg de drets
    ============================================================ */
 function filtraImatges() {
   const q = (filtreImg.text || '').toLowerCase().trim();
@@ -1106,18 +1107,19 @@ function filtraImatges() {
     if (filtreImg.estat !== 'tots' && (img.estat_intern || 'pendent') !== filtreImg.estat) return false;
     if (filtreImg.tipus !== 'tots' && (img.tipus || '') !== filtreImg.tipus) return false;
     if (filtreImg.compliment !== 'tots') {
-      const ok = complimentLegal(img).ok;
-      if (filtreImg.compliment === 'ok' && !ok) return false;
-      if (filtreImg.compliment === 'ko' && ok) return false;
+      const cl = complimentLegal(img);
+      if (filtreImg.compliment === 'ok' && !cl.ok) return false;
+      if (filtreImg.compliment === 'ko' && cl.ok) return false;
+      if (filtreImg.compliment === 'inv' && !cl.investigant) return false;
     }
     if (!q) return true;
-    const blob = [img.titol, img.descripcio, img.autor, img.etiquetes, img.notes, img.link_procedencia, img.cobertura].filter(Boolean).join(' ').toLowerCase();
+    const blob = [img.titol, img.descripcio, img.autor, img.etiquetes, img.notes, img.link_procedencia, img.cobertura, img.origen_fons].filter(Boolean).join(' ').toLowerCase();
     return blob.includes(q);
   });
 }
 function imatgesSeleccionades() { return imageRights.filter(x => seleccioImg.has(x.id)); }
 function novaImatge() {
-  currentImg = { id:null, titol:'', descripcio:'', link_procedencia:'', cobertura:'', any_data:'', tipus:'', autor:'', notes:'', credit_obligatori:'', rellevancia:'', capitol:'', durada_visualitzacio:0, estat_intern:'pendent', etiquetes:'', override_cobertura:'', override_nota:'', vincle_tasca:'', vincle_seccio_id:'', created_by: me };
+  currentImg = { id:null, titol:'', descripcio:'', link_procedencia:'', cobertura:'', any_data:'', tipus:'', autor:'', notes:'', credit_obligatori:'', rellevancia:'', capitol:'', durada_visualitzacio:0, origen_fons:'', estat_intern:'pendent', etiquetes:'', override_cobertura:'', override_nota:'', vincle_tasca:'', vincle_seccio_id:'', created_by: me };
   editingImg = true; render();
 }
 function obreImatge(img) { currentImg = JSON.parse(JSON.stringify(img)); editingImg = false; render(); }
@@ -1136,6 +1138,7 @@ async function desaImatge(img) {
     notes: img.notes || '', credit_obligatori: img.credit_obligatori || '',
     rellevancia: img.rellevancia || '', capitol: img.capitol || '',
     durada_visualitzacio: Number(img.durada_visualitzacio) || 0,
+    origen_fons: img.origen_fons || '',
     estat_intern: img.estat_intern || 'pendent', etiquetes: img.etiquetes || '',
     override_cobertura: img.override_cobertura || '', override_nota: img.override_nota || '',
     vincle_tasca: img.vincle_tasca || '', vincle_seccio_id: img.vincle_seccio_id || '',
@@ -1198,6 +1201,7 @@ function normalitzaCapcalera(h) {
   if (/rellev/.test(n)) return 'rellevancia';
   if (/capitol|capítulo|chapter/.test(n)) return 'capitol';
   if (/durada|duraci/.test(n)) return 'durada_visualitzacio';
+  if (/origen_fons|origen|fons|fondo|procedencia_fons/.test(n)) return 'origen_fons';
   return null;
 }
 async function importaImatges(text) {
@@ -1206,18 +1210,14 @@ async function importaImatges(text) {
   if (files.length < 2) { alert('Cal capçalera + almenys una fila.'); return; }
   const capcalera = files[0].map(normalitzaCapcalera);
   if (!capcalera.includes('titol')) { alert('No s\'ha detectat la columna "títol". Revisa la capçalera.'); return; }
-   const dades = [];
+  const dades = [];
   for (let i = 1; i < files.length; i++) {
     const obj = { estat_intern: 'pendent', created_by: me, updated_by: me, updated_at: new Date().toISOString() };
     files[i].forEach((v, j) => {
       const k = capcalera[j];
       if (!k) return;
-      if (k === 'durada_visualitzacio') {
-        const num = Number(v);
-        obj[k] = isNaN(num) ? 0 : num;
-      } else {
-        obj[k] = v;
-      }
+      if (k === 'durada_visualitzacio') { const num = Number(v); obj[k] = isNaN(num) ? 0 : num; }
+      else obj[k] = v;
     });
     if (obj.titol && obj.titol.trim()) dades.push(obj);
   }
@@ -1348,6 +1348,7 @@ function textInformeImatge(img) {
   if (img.any_data) camps.push('Any/Data: ' + img.any_data);
   if (img.tipus) camps.push('Tipus: ' + img.tipus);
   if (img.link_procedencia) camps.push('Enllaç de procedència: ' + img.link_procedencia);
+  if (img.origen_fons) camps.push('Origen del fons: ' + img.origen_fons);
   if (img.estat_intern) camps.push('Estat intern: ' + img.estat_intern);
   const diag = [];
   diag.push('Classificació: ' + c.text);
@@ -1361,7 +1362,7 @@ function textInformeImatge(img) {
   const compliment = [];
   compliment.push('Llicència: ' + (img.cobertura || '(no informat)'));
   compliment.push('Crèdit obligatori: ' + (img.credit_obligatori || '(no informat)'));
-  compliment.push('Resultat: ' + (cl.ok ? '✅ COMPLEIX' : '❌ NO COMPLEIX'));
+  compliment.push('Resultat: ' + (cl.investigant ? '⏳ PENDENT D\'INVESTIGAR' : (cl.ok ? '✅ COMPLEIX' : '❌ NO COMPLEIX')));
   if (cl.errors.length) compliment.push('Errors:\n' + cl.errors.map(e => '  - ' + e).join('\n'));
   if (cl.avisos.length) compliment.push('Avisos:\n' + cl.avisos.map(a => '  - ' + a).join('\n'));
   return [linia, 'BADALONA COMUNICACIÓ · CONTROL DE DRETS D\'IMATGE','Informe de cadena de drets (Chain of Title)', linia,'Data: ' + avui.toLocaleDateString('ca-ES', { day: '2-digit', month: 'long', year: 'numeric' }),'','DADES DE LA IMATGE', liniaCurta].concat(camps).concat(['','COBERTURA DECLARADA', liniaCurta, img.cobertura || '(no informat)','','DIAGNÒSTIC', liniaCurta]).concat(diag).concat(['','COMPLIMENT LEGAL', liniaCurta]).concat(compliment).join('\n');
@@ -1374,28 +1375,30 @@ function textInformeImatgesAgregat(imgs) {
   const cnt = { ok:0, warn:0, ko:0, unk:0 };
   imgs.forEach(i => { const c = classificaCobertura(i.cobertura, i.override_cobertura).estat; cnt[c] = (cnt[c]||0)+1; });
   const procedencia = {};
-  imgs.forEach(i => { const arxiu = extrauArxiu(i.link_procedencia, i.cobertura) || 'Desconegut'; procedencia[arxiu] = (procedencia[arxiu] || 0) + 1; });
+  imgs.forEach(i => { const arxiu = extrauArxiu(i.link_procedencia, i.cobertura) || i.origen_fons || 'Desconegut'; procedencia[arxiu] = (procedencia[arxiu] || 0) + 1; });
   const procedenciaOrdenada = Object.entries(procedencia).sort((a, b) => b[1] - a[1]);
-  const okLegal = imgs.filter(i => complimentLegal(i).ok).length;
-  const koLegal = imgs.length - okLegal;
+  const okLegal = imgs.filter(i => { const cl = complimentLegal(i); return cl.ok && !cl.investigant; }).length;
+  const koLegal = imgs.filter(i => { const cl = complimentLegal(i); return !cl.ok && !cl.investigant; }).length;
+  const invLegal = imgs.filter(i => complimentLegal(i).investigant).length;
   const out = [];
   out.push(linia, 'BADALONA COMUNICACIÓ · INFORME AGREGAT DE DRETS D\'IMATGE', 'Documental "Darrere el drac"', linia, 'Data: ' + avui.toLocaleDateString('ca-ES', { day: '2-digit', month: 'long', year: 'numeric' }), 'Total imatges: ' + imgs.length, '');
   out.push('ÍNDEX', liniaCurta, '  1. Resum executiu', '  2. Guia de cobertures legals', '  3. Resum per procedència', '  4. Llistat de referències', '  5. Fitxes individuals (' + imgs.length + ')', '');
-  out.push('1. RESUM EXECUTIU', liniaCurta, '🟢 Lliures: ' + cnt.ok, '🟡 CC (atribució): ' + cnt.warn, '🔴 Protegides: ' + cnt.ko, '⚪ Desconegudes: ' + cnt.unk, '✅ Compleixen legalment: ' + okLegal, '❌ No compleixen: ' + koLegal, '');
-  if (koLegal > 0) {
-    out.push('FITXES QUE NO COMPLEIXEN', liniaCurta);
+  out.push('1. RESUM EXECUTIU', liniaCurta, '🟢 Lliures: ' + cnt.ok, '🟡 CC (atribució): ' + cnt.warn, '🔴 Protegides: ' + cnt.ko, '⚪ Desconegudes: ' + cnt.unk, '✅ Compleixen legalment: ' + okLegal, '⏳ Pendents d\'investigar: ' + invLegal, '❌ No compleixen: ' + koLegal, '');
+  if (koLegal > 0 || invLegal > 0) {
+    out.push('FITXES QUE NO COMPLEIXEN O ESTAN PENDENTS', liniaCurta);
     imgs.forEach((img, i) => {
       const cl = complimentLegal(img);
-      if (!cl.ok) out.push('  [' + (i+1) + '] ' + (img.titol || '(sense títol)') + ' → ' + cl.errors.join(' · '));
+      if (cl.investigant) out.push('  [' + (i+1) + '] ⏳ ' + (img.titol || '(sense títol)') + ' → Pendent d\'investigar');
+      else if (!cl.ok) out.push('  [' + (i+1) + '] ❌ ' + (img.titol || '(sense títol)') + ' → ' + cl.errors.join(' · '));
     });
     out.push('');
   }
   out.push('2. GUIA DE COBERTURES LEGALS', liniaCurta, ANNEX_COBERTURES, '');
-  out.push('3. RESUM PER PROCEDÈNCIA', liniaCurta, 'Distribució de les imatges segons el seu arxiu d\'origen:', '');
+  out.push('3. RESUM PER PROCEDÈNCIA', liniaCurta, 'Distribució de les imatges segons el seu arxiu d\'origen o origen del fons:', '');
   procedenciaOrdenada.forEach(([arxiu, n]) => { const punts = '.'.repeat(Math.max(2, 40 - arxiu.length)); out.push('  ' + arxiu + ' ' + punts + ' ' + n + (n === 1 ? ' imatge' : ' imatges')); });
   out.push('', '  Total: ' + imgs.length + ' imatges.');
   out.push('', '4. LLISTAT DE REFERÈNCIES', liniaCurta);
-  imgs.forEach((img, i) => { const c = classificaCobertura(img.cobertura, img.override_cobertura); const cl = complimentLegal(img); out.push(String(i+1).padStart(3,' ') + '. ' + (img.titol || '—') + '  (' + (img.any_data || '—') + ')  →  ' + c.short + (cl.ok ? ' ✅' : ' ❌')); });
+  imgs.forEach((img, i) => { const c = classificaCobertura(img.cobertura, img.override_cobertura); const cl = complimentLegal(img); const marca = cl.investigant ? '⏳' : (cl.ok ? '✅' : '❌'); out.push(String(i+1).padStart(3,' ') + '. ' + (img.titol || '—') + '  (' + (img.any_data || '—') + ')  →  ' + c.short + ' ' + marca + (img.origen_fons ? '  [' + img.origen_fons + ']' : '')); });
   out.push('', '5. FITXES INDIVIDUALS', liniaCurta);
   imgs.forEach((img, i) => { out.push('', '╔══════════════════════════════════════════════════════════╗', '║ FITXA ' + String(i+1).padStart(3,'0') + ' / ' + String(imgs.length).padStart(3,'0'), '╚══════════════════════════════════════════════════════════╝', textInformeImatge(img)); });
   return out.join('\n');
@@ -1409,16 +1412,17 @@ function textResumImatges(imgs) {
   const perEstat = {};
   imgs.forEach(i => { const c = classificaCobertura(i.cobertura, i.override_cobertura).estat; cnt[c] = (cnt[c]||0)+1; const e = i.estat_intern || 'pendent'; perEstat[e] = (perEstat[e]||0)+1; });
   const procedencia = {};
-  imgs.forEach(i => { const arxiu = extrauArxiu(i.link_procedencia, i.cobertura) || 'Desconegut'; procedencia[arxiu] = (procedencia[arxiu] || 0) + 1; });
+  imgs.forEach(i => { const arxiu = extrauArxiu(i.link_procedencia, i.cobertura) || i.origen_fons || 'Desconegut'; procedencia[arxiu] = (procedencia[arxiu] || 0) + 1; });
   const procedenciaOrdenada = Object.entries(procedencia).sort((a, b) => b[1] - a[1]);
-  const okLegal = imgs.filter(i => complimentLegal(i).ok).length;
-  const koLegal = imgs.length - okLegal;
-  const out = [linia, 'BADALONA COMUNICACIÓ · RESUM DE DRETS D\'IMATGE','Documental "Darrere el drac"', linia,'Data: ' + avui.toLocaleDateString('ca-ES'),'Total imatges: ' + imgs.length, '','RESUM PER COBERTURA', liniaCurta,'🟢 Lliures: ' + cnt.ok,'🟡 CC: ' + cnt.warn,'🔴 Protegides: ' + cnt.ko,'⚪ Desconegudes: ' + cnt.unk, '','COMPLIMENT LEGAL', liniaCurta,'✅ Compleixen: ' + okLegal, '❌ No compleixen: ' + koLegal, '','RESUM PER ESTAT INTERN', liniaCurta];
+  const okLegal = imgs.filter(i => { const cl = complimentLegal(i); return cl.ok && !cl.investigant; }).length;
+  const koLegal = imgs.filter(i => { const cl = complimentLegal(i); return !cl.ok && !cl.investigant; }).length;
+  const invLegal = imgs.filter(i => complimentLegal(i).investigant).length;
+  const out = [linia, 'BADALONA COMUNICACIÓ · RESUM DE DRETS D\'IMATGE','Documental "Darrere el drac"', linia,'Data: ' + avui.toLocaleDateString('ca-ES'),'Total imatges: ' + imgs.length, '','RESUM PER COBERTURA', liniaCurta,'🟢 Lliures: ' + cnt.ok,'🟡 CC: ' + cnt.warn,'🔴 Protegides: ' + cnt.ko,'⚪ Desconegudes: ' + cnt.unk, '','COMPLIMENT LEGAL', liniaCurta,'✅ Compleixen: ' + okLegal, '⏳ Pendents d\'investigar: ' + invLegal, '❌ No compleixen: ' + koLegal, '','RESUM PER ESTAT INTERN', liniaCurta];
   ESTATS_INTERNS.forEach(([k,l]) => { if (perEstat[k]) out.push(l + ': ' + perEstat[k]); });
   out.push('', 'RESUM PER PROCEDÈNCIA', liniaCurta);
   procedenciaOrdenada.forEach(([arxiu, n]) => { const punts = '.'.repeat(Math.max(2, 40 - arxiu.length)); out.push('  ' + arxiu + ' ' + punts + ' ' + n + (n === 1 ? ' imatge' : ' imatges')); });
   out.push('', 'LLISTAT', liniaCurta);
-  imgs.forEach((img,i) => { const c = classificaCobertura(img.cobertura, img.override_cobertura); const cl = complimentLegal(img); out.push(String(i+1).padStart(3,' ') + '. ' + (img.titol || '—') + '  (' + (img.any_data || '—') + ')  →  ' + c.short + (cl.ok ? ' ✅' : ' ❌')); });
+  imgs.forEach((img,i) => { const c = classificaCobertura(img.cobertura, img.override_cobertura); const cl = complimentLegal(img); const marca = cl.investigant ? '⏳' : (cl.ok ? '✅' : '❌'); out.push(String(i+1).padStart(3,' ') + '. ' + (img.titol || '—') + '  (' + (img.any_data || '—') + ')  →  ' + c.short + ' ' + marca); });
   out.push('', ANNEX_COBERTURES);
   return out.join('\n');
 }
@@ -1435,14 +1439,16 @@ function renderImatges() {
       ])
     ]));
     card.append(el('div', { class: 'badge', style: 'margin-top:6px', textContent: 'Catàleg de drets d\'imatge. Total: ' + imageRights.length + ' registres.' }));
-    const okLegalTotal = imageRights.filter(i => complimentLegal(i).ok).length;
-    const koLegalTotal = imageRights.length - okLegalTotal;
+    const okLegalTotal = imageRights.filter(i => { const cl = complimentLegal(i); return cl.ok && !cl.investigant; }).length;
+    const koLegalTotal = imageRights.filter(i => { const cl = complimentLegal(i); return !cl.ok && !cl.investigant; }).length;
+    const invTotal = imageRights.filter(i => complimentLegal(i).investigant).length;
     card.append(el('div', { class: 'row', style: 'margin-top:8px;font-size:13px' }, [
       el('span', { style: 'color:var(--ok);font-weight:600', textContent: '✅ ' + okLegalTotal + ' compleixen' }),
+      el('span', { style: 'color:var(--warn);font-weight:600', textContent: '⏳ ' + invTotal + ' investigant' }),
       el('span', { style: 'color:var(--err);font-weight:600', textContent: '❌ ' + koLegalTotal + ' no compleixen' })
     ]));
     const filtres = el('div', { class: 'img-toolbar' });
-    const inp = el('input', { type: 'text', value: filtreImg.text, placeholder: '🔍 Cercar per títol, descripció, autor, notes, etiquetes...' });
+    const inp = el('input', { type: 'text', value: filtreImg.text, placeholder: '🔍 Cercar per títol, descripció, autor, notes, origen del fons...' });
     inp.addEventListener('input', () => { filtreImg.text = inp.value; render(); });
     filtres.append(inp);
     filtres.append(el('select', { onchange: e => { filtreImg.cobertura = e.target.value; render(); } }, [
@@ -1457,6 +1463,7 @@ function renderImatges() {
     filtres.append(el('select', { onchange: e => { filtreImg.compliment = e.target.value; render(); } }, [
       el('option', { value: 'tots', textContent: 'Compliment: tots', selected: filtreImg.compliment === 'tots' }),
       el('option', { value: 'ok', textContent: '✅ Només compleixen', selected: filtreImg.compliment === 'ok' }),
+      el('option', { value: 'inv', textContent: '⏳ Només investigant', selected: filtreImg.compliment === 'inv' }),
       el('option', { value: 'ko', textContent: '❌ Només no compleixen', selected: filtreImg.compliment === 'ko' })
     ]));
     card.append(filtres);
@@ -1473,8 +1480,10 @@ function renderImatges() {
       btns.append(el('button', { class: 'btn p s', textContent: '✅ Aprovar seleccionades', onclick: async () => {
         const sel = imatgesSeleccionades();
         if (!sel.length) { alert('No hi ha cap imatge seleccionada.'); return; }
-        const ko = sel.filter(i => !complimentLegal(i).ok);
+        const ko = sel.filter(i => { const cl = complimentLegal(i); return !cl.ok && !cl.investigant; });
         if (ko.length) { alert('No es poden aprovar ' + ko.length + ' imatges que no compleixen:\n\n' + ko.map(i => '· ' + (i.titol || '(sense títol)')).join('\n')); return; }
+        const inv = sel.filter(i => complimentLegal(i).investigant);
+        if (inv.length) { alert('No es poden aprovar ' + inv.length + ' imatges pendents d\'investigar:\n\n' + inv.map(i => '· ' + (i.titol || '(sense títol)')).join('\n') + '\n\nCanvia l\'estat intern a "Revisada" o resol la llicència abans d\'aprovar.'); return; }
         if (!confirm('Aprovar ' + sel.length + ' imatges? Aquestes sortiran als crèdits.')) return;
         for (const img of sel) { const r = await db.from('image_rights').update({ estat_intern: 'aprovada', updated_at: new Date().toISOString() }).eq('id', img.id); if (!r.error) img.estat_intern = 'aprovada'; }
         alert('✅ ' + sel.length + ' imatges aprovades.'); seleccioImg.clear(); render();
@@ -1503,9 +1512,12 @@ function renderImatges() {
         head.append(el('div', { class: 'img-title', style: 'flex:1', textContent: img.titol || '(sense títol)' }));
         body.append(head);
         body.append(el('div', { class: 'img-meta', textContent: [img.any_data, img.tipus, img.autor].filter(Boolean).join(' · ') }));
+        if (img.origen_fons) body.append(el('div', { class: 'img-meta', style: 'font-style:italic;color:var(--ac)', textContent: '📁 ' + img.origen_fons }));
         const pills = el('div', { style: 'display:flex;flex-wrap:wrap;gap:4px;margin-top:4px' });
         pills.append(el('span', { class: 'img-pill ' + c.estat, textContent: c.short }));
-        pills.append(el('span', { class: 'img-pill ' + (cl.ok ? 'legal-ok' : 'legal-ko'), textContent: cl.ok ? '✅ Legal' : '❌ No legal' }));
+        const legalPillClass = cl.investigant ? 'legal-inv' : (cl.ok ? 'legal-ok' : 'legal-ko');
+        const legalPillText = cl.investigant ? '⏳ Investigant' : (cl.ok ? '✅ Legal' : '❌ No legal');
+        pills.append(el('span', { class: 'img-pill ' + legalPillClass, textContent: legalPillText }));
         body.append(pills);
         const acts = el('div', { class: 'img-actions' });
         if (img.link_procedencia) acts.append(el('button', { class: 'btn', textContent: '🔗 Obrir', onclick: () => window.open(img.link_procedencia, '_blank') }));
@@ -1554,6 +1566,7 @@ function renderImatges() {
   form.append(camp('Capítol (opcional)', 'capitol'));
   form.append(camp('Rellevància (opcional)', 'rellevancia'));
   form.append(camp('Durada visualització (s)', 'durada_visualitzacio', 'number'));
+  form.append(camp('Origen del fons (opcional)', 'origen_fons', 'text', 'Arxiu familiar Li Chang, Cessió de..., Fons municipal...'));
   const lT = el('label'); lT.append(el('span', { textContent: 'Tipus' }));
   const selT = el('select', { onchange: e => img.tipus = e.target.value }, [el('option', { value: '', textContent: '—' })].concat(TIPUS_IMG.map(t => el('option', { value: t, textContent: t, selected: img.tipus === t }))));
   selT.disabled = !editingImg; lT.append(selT); form.append(lT);
@@ -1565,7 +1578,7 @@ function renderImatges() {
   taD.disabled = !editingImg; taD.addEventListener('input', () => img.descripcio = taD.value);
   lD.append(taD); form.append(lD);
   const lC = el('label', { class: 'full' }); lC.append(el('span', { textContent: 'Cobertura (text original)' }));
-  const taC = el('textarea', { value: img.cobertura || '', placeholder: 'Domini Públic (Public Domain), CC BY-SA 4.0, Tots els drets reservats...' });
+  const taC = el('textarea', { value: img.cobertura || '', placeholder: 'Domini Públic (Public Domain), CC BY-SA 4.0, Tots els drets reservats, Pendent d\'investigar...' });
   taC.disabled = !editingImg; taC.addEventListener('input', () => { img.cobertura = taC.value; });
   lC.append(taC); form.append(lC);
   const lCr = el('label', { class: 'full' }); lCr.append(el('span', { textContent: 'Crèdit obligatori (text exacte que ha d\'aparèixer als crèdits)' }));
@@ -1602,7 +1615,9 @@ function renderImatges() {
   card.append(diag);
   const diagLegal = el('div', { class: 'mr-diag', style: 'margin-top:14px' });
   diagLegal.append(el('h4', { textContent: 'Compliment legal' }));
-  diagLegal.append(el('p', { style: 'font-size:16px;font-weight:700;color:' + (cl.ok ? 'var(--ok)' : 'var(--err)'), textContent: cl.ok ? '✅ COMPLEIX' : '❌ NO COMPLEIX' }));
+  const resText = cl.investigant ? '⏳ PENDENT D\'INVESTIGAR' : (cl.ok ? '✅ COMPLEIX' : '❌ NO COMPLEIX');
+  const resColor = cl.investigant ? 'var(--warn)' : (cl.ok ? 'var(--ok)' : 'var(--err)');
+  diagLegal.append(el('p', { style: 'font-size:16px;font-weight:700;color:' + resColor, textContent: resText }));
   if (cl.errors.length) diagLegal.append(el('p', { style: 'color:var(--err);white-space:pre-wrap', textContent: 'Errors:\n' + cl.errors.map(e => '  - ' + e).join('\n') }));
   if (cl.avisos.length) diagLegal.append(el('p', { style: 'color:var(--warn);white-space:pre-wrap', textContent: 'Avisos:\n' + cl.avisos.map(a => '  - ' + a).join('\n') }));
   card.append(diagLegal);
@@ -1621,9 +1636,9 @@ function mostraImportador() {
   const app = $('#app');
   const card = el('div', { class: 'card' });
   card.append(el('h2', { textContent: '📥 Importar imatges des d\'Excel' }));
-  card.append(el('div', { class: 'badge', textContent: 'Enganxa aquí les files del teu Excel (amb la fila de capçalera). Detecto automàticament les columnes: títol, descripció, link procedència, cobertura/llicència, crèdit obligatori, any, tipus, autor, notes, etiquetes, capítol, rellevància, durada.' }));
+  card.append(el('div', { class: 'badge', textContent: 'Enganxa aquí les files del teu Excel (amb la fila de capçalera). Detecto automàticament les columnes: títol, descripció, link procedència, cobertura/llicència, crèdit obligatori, any, tipus, autor, notes, etiquetes, capítol, rellevància, durada, origen del fons.' }));
   const box = el('div', { class: 'img-import' });
-  const ta = el('textarea', { placeholder: 'TITOL\tDESCRIPCIO\tLINK\tLLICENCIA\tCREDIT\tAUTOR\tANY\nChing Ling Foo\tPostal promocional...\thttps://...\tDomini Públic\tChing Ling Foo, 1898...\tDesconegut\t1898' });
+  const ta = el('textarea', { placeholder: 'TITOL\tDESCRIPCIO\tLINK\tLLICENCIA\tCREDIT\tAUTOR\tANY\tTIPUS\tETIQUETES\tCAPITOL\tRELLEVANCIA\tDURADA\tORIGEN_FONS\tNOTES\nChing Ling Foo\tPostal promocional...\thttps://...\tDomini Públic\t"Ching Ling Foo, 1898..."\tDesconegut\t1898\tfoto\tMag, Il·lusionisme...\t\talta\t\tArxiu familiar Li Chang\t' });
   box.append(ta); card.append(box);
   const row = el('div', { class: 'row' });
   row.append(el('button', { class: 'btn p', textContent: '📥 Importar', onclick: async () => { await importaImatges(ta.value); } }));
@@ -1633,7 +1648,7 @@ function mostraImportador() {
 }
 
 /* ============================================================
-   FOTOGRAFIES — nou mòdul independent
+   FOTOGRAFIES — mòdul independent
    ============================================================ */
 function filtraFotografies() {
   const q = (filtreFoto.text || '').toLowerCase().trim();
@@ -1645,18 +1660,19 @@ function filtraFotografies() {
     if (filtreFoto.estat !== 'tots' && (img.estat_intern || 'pendent') !== filtreFoto.estat) return false;
     if (filtreFoto.tipus !== 'tots' && (img.tipus || '') !== filtreFoto.tipus) return false;
     if (filtreFoto.compliment !== 'tots') {
-      const ok = complimentLegal(img).ok;
-      if (filtreFoto.compliment === 'ok' && !ok) return false;
-      if (filtreFoto.compliment === 'ko' && ok) return false;
+      const cl = complimentLegal(img);
+      if (filtreFoto.compliment === 'ok' && !cl.ok) return false;
+      if (filtreFoto.compliment === 'ko' && cl.ok) return false;
+      if (filtreFoto.compliment === 'inv' && !cl.investigant) return false;
     }
     if (!q) return true;
-    const blob = [img.titol, img.descripcio, img.autor, img.etiquetes, img.notes, img.link_procedencia, img.cobertura, img.capitol, img.rellevancia].filter(Boolean).join(' ').toLowerCase();
+    const blob = [img.titol, img.descripcio, img.autor, img.etiquetes, img.notes, img.link_procedencia, img.cobertura, img.capitol, img.rellevancia, img.origen_fons].filter(Boolean).join(' ').toLowerCase();
     return blob.includes(q);
   });
 }
 function fotografiesSeleccionades() { return fotografies.filter(x => seleccioFoto.has(x.id)); }
 function novaFoto() {
-  currentFoto = { id:null, titol:'', descripcio:'', link_procedencia:'', cobertura:'', any_data:'', tipus:'', autor:'', notes:'', credit_obligatori:'', rellevancia:'', capitol:'', durada_visualitzacio:0, estat_intern:'pendent', etiquetes:'', override_cobertura:'', override_nota:'', vincle_tasca:'', vincle_seccio_id:'', created_by: me };
+  currentFoto = { id:null, titol:'', descripcio:'', link_procedencia:'', cobertura:'', any_data:'', tipus:'', autor:'', notes:'', credit_obligatori:'', rellevancia:'', capitol:'', durada_visualitzacio:0, origen_fons:'', estat_intern:'pendent', etiquetes:'', override_cobertura:'', override_nota:'', vincle_tasca:'', vincle_seccio_id:'', created_by: me };
   editingFoto = true; render();
 }
 function obreFoto(img) { currentFoto = JSON.parse(JSON.stringify(img)); editingFoto = false; render(); }
@@ -1675,6 +1691,7 @@ async function desaFoto(img) {
     notes: img.notes || '', credit_obligatori: img.credit_obligatori || '',
     rellevancia: img.rellevancia || '', capitol: img.capitol || '',
     durada_visualitzacio: Number(img.durada_visualitzacio) || 0,
+    origen_fons: img.origen_fons || '',
     estat_intern: img.estat_intern || 'pendent', etiquetes: img.etiquetes || '',
     override_cobertura: img.override_cobertura || '', override_nota: img.override_nota || '',
     vincle_tasca: img.vincle_tasca || '', vincle_seccio_id: img.vincle_seccio_id || '',
@@ -1711,7 +1728,12 @@ async function importaFotografies(text) {
   const dades = [];
   for (let i = 1; i < files.length; i++) {
     const obj = { estat_intern: 'pendent', created_by: me, updated_by: me, updated_at: new Date().toISOString() };
-    files[i].forEach((v, j) => { const k = capcalera[j]; if (k) obj[k] = v; });
+    files[i].forEach((v, j) => {
+      const k = capcalera[j];
+      if (!k) return;
+      if (k === 'durada_visualitzacio') { const num = Number(v); obj[k] = isNaN(num) ? 0 : num; }
+      else obj[k] = v;
+    });
     if (obj.titol && obj.titol.trim()) dades.push(obj);
   }
   if (!dades.length) { alert('Cap fila vàlida.'); return; }
@@ -1736,6 +1758,7 @@ function textInformeFoto(img) {
   if (img.any_data) camps.push('Any/Data: ' + img.any_data);
   if (img.tipus) camps.push('Tipus: ' + img.tipus);
   if (img.link_procedencia) camps.push('Enllaç de procedència: ' + img.link_procedencia);
+  if (img.origen_fons) camps.push('Origen del fons: ' + img.origen_fons);
   if (img.estat_intern) camps.push('Estat intern: ' + img.estat_intern);
   if (img.capitol) camps.push('Capítol: ' + img.capitol);
   if (img.rellevancia) camps.push('Rellevància: ' + img.rellevancia);
@@ -1749,7 +1772,7 @@ function textInformeFoto(img) {
   const compliment = [];
   compliment.push('Llicència: ' + (img.cobertura || '(no informat)'));
   compliment.push('Crèdit obligatori: ' + (img.credit_obligatori || '(no informat)'));
-  compliment.push('Resultat: ' + (cl.ok ? '✅ COMPLEIX' : '❌ NO COMPLEIX'));
+  compliment.push('Resultat: ' + (cl.investigant ? '⏳ PENDENT D\'INVESTIGAR' : (cl.ok ? '✅ COMPLEIX' : '❌ NO COMPLEIX')));
   if (cl.errors.length) compliment.push('Errors:\n' + cl.errors.map(e => '  - ' + e).join('\n'));
   if (cl.avisos.length) compliment.push('Avisos:\n' + cl.avisos.map(a => '  - ' + a).join('\n'));
   return [linia, 'BADALONA COMUNICACIÓ · FITXA DE FOTOGRAFIA','Documental "Darrere el drac"', linia,'Data: ' + avui.toLocaleDateString('ca-ES', { day: '2-digit', month: 'long', year: 'numeric' }),'','DADES DE LA FOTOGRAFIA', liniaCurta].concat(camps).concat(['','COBERTURA DECLARADA', liniaCurta, img.cobertura || '(no informat)','','DIAGNÒSTIC', liniaCurta]).concat(diag).concat(['','COMPLIMENT LEGAL', liniaCurta]).concat(compliment).join('\n');
@@ -1762,28 +1785,30 @@ function textInformeFotografiesAgregat(imgs) {
   const cnt = { ok:0, warn:0, ko:0, unk:0 };
   imgs.forEach(i => { const c = classificaCobertura(i.cobertura, i.override_cobertura).estat; cnt[c] = (cnt[c]||0)+1; });
   const procedencia = {};
-  imgs.forEach(i => { const arxiu = extrauArxiu(i.link_procedencia, i.cobertura) || 'Desconegut'; procedencia[arxiu] = (procedencia[arxiu] || 0) + 1; });
+  imgs.forEach(i => { const arxiu = extrauArxiu(i.link_procedencia, i.cobertura) || i.origen_fons || 'Desconegut'; procedencia[arxiu] = (procedencia[arxiu] || 0) + 1; });
   const procedenciaOrdenada = Object.entries(procedencia).sort((a, b) => b[1] - a[1]);
-  const okLegal = imgs.filter(i => complimentLegal(i).ok).length;
-  const koLegal = imgs.length - okLegal;
+  const okLegal = imgs.filter(i => { const cl = complimentLegal(i); return cl.ok && !cl.investigant; }).length;
+  const koLegal = imgs.filter(i => { const cl = complimentLegal(i); return !cl.ok && !cl.investigant; }).length;
+  const invLegal = imgs.filter(i => complimentLegal(i).investigant).length;
   const out = [];
   out.push(linia, 'BADALONA COMUNICACIÓ · INFORME AGREGAT DE FOTOGRAFIES', 'Documental "Darrere el drac"', linia, 'Data: ' + avui.toLocaleDateString('ca-ES', { day: '2-digit', month: 'long', year: 'numeric' }), 'Total fotografies: ' + imgs.length, '');
   out.push('ÍNDEX', liniaCurta, '  1. Resum executiu', '  2. Guia de cobertures legals', '  3. Resum per procedència', '  4. Llistat de referències', '  5. Fitxes individuals (' + imgs.length + ')', '');
-  out.push('1. RESUM EXECUTIU', liniaCurta, '🟢 Lliures: ' + cnt.ok, '🟡 CC (atribució): ' + cnt.warn, '🔴 Protegides: ' + cnt.ko, '⚪ Desconegudes: ' + cnt.unk, '✅ Compleixen legalment: ' + okLegal, '❌ No compleixen: ' + koLegal, '');
-  if (koLegal > 0) {
-    out.push('FITXES QUE NO COMPLEIXEN', liniaCurta);
+  out.push('1. RESUM EXECUTIU', liniaCurta, '🟢 Lliures: ' + cnt.ok, '🟡 CC (atribució): ' + cnt.warn, '🔴 Protegides: ' + cnt.ko, '⚪ Desconegudes: ' + cnt.unk, '✅ Compleixen legalment: ' + okLegal, '⏳ Pendents d\'investigar: ' + invLegal, '❌ No compleixen: ' + koLegal, '');
+  if (koLegal > 0 || invLegal > 0) {
+    out.push('FITXES QUE NO COMPLEIXEN O ESTAN PENDENTS', liniaCurta);
     imgs.forEach((img, i) => {
       const cl = complimentLegal(img);
-      if (!cl.ok) out.push('  [' + (i+1) + '] ' + (img.titol || '(sense títol)') + ' → ' + cl.errors.join(' · '));
+      if (cl.investigant) out.push('  [' + (i+1) + '] ⏳ ' + (img.titol || '(sense títol)') + ' → Pendent d\'investigar');
+      else if (!cl.ok) out.push('  [' + (i+1) + '] ❌ ' + (img.titol || '(sense títol)') + ' → ' + cl.errors.join(' · '));
     });
     out.push('');
   }
   out.push('2. GUIA DE COBERTURES LEGALS', liniaCurta, ANNEX_COBERTURES, '');
-  out.push('3. RESUM PER PROCEDÈNCIA', liniaCurta, 'Distribució de les fotografies segons el seu arxiu d\'origen:', '');
+  out.push('3. RESUM PER PROCEDÈNCIA', liniaCurta, 'Distribució de les fotografies segons el seu arxiu d\'origen o origen del fons:', '');
   procedenciaOrdenada.forEach(([arxiu, n]) => { const punts = '.'.repeat(Math.max(2, 40 - arxiu.length)); out.push('  ' + arxiu + ' ' + punts + ' ' + n + (n === 1 ? ' fotografia' : ' fotografies')); });
   out.push('', '  Total: ' + imgs.length + ' fotografies.');
   out.push('', '4. LLISTAT DE REFERÈNCIES', liniaCurta);
-  imgs.forEach((img, i) => { const c = classificaCobertura(img.cobertura, img.override_cobertura); const cl = complimentLegal(img); out.push(String(i+1).padStart(3,' ') + '. ' + (img.titol || '—') + '  (' + (img.any_data || '—') + ')  →  ' + c.short + (cl.ok ? ' ✅' : ' ❌')); });
+  imgs.forEach((img, i) => { const c = classificaCobertura(img.cobertura, img.override_cobertura); const cl = complimentLegal(img); const marca = cl.investigant ? '⏳' : (cl.ok ? '✅' : '❌'); out.push(String(i+1).padStart(3,' ') + '. ' + (img.titol || '—') + '  (' + (img.any_data || '—') + ')  →  ' + c.short + ' ' + marca + (img.origen_fons ? '  [' + img.origen_fons + ']' : '')); });
   out.push('', '5. FITXES INDIVIDUALS', liniaCurta);
   imgs.forEach((img, i) => { out.push('', '╔══════════════════════════════════════════════════════════╗', '║ FITXA ' + String(i+1).padStart(3,'0') + ' / ' + String(imgs.length).padStart(3,'0'), '╚══════════════════════════════════════════════════════════╝', textInformeFoto(img)); });
   return out.join('\n');
@@ -1797,16 +1822,17 @@ function textResumFotografies(imgs) {
   const perEstat = {};
   imgs.forEach(i => { const c = classificaCobertura(i.cobertura, i.override_cobertura).estat; cnt[c] = (cnt[c]||0)+1; const e = i.estat_intern || 'pendent'; perEstat[e] = (perEstat[e]||0)+1; });
   const procedencia = {};
-  imgs.forEach(i => { const arxiu = extrauArxiu(i.link_procedencia, i.cobertura) || 'Desconegut'; procedencia[arxiu] = (procedencia[arxiu] || 0) + 1; });
+  imgs.forEach(i => { const arxiu = extrauArxiu(i.link_procedencia, i.cobertura) || i.origen_fons || 'Desconegut'; procedencia[arxiu] = (procedencia[arxiu] || 0) + 1; });
   const procedenciaOrdenada = Object.entries(procedencia).sort((a, b) => b[1] - a[1]);
-  const okLegal = imgs.filter(i => complimentLegal(i).ok).length;
-  const koLegal = imgs.length - okLegal;
-  const out = [linia, 'BADALONA COMUNICACIÓ · RESUM DE FOTOGRAFIES','Documental "Darrere el drac"', linia,'Data: ' + avui.toLocaleDateString('ca-ES'),'Total fotografies: ' + imgs.length, '','RESUM PER COBERTURA', liniaCurta,'🟢 Lliures: ' + cnt.ok,'🟡 CC: ' + cnt.warn,'🔴 Protegides: ' + cnt.ko,'⚪ Desconegudes: ' + cnt.unk, '','COMPLIMENT LEGAL', liniaCurta,'✅ Compleixen: ' + okLegal, '❌ No compleixen: ' + koLegal, '','RESUM PER ESTAT INTERN', liniaCurta];
+  const okLegal = imgs.filter(i => { const cl = complimentLegal(i); return cl.ok && !cl.investigant; }).length;
+  const koLegal = imgs.filter(i => { const cl = complimentLegal(i); return !cl.ok && !cl.investigant; }).length;
+  const invLegal = imgs.filter(i => complimentLegal(i).investigant).length;
+  const out = [linia, 'BADALONA COMUNICACIÓ · RESUM DE FOTOGRAFIES','Documental "Darrere el drac"', linia,'Data: ' + avui.toLocaleDateString('ca-ES'),'Total fotografies: ' + imgs.length, '','RESUM PER COBERTURA', liniaCurta,'🟢 Lliures: ' + cnt.ok,'🟡 CC: ' + cnt.warn,'🔴 Protegides: ' + cnt.ko,'⚪ Desconegudes: ' + cnt.unk, '','COMPLIMENT LEGAL', liniaCurta,'✅ Compleixen: ' + okLegal, '⏳ Pendents d\'investigar: ' + invLegal, '❌ No compleixen: ' + koLegal, '','RESUM PER ESTAT INTERN', liniaCurta];
   ESTATS_INTERNS.forEach(([k,l]) => { if (perEstat[k]) out.push(l + ': ' + perEstat[k]); });
   out.push('', 'RESUM PER PROCEDÈNCIA', liniaCurta);
   procedenciaOrdenada.forEach(([arxiu, n]) => { const punts = '.'.repeat(Math.max(2, 40 - arxiu.length)); out.push('  ' + arxiu + ' ' + punts + ' ' + n + (n === 1 ? ' fotografia' : ' fotografies')); });
   out.push('', 'LLISTAT', liniaCurta);
-  imgs.forEach((img,i) => { const c = classificaCobertura(img.cobertura, img.override_cobertura); const cl = complimentLegal(img); out.push(String(i+1).padStart(3,' ') + '. ' + (img.titol || '—') + '  (' + (img.any_data || '—') + ')  →  ' + c.short + (cl.ok ? ' ✅' : ' ❌')); });
+  imgs.forEach((img,i) => { const c = classificaCobertura(img.cobertura, img.override_cobertura); const cl = complimentLegal(img); const marca = cl.investigant ? '⏳' : (cl.ok ? '✅' : '❌'); out.push(String(i+1).padStart(3,' ') + '. ' + (img.titol || '—') + '  (' + (img.any_data || '—') + ')  →  ' + c.short + ' ' + marca); });
   out.push('', ANNEX_COBERTURES);
   return out.join('\n');
 }
@@ -1823,14 +1849,16 @@ function renderFotografies() {
       ])
     ]));
     card.append(el('div', { class: 'badge', style: 'margin-top:6px', textContent: 'Fitxes tècniques de fotografies del documental. Total: ' + fotografies.length + ' registres.' }));
-    const okLegalTotal = fotografies.filter(i => complimentLegal(i).ok).length;
-    const koLegalTotal = fotografies.length - okLegalTotal;
+    const okLegalTotal = fotografies.filter(i => { const cl = complimentLegal(i); return cl.ok && !cl.investigant; }).length;
+    const koLegalTotal = fotografies.filter(i => { const cl = complimentLegal(i); return !cl.ok && !cl.investigant; }).length;
+    const invTotal = fotografies.filter(i => complimentLegal(i).investigant).length;
     card.append(el('div', { class: 'row', style: 'margin-top:8px;font-size:13px' }, [
       el('span', { style: 'color:var(--ok);font-weight:600', textContent: '✅ ' + okLegalTotal + ' compleixen' }),
+      el('span', { style: 'color:var(--warn);font-weight:600', textContent: '⏳ ' + invTotal + ' investigant' }),
       el('span', { style: 'color:var(--err);font-weight:600', textContent: '❌ ' + koLegalTotal + ' no compleixen' })
     ]));
     const filtres = el('div', { class: 'img-toolbar' });
-    const inp = el('input', { type: 'text', value: filtreFoto.text, placeholder: '🔍 Cercar per títol, descripció, autor, notes, etiquetes...' });
+    const inp = el('input', { type: 'text', value: filtreFoto.text, placeholder: '🔍 Cercar per títol, descripció, autor, notes, origen del fons...' });
     inp.addEventListener('input', () => { filtreFoto.text = inp.value; render(); });
     filtres.append(inp);
     filtres.append(el('select', { onchange: e => { filtreFoto.cobertura = e.target.value; render(); } }, [
@@ -1845,6 +1873,7 @@ function renderFotografies() {
     filtres.append(el('select', { onchange: e => { filtreFoto.compliment = e.target.value; render(); } }, [
       el('option', { value: 'tots', textContent: 'Compliment: tots', selected: filtreFoto.compliment === 'tots' }),
       el('option', { value: 'ok', textContent: '✅ Només compleixen', selected: filtreFoto.compliment === 'ok' }),
+      el('option', { value: 'inv', textContent: '⏳ Només investigant', selected: filtreFoto.compliment === 'inv' }),
       el('option', { value: 'ko', textContent: '❌ Només no compleixen', selected: filtreFoto.compliment === 'ko' })
     ]));
     card.append(filtres);
@@ -1861,8 +1890,10 @@ function renderFotografies() {
       btns.append(el('button', { class: 'btn p s', textContent: '✅ Aprovar seleccionades', onclick: async () => {
         const sel = fotografiesSeleccionades();
         if (!sel.length) { alert('No hi ha cap fotografia seleccionada.'); return; }
-        const ko = sel.filter(i => !complimentLegal(i).ok);
+        const ko = sel.filter(i => { const cl = complimentLegal(i); return !cl.ok && !cl.investigant; });
         if (ko.length) { alert('No es poden aprovar ' + ko.length + ' fotografies que no compleixen:\n\n' + ko.map(i => '· ' + (i.titol || '(sense títol)')).join('\n')); return; }
+        const inv = sel.filter(i => complimentLegal(i).investigant);
+        if (inv.length) { alert('No es poden aprovar ' + inv.length + ' fotografies pendents d\'investigar:\n\n' + inv.map(i => '· ' + (i.titol || '(sense títol)')).join('\n') + '\n\nCanvia l\'estat intern a "Revisada" o resol la llicència abans d\'aprovar.'); return; }
         if (!confirm('Aprovar ' + sel.length + ' fotografies?')) return;
         for (const img of sel) { const r = await db.from('fotografies').update({ estat_intern: 'aprovada', updated_at: new Date().toISOString() }).eq('id', img.id); if (!r.error) img.estat_intern = 'aprovada'; }
         alert('✅ ' + sel.length + ' fotografies aprovades.'); seleccioFoto.clear(); render();
@@ -1891,9 +1922,12 @@ function renderFotografies() {
         head.append(el('div', { class: 'img-title', style: 'flex:1', textContent: img.titol || '(sense títol)' }));
         body.append(head);
         body.append(el('div', { class: 'img-meta', textContent: [img.any_data, img.tipus, img.autor].filter(Boolean).join(' · ') }));
+        if (img.origen_fons) body.append(el('div', { class: 'img-meta', style: 'font-style:italic;color:var(--ac)', textContent: '📁 ' + img.origen_fons }));
         const pills = el('div', { style: 'display:flex;flex-wrap:wrap;gap:4px;margin-top:4px' });
         pills.append(el('span', { class: 'img-pill ' + c.estat, textContent: c.short }));
-        pills.append(el('span', { class: 'img-pill ' + (cl.ok ? 'legal-ok' : 'legal-ko'), textContent: cl.ok ? '✅ Legal' : '❌ No legal' }));
+        const legalPillClass = cl.investigant ? 'legal-inv' : (cl.ok ? 'legal-ok' : 'legal-ko');
+        const legalPillText = cl.investigant ? '⏳ Investigant' : (cl.ok ? '✅ Legal' : '❌ No legal');
+        pills.append(el('span', { class: 'img-pill ' + legalPillClass, textContent: legalPillText }));
         body.append(pills);
         const acts = el('div', { class: 'img-actions' });
         if (img.link_procedencia) acts.append(el('button', { class: 'btn', textContent: '🔗 Obrir', onclick: () => window.open(img.link_procedencia, '_blank') }));
@@ -1942,6 +1976,7 @@ function renderFotografies() {
   form.append(camp('Capítol', 'capitol', 'text', 'capítol 3'));
   form.append(camp('Rellevància', 'rellevancia', 'text', 'alta, mitjana, baixa...'));
   form.append(camp('Durada visualització (s)', 'durada_visualitzacio', 'number'));
+  form.append(camp('Origen del fons', 'origen_fons', 'text', 'Arxiu familiar Li Chang, Cessió de..., Fons municipal...'));
   const lT = el('label'); lT.append(el('span', { textContent: 'Tipus' }));
   const selT = el('select', { onchange: e => img.tipus = e.target.value }, [el('option', { value: '', textContent: '—' })].concat(TIPUS_IMG.map(t => el('option', { value: t, textContent: t, selected: img.tipus === t }))));
   selT.disabled = !editingFoto; lT.append(selT); form.append(lT);
@@ -1953,7 +1988,7 @@ function renderFotografies() {
   taD.disabled = !editingFoto; taD.addEventListener('input', () => img.descripcio = taD.value);
   lD.append(taD); form.append(lD);
   const lC = el('label', { class: 'full' }); lC.append(el('span', { textContent: 'Cobertura (text original)' }));
-  const taC = el('textarea', { value: img.cobertura || '', placeholder: 'Domini Públic (Public Domain), CC BY-SA 4.0, Tots els drets reservats...' });
+  const taC = el('textarea', { value: img.cobertura || '', placeholder: 'Domini Públic (Public Domain), CC BY-SA 4.0, Tots els drets reservats, Pendent d\'investigar...' });
   taC.disabled = !editingFoto; taC.addEventListener('input', () => { img.cobertura = taC.value; });
   lC.append(taC); form.append(lC);
   const lCr = el('label', { class: 'full' }); lCr.append(el('span', { textContent: 'Crèdit obligatori (text exacte que ha d\'aparèixer als crèdits)' }));
@@ -1990,7 +2025,9 @@ function renderFotografies() {
   card.append(diag);
   const diagLegal = el('div', { class: 'mr-diag', style: 'margin-top:14px' });
   diagLegal.append(el('h4', { textContent: 'Compliment legal' }));
-  diagLegal.append(el('p', { style: 'font-size:16px;font-weight:700;color:' + (cl.ok ? 'var(--ok)' : 'var(--err)'), textContent: cl.ok ? '✅ COMPLEIX' : '❌ NO COMPLEIX' }));
+  const resText = cl.investigant ? '⏳ PENDENT D\'INVESTIGAR' : (cl.ok ? '✅ COMPLEIX' : '❌ NO COMPLEIX');
+  const resColor = cl.investigant ? 'var(--warn)' : (cl.ok ? 'var(--ok)' : 'var(--err)');
+  diagLegal.append(el('p', { style: 'font-size:16px;font-weight:700;color:' + resColor, textContent: resText }));
   if (cl.errors.length) diagLegal.append(el('p', { style: 'color:var(--err);white-space:pre-wrap', textContent: 'Errors:\n' + cl.errors.map(e => '  - ' + e).join('\n') }));
   if (cl.avisos.length) diagLegal.append(el('p', { style: 'color:var(--warn);white-space:pre-wrap', textContent: 'Avisos:\n' + cl.avisos.map(a => '  - ' + a).join('\n') }));
   card.append(diagLegal);
@@ -2009,9 +2046,9 @@ function mostraImportadorFoto() {
   const app = $('#app');
   const card = el('div', { class: 'card' });
   card.append(el('h2', { textContent: '📥 Importar fotografies des d\'Excel' }));
-  card.append(el('div', { class: 'badge', textContent: 'Enganxa aquí les files del teu Excel (amb la fila de capçalera). Detecto automàticament les columnes: títol, descripció, link procedència, cobertura/llicència, crèdit obligatori, any, tipus, autor, notes, etiquetes, capítol, rellevància, durada.' }));
+  card.append(el('div', { class: 'badge', textContent: 'Enganxa aquí les files del teu Excel (amb la fila de capçalera). Columnes reconegudes: TITOL, DESCRIPCIO, LINK, LLICENCIA, CREDIT, AUTOR, ANY, TIPUS, ETIQUETES, CAPITOL, RELLEVANCIA, DURADA, ORIGEN_FONS, NOTES.' }));
   const box = el('div', { class: 'img-import' });
-  const ta = el('textarea', { placeholder: 'TITOL\tDESCRIPCIO\tLINK\tLLICENCIA\tCREDIT\tAUTOR\tANY\tCAPITOL\nChing Ling Foo\tPostal promocional...\thttps://...\tDomini Públic\tChing Ling Foo, 1898...\tDesconegut\t1898\tCapítol 1' });
+  const ta = el('textarea', { placeholder: 'TITOL\tDESCRIPCIO\tLINK\tLLICENCIA\tCREDIT\tAUTOR\tANY\tTIPUS\tETIQUETES\tCAPITOL\tRELLEVANCIA\tDURADA\tORIGEN_FONS\tNOTES\nChing Ling Foo\tPostal promocional...\thttps://...\tDomini Públic\t"Ching Ling Foo, 1898..."\tDesconegut\t1898\tfoto\tMag, Il·lusionisme...\t\talta\t\tArxiu familiar Li Chang\t' });
   box.append(ta); card.append(box);
   const row = el('div', { class: 'row' });
   row.append(el('button', { class: 'btn p', textContent: '📥 Importar', onclick: async () => { await importaFotografies(ta.value); } }));
@@ -2275,7 +2312,7 @@ async function autoGeneraCredits() {
   imageRights.forEach(img => {
     if ((img.estat_intern || '') !== 'aprovada') return;
     const c = classificaCobertura(img.cobertura, img.override_cobertura); if (c.estat !== 'ok') return;
-    const arxiu = extrauArxiu(img.link_procedencia, img.cobertura) || 'Arxiu d\'imatge';
+    const arxiu = extrauArxiu(img.link_procedencia, img.cobertura) || img.origen_fons || 'Arxiu d\'imatge';
     const atrib = img.autor || 'Anònim';
     const key = 'imatge|' + arxiu.toLowerCase() + '|' + atrib.toLowerCase();
     if (existents.has(key)) return;
@@ -2285,7 +2322,7 @@ async function autoGeneraCredits() {
   fotografies.forEach(img => {
     if ((img.estat_intern || '') !== 'aprovada') return;
     const c = classificaCobertura(img.cobertura, img.override_cobertura); if (c.estat !== 'ok') return;
-    const arxiu = extrauArxiu(img.link_procedencia, img.cobertura) || 'Arxiu de fotografia';
+    const arxiu = extrauArxiu(img.link_procedencia, img.cobertura) || img.origen_fons || 'Arxiu de fotografia';
     const atrib = img.autor || 'Anònim';
     const key = 'imatge|' + arxiu.toLowerCase() + '|' + atrib.toLowerCase();
     if (existents.has(key)) return;
@@ -2796,8 +2833,8 @@ function cercaGlobal(q) {
   docs.forEach(d => { const blob = [d.title, (d.content || '').replace(/<[^>]+>/g, ' ')].join(' ').toLowerCase(); if (blob.includes(q)) r.documents.push(d); });
   secs.forEach(s => (s.files || []).forEach(f => { if ((f.name || '').toLowerCase().includes(q)) r.fitxers.push({ fitxer: f, seccio: s }); }));
   musicRights.forEach(c => { const blob = [c.titulo, c.interprete, c.autor, c.referencia, c.notas].filter(Boolean).join(' ').toLowerCase(); if (blob.includes(q)) r.drets.push(c); });
-  imageRights.forEach(i => { const blob = [i.titol, i.descripcio, i.autor, i.etiquetes, i.notes, i.cobertura].filter(Boolean).join(' ').toLowerCase(); if (blob.includes(q)) r.imatges.push(i); });
-  fotografies.forEach(i => { const blob = [i.titol, i.descripcio, i.autor, i.etiquetes, i.notes, i.cobertura, i.capitol, i.rellevancia].filter(Boolean).join(' ').toLowerCase(); if (blob.includes(q)) r.fotografies.push(i); });
+  imageRights.forEach(i => { const blob = [i.titol, i.descripcio, i.autor, i.etiquetes, i.notes, i.cobertura, i.origen_fons].filter(Boolean).join(' ').toLowerCase(); if (blob.includes(q)) r.imatges.push(i); });
+  fotografies.forEach(i => { const blob = [i.titol, i.descripcio, i.autor, i.etiquetes, i.notes, i.cobertura, i.capitol, i.rellevancia, i.origen_fons].filter(Boolean).join(' ').toLowerCase(); if (blob.includes(q)) r.fotografies.push(i); });
   credits.forEach(c => { const blob = [c.arxiu, c.atribucio, c.titol, c.nota].filter(Boolean).join(' ').toLowerCase(); if (blob.includes(q)) r.credits.push(c); });
   creditsTecnics.forEach(c => { const blob = [c.categoria, c.nom].filter(Boolean).join(' ').toLowerCase(); if (blob.includes(q)) r.tecnics.push(c); });
   secs.forEach(s => (s.budget || []).forEach(p => (p.dietes || []).forEach(d => { const blob = [d.concepte, d.persona, (d.persones_noms||[]).join(' '), d.tipus, d.notes, p.c].filter(Boolean).join(' ').toLowerCase(); if (blob.includes(q)) r.dietes.push({ ...d, __partida: p.c, __seccio: s.id }); })));
@@ -2812,11 +2849,11 @@ function mostraResultats(r) {
     box.append(el('div', { class: 'search-group', textContent: titol + ' (' + items.length + ')' }));
     items.slice(0, 10).forEach(it => { const { title, meta } = labelFn(it); box.append(el('div', { class: 'search-result', onclick: () => { box.classList.remove('open'); $('#search-input').value = ''; clickFn(it); } }, [el('div', { class: 'title', textContent: title }), el('div', { class: 'meta', textContent: meta })])); });
   };
-  addGrup('📸 Fotografies', r.fotografies, (i) => { currentFoto = i; editingFoto = false; goto('fotografies'); }, (i) => ({ title: i.titol || '(sense títol)', meta: [i.any_data, i.tipus, i.autor].filter(Boolean).join(' · ') }));
+  addGrup('📸 Fotografies', r.fotografies, (i) => { currentFoto = i; editingFoto = false; goto('fotografies'); }, (i) => ({ title: i.titol || '(sense títol)', meta: [i.any_data, i.tipus, i.autor, i.origen_fons].filter(Boolean).join(' · ') }));
   addGrup('🍽️ Dietes', r.dietes, (d) => { const bsec = secs.find(x => isBudgetSec(x)); if (bsec) goto(bsec.id); }, (d) => ({ title: (d.concepte || '(sense concepte)') + ' · ' + (d.persona || ''), meta: [d.data, d.tipus, eur(dietaImport(d)), d.__partida].filter(Boolean).join(' · ') }));
   addGrup('📋 Crèdits tècnics', r.tecnics, (c) => goto('credits'), (c) => ({ title: c.nom || '(sense nom)', meta: c.categoria || '—' }));
   addGrup('🎼 Drets musicals', r.drets, (c) => { currentMR = c; editingMR = false; goto('drets'); }, (c) => ({ title: c.titulo || '(sense títol)', meta: [c.referencia, c.interprete, c.ano_grabacion].filter(Boolean).join(' · ') }));
-  addGrup('🖼️ Imatges', r.imatges, (i) => { currentImg = i; editingImg = false; goto('imatges'); }, (i) => ({ title: i.titol || '(sense títol)', meta: [i.any_data, i.tipus, i.autor].filter(Boolean).join(' · ') }));
+  addGrup('🖼️ Imatges', r.imatges, (i) => { currentImg = i; editingImg = false; goto('imatges'); }, (i) => ({ title: i.titol || '(sense títol)', meta: [i.any_data, i.tipus, i.autor, i.origen_fons].filter(Boolean).join(' · ') }));
   addGrup('📜 Crèdits arxiu', r.credits, (c) => { currentCredit = c; editingCredit = true; goto('credits'); }, (c) => ({ title: c.arxiu || '(sense arxiu)', meta: [c.atribucio, c.tipus].filter(Boolean).join(' · ') }));
   addGrup('📋 Tasques', r.tasques, (x) => goto(x.seccio.id), (x) => ({ title: x.tasca.t || '(sense títol)', meta: [x.seccio.name, x.tasca.d ? fmt(x.tasca.d) : 'Sense data'].filter(Boolean).join(' · ') }));
   addGrup('📚 Documents', r.documents, (d) => { currentDoc = d; goto(secs.find(x => /^gui[oó]$/i.test(x.name))?.id || 'cal'); }, (d) => ({ title: d.title || 'Sense títol', meta: d.folder }));
