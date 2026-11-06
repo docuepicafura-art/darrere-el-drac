@@ -313,7 +313,14 @@ const PARTIDES_AMB_DIETES   = /dietes|despla[cç]aments|producci[oó]|viatge|rod
 
 const DIETES_PREU_KM_DEFECTE = 0.26;
 const PREU_MANUTENCIO_PERNOCTA = 53.34;
-const TIPUS_DIETA = [['apat','Àpat'],['allotjament','Allotjament'],['transport','Transport'],['quilometratge','Quilometratge'],['manutencio_pernocta','Manutenció amb pernocta'],['altres','Altres']];
+const TIPUS_DIETA = [
+  ['apat','Àpat'],
+  ['allotjament','Allotjament'],
+  ['transport','Transport'],
+  ['quilometratge','Quilometratge'],
+  ['manutencio_pernocta','Manutenció amb pernocta'],
+  ['altres','Altres']
+];
 const ESTAT_DIETA = [['pendent','🟡 Pendent'],['cobrat','🟢 Cobrat']];
 
 const calculaTipusJornada = (hores, esLaborable) => {
@@ -428,14 +435,12 @@ let editingMR = false;
 let seleccioMR = new Set();
 const ANNO_ACTUAL = new Date().getFullYear();
 
-/* === IMATGES (catàleg de drets) === */
 let imageRights = [];
 let currentImg = null;
 let editingImg = false;
 let seleccioImg = new Set();
 let filtreImg = { text: '', cobertura: 'totes', estat: 'tots', tipus: 'tots', compliment: 'tots' };
 
-/* === FOTOGRAFIES (mòdul independent) === */
 let fotografies = [];
 let currentFoto = null;
 let editingFoto = false;
@@ -979,8 +984,7 @@ function renderDrets() {
   const adqBox = el('div', { class: 'mr-override', style: 'margin-top:16px' });
   adqBox.append(el('h4', { textContent: '💼 Adquisició de drets' }));
   const adqGrid = el('div', { class: 'mr-form' });
-  const lAdq = el('label');
-  lAdq.append(el('span', { textContent: 'Estat' }));
+  const lAdq = el('label'); lAdq.append(el('span', { textContent: 'Estat' }));
   const selAdq = el('select', { onchange: e => { c.adquisicio = e.target.value; render(); } }, [['cap', '— No adquirida —'],['negociada', '🟡 Negociada amb discogràfica/editorial'],['pagada', '🟢 Pagada (amb factura)'],['cedida', '🟢 Cedida gratuïtament'],['no_necessari', '🟢 No cal (domini públic)']].map(([v, t]) => el('option', { value: v, textContent: t, selected: (c.adquisicio || 'cap') === v })));
   selAdq.disabled = !editingMR;
   lAdq.append(selAdq); adqGrid.append(lAdq);
@@ -1636,7 +1640,7 @@ function mostraImportador() {
   const app = $('#app');
   const card = el('div', { class: 'card' });
   card.append(el('h2', { textContent: '📥 Importar imatges des d\'Excel' }));
-  card.append(el('div', { class: 'badge', textContent: 'Enganxa aquí les files del teu Excel (amb la fila de capçalera). Detecto automàticament les columnes: títol, descripció, link procedència, cobertura/llicència, crèdit obligatori, any, tipus, autor, notes, etiquetes, capítol, rellevància, durada, origen del fons.' }));
+  card.append(el('div', { class: 'badge', textContent: 'Enganxa aquí les files del teu Excel (amb la fila de capçalera). Columnes: TITOL, DESCRIPCIO, LINK, LLICENCIA, CREDIT, AUTOR, ANY, TIPUS, ETIQUETES, CAPITOL, RELLEVANCIA, DURADA, ORIGEN_FONS, NOTES.' }));
   const box = el('div', { class: 'img-import' });
   const ta = el('textarea', { placeholder: 'TITOL\tDESCRIPCIO\tLINK\tLLICENCIA\tCREDIT\tAUTOR\tANY\tTIPUS\tETIQUETES\tCAPITOL\tRELLEVANCIA\tDURADA\tORIGEN_FONS\tNOTES\nChing Ling Foo\tPostal promocional...\thttps://...\tDomini Públic\t"Ching Ling Foo, 1898..."\tDesconegut\t1898\tfoto\tMag, Il·lusionisme...\t\talta\t\tArxiu familiar Li Chang\t' });
   box.append(ta); card.append(box);
@@ -2046,7 +2050,7 @@ function mostraImportadorFoto() {
   const app = $('#app');
   const card = el('div', { class: 'card' });
   card.append(el('h2', { textContent: '📥 Importar fotografies des d\'Excel' }));
-  card.append(el('div', { class: 'badge', textContent: 'Enganxa aquí les files del teu Excel (amb la fila de capçalera). Columnes reconegudes: TITOL, DESCRIPCIO, LINK, LLICENCIA, CREDIT, AUTOR, ANY, TIPUS, ETIQUETES, CAPITOL, RELLEVANCIA, DURADA, ORIGEN_FONS, NOTES.' }));
+  card.append(el('div', { class: 'badge', textContent: 'Enganxa aquí les files del teu Excel (amb la fila de capçalera). Columnes: TITOL, DESCRIPCIO, LINK, LLICENCIA, CREDIT, AUTOR, ANY, TIPUS, ETIQUETES, CAPITOL, RELLEVANCIA, DURADA, ORIGEN_FONS, NOTES.' }));
   const box = el('div', { class: 'img-import' });
   const ta = el('textarea', { placeholder: 'TITOL\tDESCRIPCIO\tLINK\tLLICENCIA\tCREDIT\tAUTOR\tANY\tTIPUS\tETIQUETES\tCAPITOL\tRELLEVANCIA\tDURADA\tORIGEN_FONS\tNOTES\nChing Ling Foo\tPostal promocional...\thttps://...\tDomini Públic\t"Ching Ling Foo, 1898..."\tDesconegut\t1898\tfoto\tMag, Il·lusionisme...\t\talta\t\tArxiu familiar Li Chang\t' });
   box.append(ta); card.append(box);
