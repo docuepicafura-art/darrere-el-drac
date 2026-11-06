@@ -429,7 +429,7 @@ let secs = [], people = [
 let openBud = {}, openMes = {}, openDietMes = {}, cal = (() => { const n = new Date(); return { y: n.getFullYear(), m: n.getMonth() }; })();
 const timers = {};
 let activeAudioCleanup = null;
-const peopleNames = () => people.map(p => typeof p === 'string' ? p : p.name);
+const peopleNames = () => people.map(p => typeof p === 'string' ? p : (p && p.name) || '').map(n => String(n).trim()).filter(Boolean);
 
 let musicRights = [];
 let currentMR = null;
@@ -2569,8 +2569,7 @@ function renderBudget(s) {
               selLab.disabled = !editing;
               selLab.addEventListener('change', () => { j.es_laborable = selLab.value === 'true'; save(s); render(); });
               jrow.append(el('div', {}, selLab));
-              const btnPers = el('button', { class: 'btn s', style: 'min-width:110px;text-align:left', textContent: (j.persones_noms && j.persones_noms.length) ? j.persones_noms.join(', ') + ' (' + j.persones_noms.length + ')' : '— Triar persones —' });
-              if (!editing) btnPers.disabled = true;
+                            const btnPers = el('button', { class: 'btn s', style: 'min-width:110px;text-align:left', title: 'Assignar persones', textContent: (j.persones_noms && j.persones_noms.length) ? j.persones_noms.join(', ') + ' (' + j.persones_noms.length + ')' : '— Triar persones —' });
               btnPers.addEventListener('click', (ev) => {
                 ev.stopPropagation();
                 if (btnPers._dropdown && document.body.contains(btnPers._dropdown)) { btnPers._dropdown.remove(); btnPers._dropdown = null; return; }
@@ -2736,8 +2735,7 @@ function renderBlocDietes(s, p, idx) {
         row.append(el('div', {}, inpData));
 
         if (!Array.isArray(d.persones_noms)) d.persones_noms = d.persona ? String(d.persona).split(',').map(x => x.trim()).filter(Boolean) : [];
-        const btnPers = el('button', { class: 'btn s', style: 'min-width:110px;text-align:left', textContent: d.persones_noms.length ? d.persones_noms.join(', ') + ' (' + d.persones_noms.length + ')' : '— Triar persones —' });
-        if (!editing) btnPers.disabled = true;
+                const btnPers = el('button', { class: 'btn s', style: 'min-width:110px;text-align:left', title: 'Assignar persones', textContent: d.persones_noms.length ? d.persones_noms.join(', ') + ' (' + d.persones_noms.length + ')' : '— Triar persones —' });
         btnPers.addEventListener('click', (ev) => {
           ev.stopPropagation();
           if (btnPers._dropdown && document.body.contains(btnPers._dropdown)) { btnPers._dropdown.remove(); btnPers._dropdown = null; return; }
