@@ -325,15 +325,9 @@ const ESTAT_DIETA = [['pendent','🟡 Pendent'],['cobrat','🟢 Cobrat']];
 const calculaTipusJornada = (hores, esLaborable) => {
   const h = Number(hores) || 0;
   if (h <= 0) return null;
-  if (esLaborable) {
-    if (h >= 1.5 && h <= 3.75) return 'mitja';
-    if (h >= 5 && h <= 7.5) return 'sencera';
-    if (h >= 9 && h <= 12) return 'mitja_i_mitja';
-  } else {
-    if (h > 0 && h <= 3.75) return 'mitja';
-    if (h > 3.75 && h <= 7.5) return 'sencera';
-    if (h > 7.5 && h <= 12) return 'mitja_i_mitja';
-  }
+  if (h > 0 && h <= 3.75) return 'mitja';
+  if (h > 3.75 && h <= 7.5) return 'sencera';
+  if (h > 7.5 && h <= 12) return 'mitja_i_mitja';
   return 'fora_de_rang';
 };
 
@@ -2371,11 +2365,11 @@ function renderBudget(s) {
   let calDesar = false;
   s.budget.forEach((p, i) => {
     if (typeof p.pos !== 'number') { p.pos = i; calDesar = true; }
+    if (!Array.isArray(p.exp)) { p.exp = []; calDesar = true; }
     if (!Array.isArray(p.jornades)) { p.jornades = []; calDesar = true; }
     if (!Array.isArray(p.dietes)) { p.dietes = []; calDesar = true; }
     p.jornades.forEach(j => {
       if (!Array.isArray(j.persones_noms)) { j.persones_noms = Number(j.persones) > 0 ? Array(Number(j.persones)).fill('?').map((_, k) => 'Persona ' + (k+1)) : []; delete j.persones; calDesar = true; }
-      if (typeof j.es_laborable !== 'boolean') { j.es_laborable = true; calDesar = true; }
     });
     p.dietes.forEach(d => {
       if (!Array.isArray(d.persones_noms)) { d.persones_noms = d.persona ? String(d.persona).split(',').map(x => x.trim()).filter(Boolean) : []; calDesar = true; }
@@ -2555,7 +2549,7 @@ function renderBudget(s) {
           jbox.append(header);
           if (obert) {
             const taula = el('div', { class: 'jorn-taula' });
-            taula.append(el('div', { class: 'jorn-row jorn-head' }, [el('div', { textContent: 'Data' }), el('div', { textContent: 'Hores' }), el('div', { textContent: 'Laborable?' }), el('div', { textContent: 'Persones' }), el('div', { textContent: 'Concepte' }), el('div', { class: 'jorn-num', textContent: 'Preu unit.' }), el('div', { class: 'jorn-num', textContent: 'Pers.' }), el('div', { class: 'jorn-num', textContent: 'Total' }), el('div', { textContent: 'Cobrat' }), el('div')]));
+            taula.append(el('div', { class: 'jorn-row jorn-head' }, [el('div', { textContent: 'Data' }), el('div', { textContent: 'Hores' }), el('div', { textContent: '' }), el('div', { textContent: 'Persones' }), el('div', { textContent: 'Concepte' }), el('div', { class: 'jorn-num', textContent: 'Preu unit.' }), el('div', { class: 'jorn-num', textContent: 'Pers.' }), el('div', { class: 'jorn-num', textContent: 'Total' }), el('div', { textContent: 'Cobrat' }), el('div')]));
             arr.forEach(j => {
               const jrow = el('div', { class: 'jorn-row' + (j.cobrat ? ' done' : '') });
               const tipusCalc = calculaTipusJornada(j.hores, j.es_laborable);
@@ -2565,11 +2559,8 @@ function renderBudget(s) {
               const inpH = el('input', { type: 'number', value: j.hores || 0, min: 0, step: 0.25, style: 'width:70px' }); inpH.disabled = !editing;
               inpH.addEventListener('input', () => { j.hores = Number(inpH.value) || 0; save(s); });
               jrow.append(el('div', {}, inpH));
-              const selLab = el('select', { style: 'min-width:110px' }, [el('option', { value: 'true', textContent: 'Dia laborable', selected: j.es_laborable !== false }), el('option', { value: 'false', textContent: 'Dia NO laborable', selected: j.es_laborable === false })]);
-              selLab.disabled = !editing;
-              selLab.addEventListener('change', () => { j.es_laborable = selLab.value === 'true'; save(s); render(); });
-              jrow.append(el('div', {}, selLab));
-                            const btnPers = el('button', { class: 'btn s', style: 'min-width:110px;text-align:left', title: 'Assignar persones', textContent: (j.persones_noms && j.persones_noms.length) ? j.persones_noms.join(', ') + ' (' + j.persones_noms.length + ')' : '— Triar persones —' });
+              jrow.append(el('div', { class: 'badge', style: 'font-size:11px;text-align:center', textContent: '—' }));
+              const btnPers = el('button', { class: 'btn s', style: 'min-width:110px;text-align:left', title: 'Assignar persones', textContent: (j.persones_noms && j.persones_noms.length) ? j.persones_noms.join(', ') + ' (' + j.persones_noms.length + ')' : '— Triar persones —' });
               btnPers.addEventListener('click', (ev) => {
                 ev.stopPropagation();
                 if (btnPers._dropdown && document.body.contains(btnPers._dropdown)) { btnPers._dropdown.remove(); btnPers._dropdown = null; return; }
@@ -2605,7 +2596,7 @@ function renderBudget(s) {
               jrow.append(el('div', { style: 'text-align:center' }, editing ? el('button', { class: 'x', textContent: '×', onclick: () => { if (!confirm('Esborrar aquesta jornada?')) return; p.jornades = p.jornades.filter(x => x !== j); save(s); render(); } }) : ''));
               const badgeRow = el('div', { style: 'grid-column:1/-1;padding:2px 0 4px 6px;font-size:11px;' + (j.cobrat ? 'color:var(--ok)' : 'color:var(--warn)') });
               if (tipusCalc === 'fora_de_rang') { badgeRow.textContent = '❌ Les hores indicades no compleixen el quadre legal per a aquest tipus de dia.'; badgeRow.style.color = 'var(--err)'; }
-              else if (tipusCalc) { badgeRow.textContent = ETIQ_JORNADA[tipusCalc] + ' (' + (j.es_laborable !== false ? 'laborable' : 'no laborable') + ') · ' + (j.cobrat ? '🟢 Cobrat' : '🟡 Pendent de cobrar'); }
+              else if (tipusCalc) { badgeRow.textContent = ETIQ_JORNADA[tipusCalc] + ' · ' + (j.cobrat ? '🟢 Cobrat' : '🟡 Pendent de cobrar'); }
               else { badgeRow.textContent = '⚠️ Introdueix les hores per calcular la compensació.'; }
               taula.append(jrow); taula.append(badgeRow);
             });
@@ -2616,7 +2607,7 @@ function renderBudget(s) {
             if (editing) taula.append(el('div', { class: 'row', style: 'margin-top:6px' }, el('button', { class: 'btn s', textContent: '+ Afegir jornada', onclick: () => {
               const dataDefault = (mk && mk !== 'sense-data') ? (mk + '-' + String(new Date().getDate()).padStart(2, '0')) : avuiISO();
               p.jornades = p.jornades || [];
-              p.jornades.push({ id: 'j' + Date.now().toString(36), data: dataDefault, hores: 2, es_laborable: true, persones_noms: [], concepte: '', cobrat: false });
+              p.jornades.push({ id: 'j' + Date.now().toString(36), data: dataDefault, hores: 2, persones_noms: [], concepte: '', cobrat: false });
               openMes[idx] = openMes[idx] || {}; openMes[idx][mk] = true; save(s); render();
             } })));
             jbox.append(taula);
@@ -2627,7 +2618,7 @@ function renderBudget(s) {
           const valor = prompt('Mes (YYYY-MM):', ara.getFullYear() + '-' + String(ara.getMonth() + 1).padStart(2, '0'));
           if (!valor || !/^\d{4}-\d{2}$/.test(valor)) return;
           p.jornades = p.jornades || [];
-          p.jornades.push({ id: 'j' + Date.now().toString(36), data: valor + '-01', hores: 2, es_laborable: true, persones_noms: [], concepte: '', cobrat: false });
+          p.jornades.push({ id: 'j' + Date.now().toString(36), data: valor + '-01', hores: 2, persones_noms: [], concepte: '', cobrat: false });
           openMes[idx] = openMes[idx] || {}; openMes[idx][valor] = true; save(s); render();
         } })));
         jbox.append(el('div', { class: 'badge', style: 'margin-top:6px', textContent: 'Les jornades cobrades sumen al Real. Les pendents es mostren però no sumen.' }));
@@ -2735,7 +2726,7 @@ function renderBlocDietes(s, p, idx) {
         row.append(el('div', {}, inpData));
 
         if (!Array.isArray(d.persones_noms)) d.persones_noms = d.persona ? String(d.persona).split(',').map(x => x.trim()).filter(Boolean) : [];
-                const btnPers = el('button', { class: 'btn s', style: 'min-width:110px;text-align:left', title: 'Assignar persones', textContent: d.persones_noms.length ? d.persones_noms.join(', ') + ' (' + d.persones_noms.length + ')' : '— Triar persones —' });
+        const btnPers = el('button', { class: 'btn s', style: 'min-width:110px;text-align:left', title: 'Assignar persones', textContent: d.persones_noms.length ? d.persones_noms.join(', ') + ' (' + d.persones_noms.length + ')' : '— Triar persones —' });
         btnPers.addEventListener('click', (ev) => {
           ev.stopPropagation();
           if (btnPers._dropdown && document.body.contains(btnPers._dropdown)) { btnPers._dropdown.remove(); btnPers._dropdown = null; return; }
