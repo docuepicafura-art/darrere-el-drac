@@ -208,7 +208,7 @@ input[type=time]{padding:6px;width:auto}
 .jorn-mes-total{font-variant-numeric:tabular-nums;font-weight:700}
 .jorn-mes-cobrat{font-size:11px;color:var(--mut);font-variant-numeric:tabular-nums}
 .jorn-taula{margin:8px 0 4px 16px}
-.jorn-row{display:grid;grid-template-columns:130px 60px 110px 160px 1fr 90px 50px 90px 50px 30px;gap:6px;align-items:center;padding:4px 0;border-bottom:1px solid var(--bd);font-size:13px}
+.jorn-row{display:grid;grid-template-columns:130px 180px 160px 1fr 90px 50px 90px 50px 30px;gap:6px;align-items:center;padding:4px 0;border-bottom:1px solid var(--bd);font-size:13px}
 .jorn-head{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--mut);font-weight:600;border-bottom:2px solid var(--bd)}
 .jorn-row.done .jorn-num{color:var(--tx) !important;opacity:1 !important}
 .jorn-num{text-align:right;font-variant-numeric:tabular-nums;font-weight:600}
@@ -350,9 +350,8 @@ const rangTasca = k => {
 };
 
 const importJornada = j => {
-  const tipusCalculat = calculaTipusJornada(j.hores, j.es_laborable);
-  if (!tipusCalculat || tipusCalculat === 'fora_de_rang') return 0;
-  const preu = PREUS_JORNADA[tipusCalculat] || 0;
+  const tipusJ = j.tipus_jornada || 'sencera';
+  const preu = PREUS_JORNADA[tipusJ] || 0;
   const nPers = Array.isArray(j.persones_noms) ? j.persones_noms.length : (Number(j.persones) || 0);
   return preu * nPers;
 };
@@ -1894,7 +1893,7 @@ function renderGantt() {
       (p.jornades || []).forEach(j => {
         if (!j.data) return;
         const nPers = (j.persones_noms || []).length || Number(j.persones) || 0;
-        const tipusCalcJ = calculaTipusJornada(j.hores, j.es_laborable);
+        const tipusCalcJ = j.tipus_jornada || 'sencera';
         tasques.push({ tasca: { t: '🎬 ' + (j.concepte || p.c || 'Jornada') + ' · ' + (ETIQ_CURTA[tipusCalcJ] || '?') + ' × ' + nPers + 'p', k: 'Producció', done: !!j.cobrat, h: '' }, seccio: bsec, inici: j.data, fi: j.data, auto: false, esJornada: true, esDieta: false });
       });
       (p.dietes || []).forEach(d => {
@@ -1986,7 +1985,7 @@ function renderCal() {
       if (item.esJornada) {
         const { j, p, s } = item;
         const nPers = (j.persones_noms || []).length || Number(j.persones) || 0;
-        const tipusCalcCal = calculaTipusJornada(j.hores, j.es_laborable);
+        const tipusCalcCal = j.tipus_jornada || 'sencera';
         const label = '🎬 ' + (ETIQ_CURTA[tipusCalcCal] || '?') + ' ' + (j.concepte || p.c || 'Jornada') + ' (' + nPers + 'p)';
         c.append(el('div', { class: 'chip jorn-chip' + (j.cobrat ? ' done' : ''), title: (ETIQ_JORNADA[tipusCalcCal] || 'Fora de rang') + ' × ' + nPers + ' persones = ' + eur(importJornada(j)), textContent: label, onclick: () => goto(s.id) }));
       } else if (item.esDieta) {
@@ -2370,6 +2369,11 @@ function renderBudget(s) {
     if (!Array.isArray(p.dietes)) { p.dietes = []; calDesar = true; }
     p.jornades.forEach(j => {
       if (!Array.isArray(j.persones_noms)) { j.persones_noms = Number(j.persones) > 0 ? Array(Number(j.persones)).fill('?').map((_, k) => 'Persona ' + (k+1)) : []; delete j.persones; calDesar = true; }
+      if (!j.tipus_jornada) {
+        const t = j.hores ? calculaTipusJornada(j.hores) : 'sencera';
+        j.tipus_jornada = (t && t !== 'fora_de_rang') ? t : 'sencera';
+        calDesar = true;
+      }
     });
     p.dietes.forEach(d => {
       if (!Array.isArray(d.persones_noms)) { d.persones_noms = d.persona ? String(d.persona).split(',').map(x => x.trim()).filter(Boolean) : []; calDesar = true; }
@@ -2549,17 +2553,21 @@ function renderBudget(s) {
           jbox.append(header);
           if (obert) {
             const taula = el('div', { class: 'jorn-taula' });
-            taula.append(el('div', { class: 'jorn-row jorn-head' }, [el('div', { textContent: 'Data' }), el('div', { textContent: 'Hores' }), el('div', { textContent: '' }), el('div', { textContent: 'Persones' }), el('div', { textContent: 'Concepte' }), el('div', { class: 'jorn-num', textContent: 'Preu unit.' }), el('div', { class: 'jorn-num', textContent: 'Pers.' }), el('div', { class: 'jorn-num', textContent: 'Total' }), el('div', { textContent: 'Cobrat' }), el('div')]));
+            taula.append(el('div', { class: 'jorn-row jorn-head' }, [el('div', { textContent: 'Data' }), el('div', { textContent: 'Tipus' }), el('div', { textContent: 'Persones' }), el('div', { textContent: 'Concepte' }), el('div', { class: 'jorn-num', textContent: 'Preu unit.' }), el('div', { class: 'jorn-num', textContent: 'Pers.' }), el('div', { class: 'jorn-num', textContent: 'Total' }), el('div', { textContent: 'Cobrat' }), el('div')]));
             arr.forEach(j => {
               const jrow = el('div', { class: 'jorn-row' + (j.cobrat ? ' done' : '') });
-              const tipusCalc = calculaTipusJornada(j.hores, j.es_laborable);
+              const tipusJ = j.tipus_jornada || 'sencera';
               const inpData = el('input', { type: 'date', value: j.data || '' }); inpData.disabled = !editing;
               inpData.addEventListener('change', () => { j.data = inpData.value; save(s); render(); });
               jrow.append(el('div', {}, inpData));
-              const inpH = el('input', { type: 'number', value: j.hores || 0, min: 0, step: 0.25, style: 'width:70px' }); inpH.disabled = !editing;
-              inpH.addEventListener('input', () => { j.hores = Number(inpH.value) || 0; save(s); });
-              jrow.append(el('div', {}, inpH));
-              jrow.append(el('div', { class: 'badge', style: 'font-size:11px;text-align:center', textContent: '—' }));
+              const selTipusJ = el('select', { style: 'min-width:170px' }, [
+                el('option', { value: 'mitja', textContent: '½ jornada especial (71,05 €)', selected: tipusJ === 'mitja' }),
+                el('option', { value: 'sencera', textContent: '1 jornada especial (131,95 €)', selected: tipusJ === 'sencera' }),
+                el('option', { value: 'mitja_i_mitja', textContent: '1½ jornada especial (203,00 €)', selected: tipusJ === 'mitja_i_mitja' })
+              ]);
+              selTipusJ.disabled = !editing;
+              selTipusJ.addEventListener('change', () => { j.tipus_jornada = selTipusJ.value; save(s); render(); });
+              jrow.append(el('div', {}, selTipusJ));
               const btnPers = el('button', { class: 'btn s', style: 'min-width:110px;text-align:left', title: 'Assignar persones', textContent: (j.persones_noms && j.persones_noms.length) ? j.persones_noms.join(', ') + ' (' + j.persones_noms.length + ')' : '— Triar persones —' });
               btnPers.addEventListener('click', (ev) => {
                 ev.stopPropagation();
@@ -2583,7 +2591,7 @@ function renderBudget(s) {
               const inpC = el('input', { type: 'text', value: j.concepte || '', placeholder: 'Reunió, guió...' }); inpC.disabled = !editing;
               inpC.addEventListener('input', () => { j.concepte = inpC.value; save(s); });
               jrow.append(el('div', {}, inpC));
-              const preuUnit = tipusCalc && tipusCalc !== 'fora_de_rang' ? (PREUS_JORNADA[tipusCalc] || 0) : 0;
+              const preuUnit = PREUS_JORNADA[tipusJ] || 0;
               jrow.append(el('div', { class: 'jorn-num', textContent: preuUnit ? eur(preuUnit) : '—' }));
               const nPers = (j.persones_noms || []).length;
               jrow.append(el('div', { class: 'jorn-num', textContent: String(nPers) }));
@@ -2595,9 +2603,7 @@ function renderBudget(s) {
               else jrow.append(el('div', { style: 'text-align:center' }, cbC));
               jrow.append(el('div', { style: 'text-align:center' }, editing ? el('button', { class: 'x', textContent: '×', onclick: () => { if (!confirm('Esborrar aquesta jornada?')) return; p.jornades = p.jornades.filter(x => x !== j); save(s); render(); } }) : ''));
               const badgeRow = el('div', { style: 'grid-column:1/-1;padding:2px 0 4px 6px;font-size:11px;' + (j.cobrat ? 'color:var(--ok)' : 'color:var(--warn)') });
-              if (tipusCalc === 'fora_de_rang') { badgeRow.textContent = '❌ Les hores indicades no compleixen el quadre legal per a aquest tipus de dia.'; badgeRow.style.color = 'var(--err)'; }
-              else if (tipusCalc) { badgeRow.textContent = ETIQ_JORNADA[tipusCalc] + ' · ' + (j.cobrat ? '🟢 Cobrat' : '🟡 Pendent de cobrar'); }
-              else { badgeRow.textContent = '⚠️ Introdueix les hores per calcular la compensació.'; }
+              badgeRow.textContent = ETIQ_JORNADA[tipusJ] + ' · ' + (j.cobrat ? '🟢 Cobrat' : '🟡 Pendent de cobrar');
               taula.append(jrow); taula.append(badgeRow);
             });
             const tMes = totalMes(arr), cMes = cobratMes(arr), pMes = pendentMes(arr);
@@ -2607,7 +2613,7 @@ function renderBudget(s) {
             if (editing) taula.append(el('div', { class: 'row', style: 'margin-top:6px' }, el('button', { class: 'btn s', textContent: '+ Afegir jornada', onclick: () => {
               const dataDefault = (mk && mk !== 'sense-data') ? (mk + '-' + String(new Date().getDate()).padStart(2, '0')) : avuiISO();
               p.jornades = p.jornades || [];
-              p.jornades.push({ id: 'j' + Date.now().toString(36), data: dataDefault, hores: 2, persones_noms: [], concepte: '', cobrat: false });
+              p.jornades.push({ id: 'j' + Date.now().toString(36), data: dataDefault, tipus_jornada: 'sencera', persones_noms: [], concepte: '', cobrat: false });
               openMes[idx] = openMes[idx] || {}; openMes[idx][mk] = true; save(s); render();
             } })));
             jbox.append(taula);
@@ -2618,7 +2624,7 @@ function renderBudget(s) {
           const valor = prompt('Mes (YYYY-MM):', ara.getFullYear() + '-' + String(ara.getMonth() + 1).padStart(2, '0'));
           if (!valor || !/^\d{4}-\d{2}$/.test(valor)) return;
           p.jornades = p.jornades || [];
-          p.jornades.push({ id: 'j' + Date.now().toString(36), data: valor + '-01', hores: 2, persones_noms: [], concepte: '', cobrat: false });
+          p.jornades.push({ id: 'j' + Date.now().toString(36), data: valor + '-01', tipus_jornada: 'sencera', persones_noms: [], concepte: '', cobrat: false });
           openMes[idx] = openMes[idx] || {}; openMes[idx][valor] = true; save(s); render();
         } })));
         jbox.append(el('div', { class: 'badge', style: 'margin-top:6px', textContent: 'Les jornades cobrades sumen al Real. Les pendents es mostren però no sumen.' }));
