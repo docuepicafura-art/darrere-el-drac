@@ -443,6 +443,7 @@ let musicRights = [];
 let currentMR = null;
 let editingMR = false;
 let seleccioMR = new Set();
+let seleccioPartides = new Set();
 const ANNO_ACTUAL = new Date().getFullYear();
 
 let imageRights = [];
@@ -3062,7 +3063,116 @@ function _htmlTaulaPartides(partides, opts = {}) {
 }
 
 // ─── Bloc de despeses (agrupades per mes) ───────────────────
-function _htmlDespesesPerMes(partides) {
+// ─── Bloc de despeses (agrupades per mes) ───────────────────
+function _htmlDespesesPerMes(partides, mesosFiltre) {
+  const perMes = {};
+  partides.forEach(p => {
+    (p.exp || []).forEach(e => {
+      const k = e.d ? e.d.slice(0, 7) : 'sense-data';
+      if (mesosFiltre && !mesosFiltre.includes(k)) return;
+      if (!perMes[k]) perMes[k] = [];
+      perMes[k].push({ ...e, __partida: p.c });
+    });
+  });
+  const mesKeys = Object.keys(perMes).sort();
+  if (!mesKeys.length) return '<p class="muted">(cap despesa registrada amb els filtres actuals)</p>';
+  let html = '';
+  let totalGeneral = 0;
+  mesKeys.forEach(mk => {
+    const items = perMes[mk].sort((a,b) => (a.d||'').localeCompare(b.d||''));
+    const total = items.reduce((a, e) => a + (Number(e.a) || 0), 0);
+    totalGeneral += total;
+    html += '<h3>' + escapeHtml(mk === 'sense-data' ? 'Sense data' : nomMes(mk)) + ' <span class="muted">(' + items.length + ' partides · ' + eur(total) + ')</span></h3>';
+    html += '<table><thead><tr><th>Data</th><th>Concepte</th><th>Partida</th><th class="num">Import</th></tr></thead><tbody>';
+    items.forEach(e => {
+      html += '<tr><td>' + (e.d ? fmt(e.d) : '—') + '</td><td>' + escapeHtml(e.t || '(sense concepte)') + '</td><td>' + escapeHtml(e.__partida || '—') + '</td><td class="num">' + eur(e.a) + '</td></tr>';
+    });
+    html += '<tr class="total"><td colspan="3">Total ' + escapeHtml(mk === 'sense-data' ? 'sense data' : nomMes(mk)) + '</td><td class="num">' + eur(total) + '</td></tr>';
+    html += '</tbody></table>';
+  });
+  html += '<p style="text-align:right;font-size:11pt;margin-top:8px"><strong>Total despeses: ' + eur(totalGeneral) + '</strong></p>';
+  return html;
+}
+
+// ─── Bloc de jornades (agrupades per mes) ───────────────────
+function _htmlJornadesPerMes(partides, mesosFiltre) {
+  let html = '';
+  let totalGeneral = 0;
+  partides.forEach(p => {
+    if (!p.admet_jornades || !(p.jornades || []).length) return;
+    const grups = agrupaJornadesPerMes(p.jornades);
+    let keys = ordenaMesos(Object.keys(grups));
+    if (mesosFiltre) keys = keys.filter(k => mesosFiltre.includes(k));
+    if (!keys.length) return;
+    html += '<h3>' + escapeHtml(p.c || '—') + '</h3>';
+    keys.forEach(mk => {
+      const arr = grups[mk];
+      const tM = totalMes(arr);
+      totalGeneral += tM;
+      html += '<h4 style="font-size:10pt;margin:8px 0 4px;color:#555">' + escapeHtml(nomMes(mk)) + ' <span class="muted">(' + arr.length + ' jornades · ' + eur(tM) + ')</span></h4>';
+      html += '<table><thead><tr><th>Data</th><th>Tipus</th><th>Persones</th><th>Concepte</th><th class="num">Dies</th><th class="num">Pers.</th><th class="num">Total</th><th>Estat</th></tr></thead><tbody>';
+      arr.forEach(j => {
+        const tipusJ = j.tipus_jornada || 'sencera';
+        const preuU = PREUS_JORNADA[tipusJ] || 0;
+        const nPers = (j.persones_noms || []).length;
+        const diesJ = Number(j.dies) || 1;
+        const totalJ = preuU * nPers * diesJ;
+        const pillClass = j.cobrat ? 'ok' : 'warn';
+        html += '<tr>'
+          + '<td>' + (j.data ? fmt(j.data) : '—') + '</td>'
+          + '<td>' + escapeHtml(ETIQ_JORNADA[tipusJ] || '—') + '</td>'
+          + '<td>' + escapeHtml((j.persones_noms || []).join(', ') || '—') + '</td>'
+          + '<td>' + escapeHtml(j.concepte || '—') + '</td>'
+          + '<td class="num">' + diesJ + '</td>'
+          + '<td class="num">' + nPers + '</td>'
+          + '<td class="num strong">' + eur(totalJ) + '</td>'
+          + '<td><span class="pill ' + pillClass + '">' + (j.cobrat ? 'Cobrat' : 'Pendent') + '</span></td>'
+          + '</tr>';
+      });
+      html += '</tbody></table>';
+    });
+  });
+  if (!html) return '<p class="muted">(cap jornada registrada amb els filtres actuals)</p>';
+  html += '<p style="text-align:right;font-size:11pt;margin-top:8px"><strong>Total jornades: ' + eur(totalGeneral) + '</strong></p>';
+  return html;
+}
+
+// ─── Bloc de dietes (agrupades per mes) ─────────────────────
+function _htmlDietesPerMes(partides, mesosFiltre) {
+  let html = '';
+  let totalGeneral = 0;
+  partides.forEach(p => {
+    if (!p.admet_dietes || !(p.dietes || []).length) return;
+    const grups = agrupaDietesPerMes(p.dietes);
+    let keys = ordenaMesos(Object.keys(grups));
+    if (mesosFiltre) keys = keys.filter(k => mesosFiltre.includes(k));
+    if (!keys.length) return;
+    html += '<h3>' + escapeHtml(p.c || '—') + '</h3>';
+    keys.forEach(mk => {
+      const arr = grups[mk];
+      const tM = totalDietesMes(arr);
+      totalGeneral += tM;
+      const titol = (arr[0] && arr[0].__titolMes) || nomMesDieta(mk);
+      html += '<h4 style="font-size:10pt;margin:8px 0 4px;color:#555">' + escapeHtml(titol) + ' <span class="muted">(' + arr.length + ' dietes · ' + eur(tM) + ')</span></h4>';
+      html += '<table><thead><tr><th>Data</th><th>Persones</th><th>Concepte</th><th>Tipus</th><th class="num">Import</th><th>Estat</th></tr></thead><tbody>';
+      arr.forEach(d => {
+        const pillClass = d.estat === 'cobrat' ? 'ok' : 'warn';
+        html += '<tr>'
+          + '<td>' + (d.data ? fmt(d.data) : '—') + '</td>'
+          + '<td>' + escapeHtml((d.persones_noms || []).join(', ') || '—') + '</td>'
+          + '<td>' + escapeHtml(d.concepte || '—') + '</td>'
+          + '<td>' + escapeHtml((TIPUS_DIETA.find(t => t[0] === d.tipus) || [,'—'])[1]) + '</td>'
+          + '<td class="num strong">' + eur(dietaImport(d)) + '</td>'
+          + '<td><span class="pill ' + pillClass + '">' + (d.estat === 'cobrat' ? 'Cobrat' : 'Pendent') + '</span></td>'
+          + '</tr>';
+      });
+      html += '</tbody></table>';
+    });
+  });
+  if (!html) return '<p class="muted">(cap dieta registrada amb els filtres actuals)</p>';
+  html += '<p style="text-align:right;font-size:11pt;margin-top:8px"><strong>Total dietes: ' + eur(totalGeneral) + '</strong></p>';
+  return html;
+}
   const perMes = {};
   partides.forEach(p => {
     (p.exp || []).forEach(e => {
@@ -3194,11 +3304,11 @@ function _htmlSumatori(partides) {
   return html;
 }
 
-// ─── Impressió completa o per seccions ──────────────────────
-function obreImpressioPressupost(seccions) {
+// ─── Impressió completa o per seccions (amb filtres de partides/mesos) ──
+function obreImpressioPressupost(seccions, partsFiltrades, mesosPerPartida) {
   const s = cur_();
   if (!s || !s.budget) return;
-  const parts = s.budget;
+  const parts = (partsFiltrades && partsFiltrades.length) ? partsFiltrades : s.budget;
   const cos = [];
   if (seccions.resum) {
     cos.push('<h2>Resum de partides</h2>');
@@ -3206,42 +3316,153 @@ function obreImpressioPressupost(seccions) {
   }
   if (seccions.despeses) {
     cos.push('<h2>Despeses (per mes)</h2>');
-    cos.push(_htmlDespesesPerMes(parts));
+    if (mesosPerPartida && Object.keys(mesosPerPartida).length) {
+      // Si hi ha filtres per partida, els apliquem partida a partida
+      parts.forEach(p => {
+        const mesos = mesosPerPartida[p.c] || [];
+        if (!mesos.length) return;
+        cos.push('<h3>' + escapeHtml(p.c) + '</h3>');
+        cos.push(_htmlDespesesPerMes([p], mesos));
+      });
+    } else {
+      cos.push(_htmlDespesesPerMes(parts));
+    }
   }
   if (seccions.jornades) {
     cos.push('<h2>Jornades especials (per mes)</h2>');
-    cos.push(_htmlJornadesPerMes(parts));
+    if (mesosPerPartida && Object.keys(mesosPerPartida).length) {
+      parts.forEach(p => {
+        const mesos = mesosPerPartida[p.c] || [];
+        if (!mesos.length) return;
+        if (!p.admet_jornades || !(p.jornades || []).length) return;
+        cos.push('<h3>' + escapeHtml(p.c) + '</h3>');
+        cos.push(_htmlJornadesPerMes([p], mesos));
+      });
+    } else {
+      cos.push(_htmlJornadesPerMes(parts));
+    }
   }
   if (seccions.dietes) {
     cos.push('<h2>Dietes (per mes)</h2>');
-    cos.push(_htmlDietesPerMes(parts));
+    if (mesosPerPartida && Object.keys(mesosPerPartida).length) {
+      parts.forEach(p => {
+        const mesos = mesosPerPartida[p.c] || [];
+        if (!mesos.length) return;
+        if (!p.admet_dietes || !(p.dietes || []).length) return;
+        cos.push('<h3>' + escapeHtml(p.c) + '</h3>');
+        cos.push(_htmlDietesPerMes([p], mesos));
+      });
+    } else {
+      cos.push(_htmlDietesPerMes(parts));
+    }
   }
   if (seccions.sumatori) {
     cos.push('<h2>Sumatori final</h2>');
     cos.push(_htmlSumatori(parts));
   }
-  _obreImpressio(_htmlImpressio('Pressupost del documental', cos.join('')));
+  const nomFitxer = parts.length === s.budget.length ? 'Pressupost complet' : 'Pressupost (' + parts.length + ' partides)';
+  _obreImpressio(_htmlImpressio(nomFitxer, cos.join('')));
 }
 
-// ─── Modal per triar què imprimir ──────────────────────────
+// ─── Modal per triar què imprimir (amb arbre de partides i mesos) ──
 function mostraMenuImpressio() {
-  const overlay = el('div', { class: 'print-menu', onclick: (e) => { if (e.target === overlay) overlay.remove(); } });
-  const card = el('div', { class: 'print-menu-card' });
-  card.append(el('h3', { textContent: '🖨️ Imprimir pressupost' }));
-  card.append(el('p', { style: 'font-size:12px;color:var(--mut);margin:0 0 10px', textContent: 'Marca les seccions que vols incloure:' }));
+  const s = cur_();
+  if (!s || !s.budget) return;
 
+  const overlay = el('div', { class: 'print-menu', onclick: (e) => { if (e.target === overlay) overlay.remove(); } });
+  const card = el('div', { class: 'print-menu-card', style: 'max-width:640px' });
+  card.append(el('h3', { textContent: '🖨️ Imprimir pressupost' }));
+
+  // ─── Secció 1: tipus de contingut ──────────────────────
+  card.append(el('h4', { style: 'margin:0 0 8px;font-size:12px;text-transform:uppercase;color:var(--mut);letter-spacing:.05em', textContent: '1. Què vols imprimir' }));
   const cResum = el('input', { type: 'checkbox', checked: true });
   const cDespeses = el('input', { type: 'checkbox', checked: true });
   const cJornades = el('input', { type: 'checkbox', checked: true });
   const cDietes = el('input', { type: 'checkbox', checked: true });
   const cSumatori = el('input', { type: 'checkbox', checked: true });
-
   card.append(el('label', {}, [cResum, el('span', { textContent: '📋 Resum de partides (una línia per partida)' })]));
-  card.append(el('label', {}, [cDespeses, el('span', { textContent: '💸 Despeses (per mes, de totes les partides)' })]));
-  card.append(el('label', {}, [cJornades, el('span', { textContent: '🎬 Jornades especials (per mes, de totes les partides)' })]));
-  card.append(el('label', {}, [cDietes, el('span', { textContent: '🍽️ Dietes (per mes, de totes les partides)' })]));
-  card.append(el('label', {}, [cSumatori, el('span', { textContent: '📊 Sumatori final (previst, real, pendent, diferència)' })]));
+  card.append(el('label', {}, [cDespeses, el('span', { textContent: '💸 Despeses (per mes)' })]));
+  card.append(el('label', {}, [cJornades, el('span', { textContent: '🎬 Jornades especials (per mes)' })]));
+  card.append(el('label', {}, [cDietes, el('span', { textContent: '🍽️ Dietes (per mes)' })]));
+  card.append(el('label', {}, [cSumatori, el('span', { textContent: '📊 Sumatori final' })]));
 
+  // ─── Secció 2: partides i mesos ────────────────────────
+  card.append(el('h4', { style: 'margin:16px 0 8px;font-size:12px;text-transform:uppercase;color:var(--mut);letter-spacing:.05em', textContent: '2. Quines partides i quins mesos' }));
+
+  const barraAccions = el('div', { style: 'display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap' });
+  barraAccions.append(el('button', { class: 'btn s', textContent: '✅ Totes les partides', onclick: () => { partidesChecks.forEach(({ cb, mesos }) => { cb.checked = true; mesos.forEach(m => m.cb.checked = true); }); } }));
+  barraAccions.append(el('button', { class: 'btn s', textContent: '⬜ Cap partida', onclick: () => { partidesChecks.forEach(({ cb, mesos }) => { cb.checked = false; mesos.forEach(m => m.cb.checked = false); }); } }));
+  barraAccions.append(el('button', { class: 'btn s', textContent: '🎯 Només amb dades', onclick: () => {
+    partidesChecks.forEach(({ cb, mesos }) => {
+      const teDades = mesos.some(m => m.count > 0);
+      cb.checked = teDades;
+      mesos.forEach(m => m.cb.checked = m.count > 0);
+    });
+  } }));
+  card.append(barraAccions);
+
+  // Calculem els mesos amb dades per a cada partida
+  const mesosAmbDades = (p) => {
+    const set = new Set();
+    (p.exp || []).forEach(e => { if (e.d) set.add(e.d.slice(0,7)); });
+    (p.jornades || []).forEach(j => { if (j.data) set.add(j.data.slice(0,7)); });
+    (p.dietes || []).forEach(d => { if (d.data) set.add(d.data.slice(0,7)); });
+    return Array.from(set).sort();
+  };
+  const countMes = (p, mk) => {
+    let n = 0;
+    (p.exp || []).forEach(e => { if ((e.d || '').slice(0,7) === mk) n++; });
+    (p.jornades || []).forEach(j => { if ((j.data || '').slice(0,7) === mk) n++; });
+    (p.dietes || []).forEach(d => { if ((d.data || '').slice(0,7) === mk) n++; });
+    return n;
+  };
+
+  const llistaPartides = el('div', { style: 'max-height:320px;overflow-y:auto;border:1px solid var(--bd);border-radius:8px;padding:6px;background:var(--bg)' });
+  const partidesChecks = [];
+
+  s.budget.forEach((p) => {
+    const mesos = mesosAmbDades(p);
+    const pRow = el('div', { style: 'padding:6px 4px;border-bottom:1px solid var(--bd)' });
+    const pHeader = el('div', { style: 'display:flex;align-items:center;gap:8px' });
+    const pCb = el('input', { type: 'checkbox', checked: true });
+    pHeader.append(pCb);
+    pHeader.append(el('span', { style: 'font-weight:600;font-size:13px;cursor:pointer', textContent: p.c || '(sense nom)', onclick: () => { pCb.checked = !pCb.checked; pCb.dispatchEvent(new Event('change')); } }));
+    if (mesos.length === 0) {
+      pHeader.append(el('span', { style: 'font-size:11px;color:var(--mut);margin-left:auto', textContent: '(sense dades)' }));
+    } else {
+      pHeader.append(el('span', { style: 'font-size:11px;color:var(--mut);margin-left:auto', textContent: mesos.length + ' mes' + (mesos.length > 1 ? 'os' : '') }));
+    }
+    pRow.append(pHeader);
+
+    // Sub-llista de mesos
+    const mesosChecks = [];
+    if (mesos.length > 0) {
+      const subLlista = el('div', { style: 'margin:4px 0 4px 26px;display:flex;flex-wrap:wrap;gap:4px 10px' });
+      mesos.forEach(mk => {
+        const n = countMes(p, mk);
+        const mLbl = el('label', { style: 'display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;padding:2px 4px;border-radius:4px;background:var(--card);border:1px solid var(--bd)' });
+        const mCb = el('input', { type: 'checkbox', checked: true, style: 'width:14px;height:14px' });
+        mLbl.append(mCb);
+        mLbl.append(el('span', { textContent: nomMes(mk) + ' (' + n + ')' }));
+        mesosChecks.push({ mk, cb: mCb, count: n });
+        subLlista.append(mLbl);
+      });
+      pRow.append(subLlista);
+    }
+
+    // Si desmarquem la partida, desmarquem tots els mesos (i a l'inrevés)
+    pCb.addEventListener('change', () => {
+      mesosChecks.forEach(m => { m.cb.checked = pCb.checked; });
+      pCb.closest('div').style.opacity = pCb.checked ? '1' : '0.5';
+    });
+
+    llistaPartides.append(pRow);
+    partidesChecks.push({ p, cb: pCb, mesos: mesosChecks });
+  });
+
+  card.append(llistaPartides);
+
+  // ─── Peu: botons ───────────────────────────────────────
   const actions = el('div', { class: 'pm-actions' });
   actions.append(el('button', { class: 'btn', textContent: 'Cancel·lar', onclick: () => overlay.remove() }));
   actions.append(el('button', { class: 'btn p', textContent: '🖨️ Imprimir', onclick: () => {
@@ -3253,11 +3474,31 @@ function mostraMenuImpressio() {
       sumatori: cSumatori.checked
     };
     if (!seccions.resum && !seccions.despeses && !seccions.jornades && !seccions.dietes && !seccions.sumatori) {
-      alert('Has de marcar almenys una secció.');
+      alert('Has de marcar almenys una secció de contingut (resum, despeses, jornades, dietes o sumatori).');
       return;
     }
+
+    // Recollim les partides seleccionades
+    const partsFiltrades = [];
+    const mesosPerPartida = {};
+    let algunaPartida = false;
+    partidesChecks.forEach(({ p, cb, mesos }) => {
+      if (!cb.checked) return;
+      algunaPartida = true;
+      const mesosMarcats = mesos.filter(m => m.cb.checked).map(m => m.mk);
+      // Si cap mes està marcat, no imprimim aquesta partida
+      if (mesos.length > 0 && mesosMarcats.length === 0) return;
+      partsFiltrades.push(p);
+      mesosPerPartida[p.c || '(sense nom)'] = mesos.length > 0 ? mesosMarcats : null;
+    });
+
+    if (!algunaPartida || partsFiltrades.length === 0) {
+      alert('Has de marcar almenys una partida (i almenys un mes si en té).');
+      return;
+    }
+
     overlay.remove();
-    obreImpressioPressupost(seccions);
+    obreImpressioPressupost(seccions, partsFiltrades, mesosPerPartida);
   } }));
   card.append(actions);
   overlay.append(card);
@@ -3345,10 +3586,25 @@ function renderBudget(s) {
 
   const dSoundtrack = calculaDretsSoundtrack();
   const wrap = el('div', { class: 'card' });
+   // Netegem la selecció si estem en mode edició (perquè els checkboxes no es mostren)
+  if (editing) seleccioPartides.clear();
+
   wrap.append(el('div', { class: 'row', style: 'justify-content:space-between;margin:0 0 8px;align-items:center' }, [
     el('h3', { textContent: 'Full de pressupost', style: 'margin:0' }),
     el('div', { class: 'row', style: 'margin:0' }, [
-      el('button', { class: 'btn', textContent: '🖨️ Imprimir', title: 'Imprimir el pressupost (per seccions)', onclick: () => mostraMenuImpressio() }),
+      el('button', { class: 'btn', textContent: '🖨️ Imprimir', title: 'Imprimir el pressupost (per seccions i partides)', onclick: () => mostraMenuImpressio() }),
+      (() => {
+        const n = seleccioPartides.size;
+        const btn = el('button', { id: 'btn-imprimir-seleccio', class: 'btn p', title: 'Imprimir només les partides seleccionades (amb tots els seus mesos)', style: 'display:' + (n > 0 ? 'inline-flex' : 'none'), textContent: '🖨️ Imprimir ' + n + ' seleccionada' + (n > 1 ? 'es' : ''), onclick: () => {
+          const s = cur_();
+          if (!s || !s.budget) return;
+          const partsFiltrades = [];
+          seleccioPartides.forEach(idx => { if (s.budget[idx]) partsFiltrades.push(s.budget[idx]); });
+          if (!partsFiltrades.length) { alert('Cap partida seleccionada.'); return; }
+          obreImpressioPressupost({ resum: true, despeses: true, jornades: true, dietes: true, sumatori: true }, partsFiltrades, null);
+        } });
+        return btn;
+      })(),
       editing ? el('button', { class: 'btn s', textContent: '📥 Recarregar', onclick: () => {
         if (!confirm('Sobreescriure amb les 22 partides inicials?')) return;
         s.budget = JSON.parse(JSON.stringify(PARTIDES_INICIALS));
@@ -3392,8 +3648,26 @@ function renderBudget(s) {
       handle.addEventListener('dragend', () => row.classList.remove('dragging'));
       cellCaret.append(handle);
     }
-    cellCaret.append(el('button', { class: 'caret' + (open ? ' open' : ''), textContent: '▶', onclick: () => { openBud[idx] = !openBud[idx]; render(); } }));
+      cellCaret.append(el('button', { class: 'caret' + (open ? ' open' : ''), textContent: '▶', onclick: () => { openBud[idx] = !openBud[idx]; render(); } }));
     row.append(cellCaret);
+
+    // Checkbox de selecció de partida (només en mode no-edició, com a Imatges/Fotografies)
+    if (!editing) {
+      const cbPart = el('input', { type: 'checkbox', checked: seleccioPartides.has(idx), style: 'width:16px;height:16px;margin:0' });
+      cbPart.addEventListener('change', (ev) => {
+        ev.stopPropagation();
+        if (cbPart.checked) seleccioPartides.add(idx); else seleccioPartides.delete(idx);
+        // Repintem només el botó "Imprimir selecció" de la capçalera sense repintar tota la vista
+        const btn = document.getElementById('btn-imprimir-seleccio');
+        if (btn) {
+          const n = seleccioPartides.size;
+          btn.textContent = '🖨️ Imprimir ' + n + ' seleccionada' + (n > 1 ? 'es' : '');
+          btn.style.display = n > 0 ? 'inline-flex' : 'none';
+        }
+      });
+      // Inserim el checkbox a la primera columna, davant del caret
+      cellCaret.insertBefore(cbPart, cellCaret.firstChild);
+    }
 
     if (editing) {
       const cellC = el('div', {});
