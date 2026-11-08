@@ -103,7 +103,9 @@ input[type=time]{padding:6px;width:auto}
 .file-size{font-size:11px;color:var(--mut)}
 .file-actions{display:flex;gap:6px;margin-top:auto;flex-wrap:wrap}
 .file-actions .btn{flex:1;padding:4px 6px;font-size:12px;min-width:60px}
-.rich-editor{width:100%;min-height:400px;font:15px/1.7 Georgia,serif;padding:16px;background:var(--bg);border:1px solid var(--bd);border-radius:8px;outline:none}
+.rich-editor{width:100%;min-height:300px;max-height:65vh;overflow-y:auto;font:15px/1.7 Georgia,serif;padding:16px;background:var(--bg);border:1px solid var(--bd);border-radius:8px;outline:none}
+.doc-toolbar-sticky{position:sticky;top:0;z-index:5;background:var(--card);padding-bottom:6px}
+.doc-toolbar-sticky .audio-box{margin-bottom:6px}
 .rich-toolbar{display:flex;gap:4px;flex-wrap:wrap;padding:8px;background:var(--bg);border:1px solid var(--bd);border-radius:8px;margin-bottom:8px}
 .rich-toolbar button{background:var(--card);border:1px solid var(--bd);padding:4px 8px;border-radius:4px;cursor:pointer;font-size:14px;min-width:32px}
 .editor-save{font-size:12px;color:var(--ok);text-align:right;margin-top:6px}
@@ -1423,7 +1425,9 @@ function normalitzaCapcalera(h) {
   const n = h.toLowerCase().trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '_');
   if (/titol|titulo|title/.test(n)) return 'titol';
   if (/descrip|description|desc/.test(n)) return 'descripcio';
-  if (/link|url|font|proced|origen|source|enlace/.test(n)) return 'link_procedencia';
+  // ⚠️ origen_fons ha d'anar ABANS de link_procedencia
+  if (/origen_fons|origen_fondo|origen_de_fons|^origen$|^fons$|^fondo$|fons$|fondo$/.test(n)) return 'origen_fons';
+  if (/link|url|proced|source|enlace/.test(n)) return 'link_procedencia';
   if (/cobert|derech|right|copyright|llicencia|licencia|license/.test(n)) return 'cobertura';
   if (/credit|atribu|attribution/.test(n)) return 'credit_obligatori';
   if (/any|ano|year|data|date|fecha/.test(n)) return 'any_data';
@@ -1435,7 +1439,6 @@ function normalitzaCapcalera(h) {
   if (/capitol|capítulo|chapter/.test(n)) return 'capitol';
   if (/rellev|relev/.test(n)) return 'rellevancia';
   if (/durada|duraci|duration/.test(n)) return 'durada_visualitzacio';
-  if (/origen_fons|fons|fondo|fons/.test(n)) return 'origen_fons';
   return null;
 }
 async function importaImatges(text) {
@@ -2070,11 +2073,104 @@ function textCreditsInforme() {
   const linia = '===========================================================';
   const liniaCurta = '-----------------------------------------------------------';
   const avui = new Date();
-  const out = [linia, 'BADALONA COMUNICACIÓ · INFORME COMPLET DE CRÈDITS','Documental "Darrere el drac"', linia,'Data: ' + avui.toLocaleDateString('ca-ES'),'Crèdits tècnics: ' + creditsTecnics.length,'Imatges aprovades: ' + credits.filter(c => c.tipus === 'imatge').length,'Cançons aprovades: ' + credits.filter(c => c.tipus === 'musica').length,'Fotografies: ' + fotografies.length,'Frase imatges: "' + creditFraseImatges + '"','Frase música: "' + creditFraseMusica + '"', '','DOCUMENT FINAL DE CRÈDITS (per a la pantalla)', liniaCurta, textCreditsFinals(), '','DETALL CRÈDITS TÈCNICS', liniaCurta];
-  if (creditsTecnics.length) creditsTecnics.forEach((c, i) => { out.push((i+1) + '. [' + (c.categoria || '—') + '] ' + (c.nom || '—')); });
-  else out.push('(cap crèdit tècnic)');
+
+  // ── Fotografies: aprovades (les que ja han entrat a credits) vs pendents ──
+  const fotosAprovades = fotografies.filter(f => {
+    if ((f.estat_intern || '') !== 'aprovada') return false;
+    return classificaCobertura(f.cobertura, f.override_cobertura).estat === 'ok';
+  });
+  const fotosPendents = fotografies.filter(f => {
+    if ((f.estat_intern || '') === 'aprovada') return false;
+    const cl = complimentLegal(f);
+    return !cl.ok; // pendents o no compleixen
+  });
+
+  const out = [
+    linia,
+    'BADALONA COMUNICACIÓ · INFORME COMPLET DE CRÈDITS',
+    'Documental "Darrere el drac"',
+    linia,
+    'Data: ' + avui.toLocaleDateString('ca-ES'),
+    'Crèdits tècnics: ' + creditsTecnics.length,
+    'Imatges aprovades: ' + credits.filter(c => c.tipus === 'imatge').length,
+    'Cançons aprovades: ' + credits.filter(c => c.tipus === 'musica').length,
+    'Fotografies totals: ' + fotografies.length,
+    'Fotografies aprovades: ' + fotosAprovades.length,
+    'Fotografies pendents/no compleixen: ' + fotosPendents.length,
+    'Frase imatges: "' + creditFraseImatges + '"',
+    'Frase música: "' + creditFraseMusica + '"',
+    '',
+    'DOCUMENT FINAL DE CRÈDITS (per a la pantalla)',
+    liniaCurta,
+    textCreditsFinals(),
+    '',
+    'DETALL CRÈDITS TÈCNICS',
+    liniaCurta
+  ];
+
+  if (creditsTecnics.length) {
+    creditsTecnics.forEach((c, i) => {
+      out.push((i + 1) + '. [' + (c.categoria || '—') + '] ' + (c.nom || '—'));
+    });
+  } else {
+    out.push('(cap crèdit tècnic)');
+  }
+
   out.push('', 'DETALL IMATGES I MÚSICA', liniaCurta);
-  credits.forEach((c, i) => { out.push((i+1) + '. [' + (c.tipus || 'imatge') + '] ' + (c.arxiu || '—')); out.push('   Atribució: ' + (c.atribucio || '—')); if (c.titol) out.push('   Títol: ' + c.titol); if (c.any_text) out.push('   Any: ' + c.any_text); if (c.frase) out.push('   Frase pròpia: ' + c.frase); if (c.nota) out.push('   Nota: ' + c.nota); out.push(''); });
+  if (credits.length) {
+    credits.forEach((c, i) => {
+      out.push((i + 1) + '. [' + (c.tipus || 'imatge') + '] ' + (c.arxiu || '—'));
+      out.push('   Atribució: ' + (c.atribucio || '—'));
+      if (c.titol) out.push('   Títol: ' + c.titol);
+      if (c.any_text) out.push('   Any: ' + c.any_text);
+      if (c.frase) out.push('   Frase pròpia: ' + c.frase);
+      if (c.nota) out.push('   Nota: ' + c.nota);
+      out.push('');
+    });
+  } else {
+    out.push('(cap crèdit d\'imatge ni música)');
+  }
+
+  // ── NOU: detall de fotografies aprovades ──────────────────
+  out.push('', 'DETALL FOTOGRAFIES APROVADES', liniaCurta);
+  if (fotosAprovades.length) {
+    fotosAprovades.forEach((f, i) => {
+      out.push((i + 1) + '. "' + (f.titol || '—') + '"');
+      if (f.autor) out.push('   Autor: ' + f.autor);
+      if (f.any_data) out.push('   Any: ' + f.any_data);
+      if (f.origen_fons) out.push('   Origen del fons: ' + f.origen_fons);
+      if (f.credit_obligatori) out.push('   Crèdit obligatori: ' + f.credit_obligatori);
+      if (f.capitol) out.push('   Capítol: ' + f.capitol);
+      if (f.rellevancia) out.push('   Rellevància: ' + f.rellevancia);
+      if (f.link_procedencia) out.push('   Enllaç: ' + f.link_procedencia);
+      out.push('');
+    });
+  } else {
+    out.push('(cap fotografia aprovada)');
+  }
+
+  // ── NOU: fotografies pendents o que no compleixen ─────────
+  out.push('', 'FOTOGRAFIES PENDENTS O QUE NO COMPLEIXEN', liniaCurta);
+  if (fotosPendents.length) {
+    fotosPendents.forEach((f, i) => {
+      const cl = complimentLegal(f);
+      const estatTxt = cl.investigant ? '⏳ INVESTIGANT' : '❌ NO COMPLEIX';
+      out.push((i + 1) + '. ' + estatTxt + ' · "' + (f.titol || '—') + '"');
+      if (f.estat_intern) out.push('   Estat intern: ' + f.estat_intern);
+      if (cl.errors.length) {
+        out.push('   Errors:');
+        cl.errors.forEach(e => out.push('     · ' + e));
+      }
+      if (cl.avisos.length) {
+        out.push('   Avisos:');
+        cl.avisos.forEach(a => out.push('     · ' + a));
+      }
+      out.push('');
+    });
+  } else {
+    out.push('(cap fotografia pendent — tot aprovat)');
+  }
+
   out.push(linia);
   return out.join('\n');
 }
@@ -2579,12 +2675,13 @@ function renderDocEditor() {
   rightB.append(el('button', { class: 'btn p', textContent: '📄 PDF', onclick: () => descarregaPDF(d) }));
   bar.append(rightB); card.append(bar);
   card.append(el('input', { type: 'text', value: d.title || 'Sense títol', placeholder: 'Títol', style: 'font-size:20px;font-weight:700;font-family:Georgia,serif;margin-bottom:10px', oninput: e => { d.title = e.target.value; saveDoc(d); } }));
-  let audioEl = null;
+    let audioEl = null;
+  const stickyTop = el('div', { class: 'doc-toolbar-sticky' });
   if (d.audio_path) {
     const box = el('div', { class: 'audio-box' });
     box.append(el('div', { class: 'audio-label', textContent: '🎧 ' + (d.audio_name || 'Àudio') }));
     audioEl = el('audio', { controls: true, preload: 'metadata', class: 'audio-player' });
-    box.append(audioEl); card.append(box);
+    box.append(audioEl); stickyTop.append(box);
     (async () => { const { data, error } = await db.storage.from('adjunts').createSignedUrl(d.audio_path, 7200); if (error) { box.append(el('div', { class: 'badge', textContent: '⚠️ ' + error.message })); return; } audioEl.src = data.signedUrl; })();
   }
   const tb = el('div', { class: 'rich-toolbar' });
@@ -2593,7 +2690,8 @@ function renderDocEditor() {
     tb.append(el('button', { textContent: '⏱️', style: 'background:var(--ac);color:#fff', onclick: (e) => { e.preventDefault(); insertaTimestamp(d, audioEl); } }));
     tb.append(el('button', { textContent: '▶️', onclick: (e) => { e.preventDefault(); if (!audioEl || !audioEl.src) return; if (audioEl.paused) { const p = audioEl.play(); if (p && p.catch) p.catch((err) => { if (err.name !== 'AbortError') console.warn(err); }); } else { audioEl.pause(); } } }));
   }
-  card.append(tb);
+  stickyTop.append(tb);
+  card.append(stickyTop);
   const ed = el('div', { class: 'rich-editor', contentEditable: 'true' }); ed.innerHTML = d.content || '';
   if (ed.querySelectorAll('.ts').length === 0 && /\[\d{1,2}:\d{2}(?::\d{2})?\]/.test(ed.textContent)) {
     const regex = /\[(\d{1,2}:\d{2}(?::\d{2})?)\]/g; let count = 0;
@@ -2887,7 +2985,11 @@ function renderBudget(s) {
     const open = !!openBud[idx];
     const real = realOf(p);
     const isSoundtrack = /soundtrack/i.test(p.c || '');
-    const row = el('div', { class: 'bud-row' + (open ? ' open' : '') });
+      const row = el('div', { class: 'bud-row' + (open ? ' open' : '') });
+    // ⚠️ Possible doble comptatge (declarat ABANS d'usar-lo al concepteCell)
+    const teDespesesManuals = (p.exp || []).some(e => Number(e.a) > 0);
+    const teAdquisicioPagada = isSoundtrack && dSoundtrack.existeix && dSoundtrack.pagat > 0;
+    const possibleDobleComptatge = isSoundtrack && teDespesesManuals && teAdquisicioPagada;
 
     const cellCaret = el('div', { class: 'bc-caret' });
     if (editing) {
@@ -2917,6 +3019,7 @@ function renderBudget(s) {
       row.append(el('div', { class: 'bc-num' }, el('input', { type: 'number', value: p.p, min: 0, step: '0.01', style: 'text-align:right', oninput: e => { p.p = Number(e.target.value) || 0; save(s); } })));
     } else {
       const concepteCell = el('div', { textContent: p.c || '(sense nom)' });
+if (possibleDobleComptatge) concepteCell.append(el('span', { class: 'budget-badge', style: 'background:rgba(192,57,43,.15);color:var(--err);font-weight:700', title: 'Hi ha despeses manuals a la partida i adquisicions pagades a music_rights. El Real podria estar inflat.', textContent: '⚠️ Possible doble comptatge' }));
       if (isSoundtrack && dSoundtrack.existeix && dSoundtrack.pendent > 0) concepteCell.append(el('span', { class: 'budget-badge', textContent: '🎼 ' + eur(dSoundtrack.pendent) + ' pendents en drets musicals' }));
       if (p.admet_jornades && (p.jornades || []).length) { const pend = pendentJornadesOf(p); if (pend > 0) concepteCell.append(el('span', { class: 'budget-badge', textContent: '🎬 ' + eur(pend) + ' pendents de cobrar' })); }
       if (p.admet_dietes && (p.dietes || []).length) { const pendD = pendentDietesOf(p); if (pendD > 0) concepteCell.append(el('span', { class: 'budget-badge', textContent: '🍽️ ' + eur(pendD) + ' en dietes pendents' })); }
@@ -2925,8 +3028,8 @@ function renderBudget(s) {
       row.append(el('div', { class: 'bc-num', textContent: eur(p.p) }));
     }
 
-    let realMostrat = real;
-    if (isSoundtrack && dSoundtrack.existeix && dSoundtrack.pagat > 0) realMostrat = real + dSoundtrack.pagat;
+      let realMostrat = real;
+    if (teAdquisicioPagada) realMostrat = real + dSoundtrack.pagat;
     row.append(el('div', { class: 'bc-num strong', textContent: eur(realMostrat) }));
 
     let estatMostrar = p.st || 'pendent';
