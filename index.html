@@ -210,7 +210,7 @@ input[type=time]{padding:6px;width:auto}
 .jorn-mes-total{font-variant-numeric:tabular-nums;font-weight:700}
 .jorn-mes-cobrat{font-size:11px;color:var(--mut);font-variant-numeric:tabular-nums}
 .jorn-taula{margin:8px 0 4px 16px}
-.jorn-row{display:grid;grid-template-columns:130px 180px 160px 1fr 90px 50px 90px 50px 30px;gap:6px;align-items:center;padding:4px 0;border-bottom:1px solid var(--bd);font-size:13px}
+.jorn-row{display:grid;grid-template-columns:130px 170px 160px 1fr 80px 44px 50px 90px 50px 30px;gap:6px;align-items:center;padding:4px 0;border-bottom:1px solid var(--bd);font-size:13px}
 .jorn-head{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--mut);font-weight:600;border-bottom:2px solid var(--bd)}
 .jorn-row.done .jorn-num{color:var(--tx) !important;opacity:1 !important}
 .jorn-num{text-align:right;font-variant-numeric:tabular-nums;font-weight:600}
@@ -233,6 +233,18 @@ input[type=time]{padding:6px;width:auto}
 .diet-head{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--mut);font-weight:600;border-bottom:2px solid var(--bd)}
 .diet-num{text-align:right;font-variant-numeric:tabular-nums;font-weight:600}
 .diet-row.done .diet-num{color:var(--tx);opacity:1}
+
+/* BOTONS IMPRESSIÓ */
+.btn-print{background:var(--bg);border:1px solid var(--bd);color:var(--tx);padding:3px 8px;border-radius:6px;cursor:pointer;font-size:12px;line-height:1;display:inline-flex;align-items:center;gap:4px}
+.btn-print:hover{background:rgba(180,71,31,.1);border-color:var(--ac);color:var(--ac)}
+.btn-print.sm{padding:1px 5px;font-size:11px}
+.print-menu{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:200;display:flex;align-items:center;justify-content:center;padding:16px}
+.print-menu-card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:20px;max-width:480px;width:100%;box-shadow:0 12px 48px rgba(0,0,0,.25);max-height:90vh;overflow-y:auto}
+.print-menu-card h3{font-size:15px;text-transform:none;letter-spacing:0;color:var(--tx);margin:0 0 12px;font-family:Georgia,serif;font-weight:700}
+.print-menu-card label{display:flex;align-items:center;gap:10px;padding:8px 4px;cursor:pointer;font-size:14px;border-bottom:1px solid var(--bd)}
+.print-menu-card label:last-of-type{border-bottom:none}
+.print-menu-card label input{width:18px;height:18px;flex:none}
+.print-menu-card .pm-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:16px;flex-wrap:wrap}
 
 @media (max-width:640px){
   .bud-head,.bud-row{grid-template-columns:24px 1fr 90px 32px}
@@ -355,7 +367,8 @@ const importJornada = j => {
   const tipusJ = j.tipus_jornada || 'sencera';
   const preu = PREUS_JORNADA[tipusJ] || 0;
   const nPers = Array.isArray(j.persones_noms) ? j.persones_noms.length : (Number(j.persones) || 0);
-  return preu * nPers;
+  const dies = Number(j.dies) || 1;
+  return preu * nPers * dies;
 };
 
 const mesDeJornada  = j => (j.data || '').slice(0, 7);
@@ -648,7 +661,6 @@ function render() {
     ]));
   }
 }
-
 function calcularDiagnosticoLegal(c) {
   const anyG = Number(c.ano_grabacion) || 0;
   const anyM = Number(c.ano_muerte_autor) || 0;
@@ -824,6 +836,49 @@ function cancionsSeleccionades() { return musicRights.filter(c => seleccioMR.has
 
 async function desaCancion(c) {
   if (!c.titulo || !c.titulo.trim()) { alert('Cal indicar el títol.'); return; }
+
+  // ── Validacions ─────────────────────────────────────────────
+  const errors = [];
+
+  // URL de descàrrega / procedència
+  const link = (c.link_descarga || '').trim();
+  if (link && !/^https?:\/\//i.test(link)) {
+    errors.push('L\'enllaç de descàrrega no és una URL vàlida (ha de començar per http:// o https://).');
+  }
+
+  // Any de gravació: 1888 (naixement del cinema) fins a l'any actual
+  const anyG = Number(c.ano_grabacion) || 0;
+  if (anyG && (anyG < 1888 || anyG > ANNO_ACTUAL)) {
+    errors.push('L\'any de gravació ha d\'estar entre 1888 i ' + ANNO_ACTUAL + '.');
+  }
+
+  // Any de defunció de l'autor
+  const anyM = Number(c.ano_muerte_autor) || 0;
+  if (anyM && (anyM < 1888 || anyM > ANNO_ACTUAL)) {
+    errors.push('L\'any de defunció de l\'autor ha d\'estar entre 1888 i ' + ANNO_ACTUAL + '.');
+  }
+  if (anyG && anyM && anyM < anyG) {
+    errors.push('L\'any de defunció de l\'autor (' + anyM + ') és anterior a l\'any de gravació (' + anyG + ').');
+  }
+
+  // Import d'adquisició no negatiu
+  const imp = Number(c.adquisicio_import) || 0;
+  if (imp < 0) {
+    errors.push('L\'import d\'adquisició no pot ser negatiu.');
+  }
+
+  // Cost previst no negatiu
+  const cost = Number(c.partida_presupuesto) || 0;
+  if (cost < 0) {
+    errors.push('El cost previst no pot ser negatiu.');
+  }
+
+  if (errors.length) {
+    alert('No es pot desar:\n\n' + errors.map(e => '· ' + e).join('\n'));
+    return;
+  }
+  // ────────────────────────────────────────────────────────────
+
   const payload = {
     referencia: c.referencia || '', link_descarga: c.link_descarga || '', titulo: c.titulo || '',
     interprete: c.interprete || '', ano_grabacion: Number(c.ano_grabacion) || 0,
@@ -1153,7 +1208,6 @@ function complimentLegal(item) {
   const ok = errors.length === 0 && !investigant;
   return { ok, errors, avisos, investigant, classificacio };
 }
-
 /* === IMATGES === */
 function filtraImatges() {
   const q = (filtreImg.text || '').toLowerCase().trim();
@@ -1866,7 +1920,6 @@ const ANNEX_COBERTURES = [
 'ACCIONS PER A PRODUCCIÓ:',
 'NO integrar al muntatge fins a tancar la verificació.'
 ].join('\n');
-
 function textInformeImatge(img) {
   const c = classificaCobertura(img.cobertura, img.override_cobertura);
   const cl = complimentLegal(img);
@@ -2394,7 +2447,6 @@ async function autoGeneraCredits() {
   alert('✅ ' + r.data.length + ' crèdits afegits.');
   render();
 }
-
 /* === ALTRES VISTES === */
 function renderOverview() {
   const wrap = el('div');
@@ -2455,7 +2507,9 @@ function renderGantt() {
         if (!j.data) return;
         const nPers = (j.persones_noms || []).length || Number(j.persones) || 0;
         const tipusCalcJ = j.tipus_jornada || 'sencera';
-        tasques.push({ tasca: { t: '🎬 ' + (j.concepte || p.c || 'Jornada') + ' · ' + (ETIQ_CURTA[tipusCalcJ] || '?') + ' × ' + nPers + 'p', k: 'Producció', done: !!j.cobrat, h: '' }, seccio: bsec, inici: j.data, fi: j.data, auto: false, esJornada: true, esDieta: false });
+        const diesJ = Number(j.dies) || 1;
+        const diesTxt = diesJ > 1 ? ' × ' + diesJ + 'd' : '';
+        tasques.push({ tasca: { t: '🎬 ' + (j.concepte || p.c || 'Jornada') + ' · ' + (ETIQ_CURTA[tipusCalcJ] || '?') + diesTxt + ' × ' + nPers + 'p', k: 'Producció', done: !!j.cobrat, h: '' }, seccio: bsec, inici: j.data, fi: j.data, auto: false, esJornada: true, esDieta: false });
       });
       (p.dietes || []).forEach(d => {
         if (!d.data) return;
@@ -2547,8 +2601,10 @@ function renderCal() {
         const { j, p, s } = item;
         const nPers = (j.persones_noms || []).length || Number(j.persones) || 0;
         const tipusCalcCal = j.tipus_jornada || 'sencera';
-        const label = '🎬 ' + (ETIQ_CURTA[tipusCalcCal] || '?') + ' ' + (j.concepte || p.c || 'Jornada') + ' (' + nPers + 'p)';
-        c.append(el('div', { class: 'chip jorn-chip' + (j.cobrat ? ' done' : ''), title: (ETIQ_JORNADA[tipusCalcCal] || 'Fora de rang') + ' × ' + nPers + ' persones = ' + eur(importJornada(j)), textContent: label, onclick: () => goto(s.id) }));
+        const diesJ = Number(j.dies) || 1;
+        const diesTxt = diesJ > 1 ? ' ×' + diesJ + 'd' : '';
+        const label = '🎬 ' + (ETIQ_CURTA[tipusCalcCal] || '?') + diesTxt + ' ' + (j.concepte || p.c || 'Jornada') + ' (' + nPers + 'p)';
+        c.append(el('div', { class: 'chip jorn-chip' + (j.cobrat ? ' done' : ''), title: (ETIQ_JORNADA[tipusCalcCal] || 'Fora de rang') + (diesJ > 1 ? ' × ' + diesJ + ' dies' : '') + ' × ' + nPers + ' persones = ' + eur(importJornada(j)), textContent: label, onclick: () => goto(s.id) }));
       } else if (item.esDieta) {
         const dd = item.dieta;
         const nPersD = (dd.persones_noms || []).length || (dd.persona ? 1 : 0);
@@ -2638,7 +2694,6 @@ function mouPartidaA(s, from, to) {
   s.budget.forEach((p, i) => p.pos = i);
   save(s); render();
 }
-
 function renderDocsUI() { if (currentDoc) return renderDocEditor(); return renderDocsList(); }
 
 function renderDocsList() {
@@ -2675,7 +2730,7 @@ function renderDocEditor() {
   rightB.append(el('button', { class: 'btn p', textContent: '📄 PDF', onclick: () => descarregaPDF(d) }));
   bar.append(rightB); card.append(bar);
   card.append(el('input', { type: 'text', value: d.title || 'Sense títol', placeholder: 'Títol', style: 'font-size:20px;font-weight:700;font-family:Georgia,serif;margin-bottom:10px', oninput: e => { d.title = e.target.value; saveDoc(d); } }));
-    let audioEl = null;
+  let audioEl = null;
   const stickyTop = el('div', { class: 'doc-toolbar-sticky' });
   if (d.audio_path) {
     const box = el('div', { class: 'audio-box' });
@@ -2920,6 +2975,343 @@ function mostraResultats(r) {
   addGrup('📎 Fitxers', r.fitxers, (x) => goto(x.seccio.id), (x) => ({ title: x.fitxer.name, meta: x.seccio.name }));
   box.classList.add('open');
 }
+/* ============================================================
+   IMPRESSIÓ DEL PRESSUPOST
+   ============================================================ */
+
+// Genera un HTML net amb capçalera corporativa i CSS @media print
+function _htmlImpressio(titol, cosHtml) {
+  const avui = new Date();
+  const dataStr = avui.toLocaleDateString('ca-ES', { day: '2-digit', month: 'long', year: 'numeric' });
+  const horaStr = avui.toLocaleTimeString('ca-ES', { hour: '2-digit', minute: '2-digit' });
+  return '<!doctype html><html lang="ca"><head><meta charset="utf-8"><title>' + escapeHtml(titol) + '</title><style>'
+    + '@page{size:A4;margin:15mm 14mm}'
+    + '*{box-sizing:border-box}'
+    + 'body{font:11pt/1.5 Georgia,"Times New Roman",serif;color:#1f1d1a;background:#fff;margin:0;padding:0}'
+    + 'h1{font-size:18pt;margin:0 0 2px;color:#b4471f}'
+    + '.head{border-bottom:2px solid #b4471f;padding-bottom:8px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:flex-end;gap:12px}'
+    + '.head .sub{font-size:10pt;color:#666;font-style:italic}'
+    + '.head .meta{font-size:9pt;color:#666;text-align:right}'
+    + 'h2{font-size:14pt;margin:18px 0 8px;color:#b4471f;border-bottom:1px solid #e2ddd2;padding-bottom:3px}'
+    + 'h3{font-size:11pt;margin:14px 0 6px;color:#333;text-transform:uppercase;letter-spacing:.05em}'
+    + 'table{width:100%;border-collapse:collapse;font-size:10pt;margin-bottom:8px}'
+    + 'th,td{padding:4px 6px;border-bottom:1px solid #e2ddd2;text-align:left;vertical-align:top}'
+    + 'th{background:#f6f4ef;font-weight:700;font-size:9pt;text-transform:uppercase;letter-spacing:.04em;color:#555}'
+    + 'td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}'
+    + 'td.num.strong{font-weight:700}'
+    + 'tr.total td{border-top:2px solid #b4471f;border-bottom:none;font-weight:700;background:#faf6f1}'
+    + '.pill{display:inline-block;font-size:8pt;padding:1px 6px;border-radius:999px;background:#eee;color:#333;margin-right:3px}'
+    + '.pill.ok{background:#d6efe0;color:#1a6b3a}'
+    + '.pill.warn{background:#fbeccd;color:#7a4a0c}'
+    + '.pill.ko{background:#f8d8d3;color:#8a1e14}'
+    + '.muted{color:#666;font-size:9pt}'
+    + '.summary-block{background:#faf6f1;border:1px solid #e2ddd2;border-radius:6px;padding:10px 14px;margin:14px 0}'
+    + '.summary-block .row-s{display:grid;grid-template-columns:1fr auto;gap:4px 20px;font-size:10pt;padding:2px 0}'
+    + '.summary-block .row-s.big{font-size:12pt;font-weight:700;border-top:1px solid #b4471f;padding-top:6px;margin-top:4px}'
+    + '.summary-block .row-s .lbl{color:#555}'
+    + '.summary-block .row-s .val{text-align:right;font-variant-numeric:tabular-nums}'
+    + '.summary-block .row-s .val.pos{color:#8a1e14}'
+    + '.summary-block .row-s .val.neg{color:#1a6b3a}'
+    + 'tr{page-break-inside:avoid}'
+    + 'h2,h3{page-break-after:avoid}'
+    + '@media print{.no-print{display:none !important}}'
+    + '</style></head><body>'
+    + '<div class="head">'
+    + '<div><h1>Badalona Comunicació</h1><div class="sub">Darrere el drac · Un documental de David González i Joan Clusella</div></div>'
+    + '<div class="meta">' + escapeHtml(titol) + '<br>' + dataStr + ' · ' + horaStr + '</div>'
+    + '</div>'
+    + cosHtml
+    + '<script>window.addEventListener("load",function(){setTimeout(function(){window.print();},400);});<\/script>'
+    + '</body></html>';
+}
+
+// Obre una finestra nova amb el contingut i llança window.print()
+function _obreImpressio(html) {
+  const w = window.open('', '_blank');
+  if (!w) { alert('El navegador ha bloquejat la finestra emergent. Desbloqueja els pop-ups per a aquest lloc.'); return; }
+  w.document.open();
+  w.document.write(html);
+  w.document.close();
+}
+
+// ─── Taula de resum de partides ─────────────────────────────
+function _htmlTaulaPartides(partides, opts = {}) {
+  const files = partides.map(p => {
+    const real = realOf(p);
+    const isSound = /soundtrack/i.test(p.c || '');
+    const dS = calculaDretsSoundtrack();
+    const realMostrat = (isSound && dS.existeix && dS.pagat > 0) ? real + dS.pagat : real;
+    let estat = p.st || 'pendent';
+    if (isSound && dS.existeix && dS.pagat > 0) estat = 'pagat';
+    const pillClass = estat === 'pagat' ? 'ok' : estat === 'aprovat' ? 'warn' : '';
+    return '<tr>'
+      + '<td>' + escapeHtml(p.c || '—') + '</td>'
+      + '<td>' + escapeHtml(p.cat || '—') + '</td>'
+      + '<td class="num">' + eur(p.p) + '</td>'
+      + '<td class="num strong">' + eur(realMostrat) + '</td>'
+      + '<td><span class="pill ' + pillClass + '">' + stLabel(estat) + '</span></td>'
+      + '</tr>';
+  }).join('');
+  const totalP = partides.reduce((a, p) => a + (Number(p.p) || 0), 0);
+  const totalR = partides.reduce((a, p) => { let base = realOf(p); const isSound = /soundtrack/i.test(p.c || ''); const dS = calculaDretsSoundtrack(); if (isSound && dS.existeix && dS.pagat > 0) base += dS.pagat; return a + base; }, 0);
+  return '<table><thead><tr>'
+    + '<th>Concepte</th><th>Tipus</th><th class="num">Previst</th><th class="num">Real</th><th>Estat</th>'
+    + '</tr></thead><tbody>' + files
+    + '<tr class="total"><td colspan="2">TOTAL (' + partides.length + ' partides)</td><td class="num">' + eur(totalP) + '</td><td class="num">' + eur(totalR) + '</td><td></td></tr>'
+    + '</tbody></table>';
+}
+
+// ─── Bloc de despeses (agrupades per mes) ───────────────────
+function _htmlDespesesPerMes(partides) {
+  const perMes = {};
+  partides.forEach(p => {
+    (p.exp || []).forEach(e => {
+      const k = e.d ? e.d.slice(0, 7) : 'sense-data';
+      if (!perMes[k]) perMes[k] = [];
+      perMes[k].push({ ...e, __partida: p.c });
+    });
+  });
+  const mesKeys = Object.keys(perMes).sort();
+  if (!mesKeys.length) return '<p class="muted">(cap despesa registrada)</p>';
+  let html = '';
+  let totalGeneral = 0;
+  mesKeys.forEach(mk => {
+    const items = perMes[mk].sort((a,b) => (a.d||'').localeCompare(b.d||''));
+    const total = items.reduce((a, e) => a + (Number(e.a) || 0), 0);
+    totalGeneral += total;
+    html += '<h3>' + escapeHtml(mk === 'sense-data' ? 'Sense data' : nomMes(mk)) + ' <span class="muted">(' + items.length + ' partides · ' + eur(total) + ')</span></h3>';
+    html += '<table><thead><tr><th>Data</th><th>Concepte</th><th>Partida</th><th class="num">Import</th></tr></thead><tbody>';
+    items.forEach(e => {
+      html += '<tr><td>' + (e.d ? fmt(e.d) : '—') + '</td><td>' + escapeHtml(e.t || '(sense concepte)') + '</td><td>' + escapeHtml(e.__partida || '—') + '</td><td class="num">' + eur(e.a) + '</td></tr>';
+    });
+    html += '<tr class="total"><td colspan="3">Total ' + escapeHtml(nomMes(mk)) + '</td><td class="num">' + eur(total) + '</td></tr>';
+    html += '</tbody></table>';
+  });
+  html += '<p style="text-align:right;font-size:11pt;margin-top:8px"><strong>Total despeses: ' + eur(totalGeneral) + '</strong></p>';
+  return html;
+}
+
+// ─── Bloc de jornades (agrupades per mes) ───────────────────
+function _htmlJornadesPerMes(partides) {
+  let html = '';
+  let totalGeneral = 0;
+  partides.forEach(p => {
+    if (!p.admet_jornades || !(p.jornades || []).length) return;
+    const grups = agrupaJornadesPerMes(p.jornades);
+    const keys = ordenaMesos(Object.keys(grups));
+    if (!keys.length) return;
+    html += '<h3>' + escapeHtml(p.c || '—') + '</h3>';
+    keys.forEach(mk => {
+      const arr = grups[mk];
+      const tM = totalMes(arr);
+      totalGeneral += tM;
+      html += '<h4 style="font-size:10pt;margin:8px 0 4px;color:#555">' + escapeHtml(nomMes(mk)) + ' <span class="muted">(' + arr.length + ' jornades · ' + eur(tM) + ')</span></h4>';
+      html += '<table><thead><tr><th>Data</th><th>Tipus</th><th>Persones</th><th>Concepte</th><th class="num">Dies</th><th class="num">Pers.</th><th class="num">Total</th><th>Estat</th></tr></thead><tbody>';
+      arr.forEach(j => {
+        const tipusJ = j.tipus_jornada || 'sencera';
+        const preuU = PREUS_JORNADA[tipusJ] || 0;
+        const nPers = (j.persones_noms || []).length;
+        const diesJ = Number(j.dies) || 1;
+        const totalJ = preuU * nPers * diesJ;
+        const pillClass = j.cobrat ? 'ok' : 'warn';
+        html += '<tr>'
+          + '<td>' + (j.data ? fmt(j.data) : '—') + '</td>'
+          + '<td>' + escapeHtml(ETIQ_JORNADA[tipusJ] || '—') + '</td>'
+          + '<td>' + escapeHtml((j.persones_noms || []).join(', ') || '—') + '</td>'
+          + '<td>' + escapeHtml(j.concepte || '—') + '</td>'
+          + '<td class="num">' + diesJ + '</td>'
+          + '<td class="num">' + nPers + '</td>'
+          + '<td class="num strong">' + eur(totalJ) + '</td>'
+          + '<td><span class="pill ' + pillClass + '">' + (j.cobrat ? 'Cobrat' : 'Pendent') + '</span></td>'
+          + '</tr>';
+      });
+      html += '</tbody></table>';
+    });
+  });
+  if (!html) return '<p class="muted">(cap jornada registrada)</p>';
+  html += '<p style="text-align:right;font-size:11pt;margin-top:8px"><strong>Total jornades: ' + eur(totalGeneral) + '</strong></p>';
+  return html;
+}
+
+// ─── Bloc de dietes (agrupades per mes) ─────────────────────
+function _htmlDietesPerMes(partides) {
+  let html = '';
+  let totalGeneral = 0;
+  partides.forEach(p => {
+    if (!p.admet_dietes || !(p.dietes || []).length) return;
+    const grups = agrupaDietesPerMes(p.dietes);
+    const keys = ordenaMesos(Object.keys(grups));
+    if (!keys.length) return;
+    html += '<h3>' + escapeHtml(p.c || '—') + '</h3>';
+    keys.forEach(mk => {
+      const arr = grups[mk];
+      const tM = totalDietesMes(arr);
+      totalGeneral += tM;
+      const titol = (arr[0] && arr[0].__titolMes) || nomMesDieta(mk);
+      html += '<h4 style="font-size:10pt;margin:8px 0 4px;color:#555">' + escapeHtml(titol) + ' <span class="muted">(' + arr.length + ' dietes · ' + eur(tM) + ')</span></h4>';
+      html += '<table><thead><tr><th>Data</th><th>Persones</th><th>Concepte</th><th>Tipus</th><th class="num">Import</th><th>Estat</th></tr></thead><tbody>';
+      arr.forEach(d => {
+        const pillClass = d.estat === 'cobrat' ? 'ok' : 'warn';
+        html += '<tr>'
+          + '<td>' + (d.data ? fmt(d.data) : '—') + '</td>'
+          + '<td>' + escapeHtml((d.persones_noms || []).join(', ') || '—') + '</td>'
+          + '<td>' + escapeHtml(d.concepte || '—') + '</td>'
+          + '<td>' + escapeHtml((TIPUS_DIETA.find(t => t[0] === d.tipus) || [,'—'])[1]) + '</td>'
+          + '<td class="num strong">' + eur(dietaImport(d)) + '</td>'
+          + '<td><span class="pill ' + pillClass + '">' + (d.estat === 'cobrat' ? 'Cobrat' : 'Pendent') + '</span></td>'
+          + '</tr>';
+      });
+      html += '</tbody></table>';
+    });
+  });
+  if (!html) return '<p class="muted">(cap dieta registrada)</p>';
+  html += '<p style="text-align:right;font-size:11pt;margin-top:8px"><strong>Total dietes: ' + eur(totalGeneral) + '</strong></p>';
+  return html;
+}
+
+// ─── Sumatori final ─────────────────────────────────────────
+function _htmlSumatori(partides) {
+  const totalP = partides.reduce((a, p) => a + (Number(p.p) || 0), 0);
+  const dS = calculaDretsSoundtrack();
+  const totalR = partides.reduce((a, p) => { let base = realOf(p); if (/soundtrack/i.test(p.c || '') && dS.existeix && dS.pagat > 0) base += dS.pagat; return a + base; }, 0);
+  const pendJ = partides.reduce((a, p) => a + pendentJornadesOf(p), 0);
+  const pendD = partides.reduce((a, p) => a + pendentDietesOf(p), 0);
+  const pendS = dS.existeix ? dS.pendent : 0;
+  const totalPendent = pendJ + pendD + pendS;
+  const totalRealComplert = totalR + totalPendent;
+  const diff = totalRealComplert - totalP;
+  let html = '<div class="summary-block">';
+  html += '<div class="row-s"><span class="lbl">Total previst</span><span class="val">' + eur(totalP) + '</span></div>';
+  html += '<div class="row-s"><span class="lbl">Total real (pagat + compromès)</span><span class="val">' + eur(totalRealComplert) + '</span></div>';
+  if (totalPendent > 0) {
+    html += '<div class="row-s"><span class="lbl">├─ Pendent de pagar/cobrar</span><span class="val">' + eur(totalPendent) + '</span></div>';
+    if (pendJ > 0) html += '<div class="row-s"><span class="lbl" style="padding-left:14px">· Jornades pendents</span><span class="val">' + eur(pendJ) + '</span></div>';
+    if (pendD > 0) html += '<div class="row-s"><span class="lbl" style="padding-left:14px">· Dietes pendents</span><span class="val">' + eur(pendD) + '</span></div>';
+    if (pendS > 0) html += '<div class="row-s"><span class="lbl" style="padding-left:14px">· Drets Soundtrack pendents</span><span class="val">' + eur(pendS) + '</span></div>';
+  }
+  html += '<div class="row-s big"><span class="lbl">Diferència</span><span class="val ' + (diff > 0 ? 'pos' : diff < 0 ? 'neg' : '') + '">' + (diff > 0 ? '+' : '') + eur(diff) + '</span></div>';
+  html += '</div>';
+  return html;
+}
+
+// ─── Impressió completa o per seccions ──────────────────────
+function obreImpressioPressupost(seccions) {
+  const s = cur_();
+  if (!s || !s.budget) return;
+  const parts = s.budget;
+  const cos = [];
+  if (seccions.resum) {
+    cos.push('<h2>Resum de partides</h2>');
+    cos.push(_htmlTaulaPartides(parts));
+  }
+  if (seccions.despeses) {
+    cos.push('<h2>Despeses (per mes)</h2>');
+    cos.push(_htmlDespesesPerMes(parts));
+  }
+  if (seccions.jornades) {
+    cos.push('<h2>Jornades especials (per mes)</h2>');
+    cos.push(_htmlJornadesPerMes(parts));
+  }
+  if (seccions.dietes) {
+    cos.push('<h2>Dietes (per mes)</h2>');
+    cos.push(_htmlDietesPerMes(parts));
+  }
+  if (seccions.sumatori) {
+    cos.push('<h2>Sumatori final</h2>');
+    cos.push(_htmlSumatori(parts));
+  }
+  _obreImpressio(_htmlImpressio('Pressupost del documental', cos.join('')));
+}
+
+// ─── Modal per triar què imprimir ──────────────────────────
+function mostraMenuImpressio() {
+  const overlay = el('div', { class: 'print-menu', onclick: (e) => { if (e.target === overlay) overlay.remove(); } });
+  const card = el('div', { class: 'print-menu-card' });
+  card.append(el('h3', { textContent: '🖨️ Imprimir pressupost' }));
+  card.append(el('p', { style: 'font-size:12px;color:var(--mut);margin:0 0 10px', textContent: 'Marca les seccions que vols incloure:' }));
+
+  const cResum = el('input', { type: 'checkbox', checked: true });
+  const cDespeses = el('input', { type: 'checkbox', checked: true });
+  const cJornades = el('input', { type: 'checkbox', checked: true });
+  const cDietes = el('input', { type: 'checkbox', checked: true });
+  const cSumatori = el('input', { type: 'checkbox', checked: true });
+
+  card.append(el('label', {}, [cResum, el('span', { textContent: '📋 Resum de partides (una línia per partida)' })]));
+  card.append(el('label', {}, [cDespeses, el('span', { textContent: '💸 Despeses (per mes, de totes les partides)' })]));
+  card.append(el('label', {}, [cJornades, el('span', { textContent: '🎬 Jornades especials (per mes, de totes les partides)' })]));
+  card.append(el('label', {}, [cDietes, el('span', { textContent: '🍽️ Dietes (per mes, de totes les partides)' })]));
+  card.append(el('label', {}, [cSumatori, el('span', { textContent: '📊 Sumatori final (previst, real, pendent, diferència)' })]));
+
+  const actions = el('div', { class: 'pm-actions' });
+  actions.append(el('button', { class: 'btn', textContent: 'Cancel·lar', onclick: () => overlay.remove() }));
+  actions.append(el('button', { class: 'btn p', textContent: '🖨️ Imprimir', onclick: () => {
+    const seccions = {
+      resum: cResum.checked,
+      despeses: cDespeses.checked,
+      jornades: cJornades.checked,
+      dietes: cDietes.checked,
+      sumatori: cSumatori.checked
+    };
+    if (!seccions.resum && !seccions.despeses && !seccions.jornades && !seccions.dietes && !seccions.sumatori) {
+      alert('Has de marcar almenys una secció.');
+      return;
+    }
+    overlay.remove();
+    obreImpressioPressupost(seccions);
+  } }));
+  card.append(actions);
+  overlay.append(card);
+  document.body.append(overlay);
+}
+
+// ─── Imprimir una sola partida ─────────────────────────────
+function imprimeixPartida(idx) {
+  const s = cur_();
+  if (!s || !s.budget || !s.budget[idx]) return;
+  const p = s.budget[idx];
+  const cos = [];
+  cos.push('<h2>' + escapeHtml(p.c || '—') + ' <span class="muted">· ' + escapeHtml(p.cat || '—') + '</span></h2>');
+  cos.push('<table><tbody>'
+    + '<tr><td style="width:30%">Previst</td><td class="num strong">' + eur(p.p) + '</td></tr>'
+    + '<tr><td>Real</td><td class="num strong">' + eur(realOf(p)) + '</td></tr>'
+    + '<tr><td>Estat</td><td><span class="pill ' + (p.st === 'pagat' ? 'ok' : p.st === 'aprovat' ? 'warn' : '') + '">' + stLabel(p.st || 'pendent') + '</span></td></tr>'
+    + '</tbody></table>');
+  if ((p.exp || []).length) {
+    cos.push('<h3>Despeses</h3>');
+    cos.push(_htmlDespesesPerMes([p]));
+  }
+  if (p.admet_jornades && (p.jornades || []).length) {
+    cos.push('<h3>Jornades especials</h3>');
+    cos.push(_htmlJornadesPerMes([p]));
+  }
+  if (p.admet_dietes && (p.dietes || []).length) {
+    cos.push('<h3>Dietes</h3>');
+    cos.push(_htmlDietesPerMes([p]));
+  }
+  _obreImpressio(_htmlImpressio('Partida · ' + (p.c || ''), cos.join('')));
+}
+
+// ─── Imprimir un mes d'un bloc (despeses / jornades / dietes) ───
+function imprimeixMes(tipus, idxPartida, mesKey) {
+  const s = cur_();
+  if (!s || !s.budget || !s.budget[idxPartida]) return;
+  const p = s.budget[idxPartida];
+  const cos = [];
+  if (tipus === 'despeses') {
+    const items = (p.exp || []).filter(e => (e.d ? e.d.slice(0,7) : 'sense-data') === mesKey);
+    cos.push('<h2>' + escapeHtml(p.c || '—') + ' · Despeses · ' + escapeHtml(nomMes(mesKey)) + '</h2>');
+    cos.push(_htmlDespesesPerMes([{ ...p, exp: items }]));
+  } else if (tipus === 'jornades') {
+    const items = (p.jornades || []).filter(j => (j.data || '').slice(0,7) === mesKey);
+    cos.push('<h2>' + escapeHtml(p.c || '—') + ' · Jornades · ' + escapeHtml(nomMes(mesKey)) + '</h2>');
+    cos.push(_htmlJornadesPerMes([{ ...p, jornades: items, admet_jornades: true }]));
+  } else if (tipus === 'dietes') {
+    const items = (p.dietes || []).filter(d => (d.data || '').slice(0,7) === mesKey);
+    cos.push('<h2>' + escapeHtml(p.c || '—') + ' · Dietes · ' + escapeHtml(nomMesDieta(mesKey)) + '</h2>');
+    cos.push(_htmlDietesPerMes([{ ...p, dietes: items, admet_dietes: true }]));
+  }
+  _obreImpressio(_htmlImpressio('Mes · ' + mesKey, cos.join('')));
+}
 
 /* ============================================================
    RENDER BUDGET
@@ -2939,6 +3331,7 @@ function renderBudget(s) {
         j.tipus_jornada = (t && t !== 'fora_de_rang') ? t : 'sencera';
         calDesar = true;
       }
+      if (typeof j.dies !== 'number' || j.dies < 1) { j.dies = 1; calDesar = true; }
     });
     p.dietes.forEach(d => {
       if (!Array.isArray(d.persones_noms)) { d.persones_noms = d.persona ? String(d.persona).split(',').map(x => x.trim()).filter(Boolean) : []; calDesar = true; }
@@ -2955,6 +3348,7 @@ function renderBudget(s) {
   wrap.append(el('div', { class: 'row', style: 'justify-content:space-between;margin:0 0 8px;align-items:center' }, [
     el('h3', { textContent: 'Full de pressupost', style: 'margin:0' }),
     el('div', { class: 'row', style: 'margin:0' }, [
+      el('button', { class: 'btn', textContent: '🖨️ Imprimir', title: 'Imprimir el pressupost (per seccions)', onclick: () => mostraMenuImpressio() }),
       editing ? el('button', { class: 'btn s', textContent: '📥 Recarregar', onclick: () => {
         if (!confirm('Sobreescriure amb les 22 partides inicials?')) return;
         s.budget = JSON.parse(JSON.stringify(PARTIDES_INICIALS));
@@ -2985,7 +3379,7 @@ function renderBudget(s) {
     const open = !!openBud[idx];
     const real = realOf(p);
     const isSoundtrack = /soundtrack/i.test(p.c || '');
-      const row = el('div', { class: 'bud-row' + (open ? ' open' : '') });
+    const row = el('div', { class: 'bud-row' + (open ? ' open' : '') });
     // ⚠️ Possible doble comptatge (declarat ABANS d'usar-lo al concepteCell)
     const teDespesesManuals = (p.exp || []).some(e => Number(e.a) > 0);
     const teAdquisicioPagada = isSoundtrack && dSoundtrack.existeix && dSoundtrack.pagat > 0;
@@ -3019,7 +3413,7 @@ function renderBudget(s) {
       row.append(el('div', { class: 'bc-num' }, el('input', { type: 'number', value: p.p, min: 0, step: '0.01', style: 'text-align:right', oninput: e => { p.p = Number(e.target.value) || 0; save(s); } })));
     } else {
       const concepteCell = el('div', { textContent: p.c || '(sense nom)' });
-if (possibleDobleComptatge) concepteCell.append(el('span', { class: 'budget-badge', style: 'background:rgba(192,57,43,.15);color:var(--err);font-weight:700', title: 'Hi ha despeses manuals a la partida i adquisicions pagades a music_rights. El Real podria estar inflat.', textContent: '⚠️ Possible doble comptatge' }));
+      if (possibleDobleComptatge) concepteCell.append(el('span', { class: 'budget-badge', style: 'background:rgba(192,57,43,.15);color:var(--err);font-weight:700', title: 'Hi ha despeses manuals a la partida i adquisicions pagades a music_rights. El Real podria estar inflat.', textContent: '⚠️ Possible doble comptatge' }));
       if (isSoundtrack && dSoundtrack.existeix && dSoundtrack.pendent > 0) concepteCell.append(el('span', { class: 'budget-badge', textContent: '🎼 ' + eur(dSoundtrack.pendent) + ' pendents en drets musicals' }));
       if (p.admet_jornades && (p.jornades || []).length) { const pend = pendentJornadesOf(p); if (pend > 0) concepteCell.append(el('span', { class: 'budget-badge', textContent: '🎬 ' + eur(pend) + ' pendents de cobrar' })); }
       if (p.admet_dietes && (p.dietes || []).length) { const pendD = pendentDietesOf(p); if (pendD > 0) concepteCell.append(el('span', { class: 'budget-badge', textContent: '🍽️ ' + eur(pendD) + ' en dietes pendents' })); }
@@ -3028,7 +3422,7 @@ if (possibleDobleComptatge) concepteCell.append(el('span', { class: 'budget-badg
       row.append(el('div', { class: 'bc-num', textContent: eur(p.p) }));
     }
 
-      let realMostrat = real;
+    let realMostrat = real;
     if (teAdquisicioPagada) realMostrat = real + dSoundtrack.pagat;
     row.append(el('div', { class: 'bc-num strong', textContent: eur(realMostrat) }));
 
@@ -3041,9 +3435,13 @@ if (possibleDobleComptatge) concepteCell.append(el('span', { class: 'budget-badg
       row.append(el('div', { class: 'hide-s' }, el('span', { class: 'st-pill ' + stClass(estatMostrar), textContent: stLabel(estatMostrar) })));
     }
 
-    row.append(el('div', { class: 'bc-x' }, editing ? el('button', { class: 'x', textContent: '×', onclick: () => {
-      if (confirm('Eliminar?')) { s.budget.splice(idx, 1); s.budget.forEach((q,i)=>q.pos=i); save(s); render(); }
-    } }) : ''));
+    // Botons: imprimir partida + eliminar (si editing)
+    const cellAccions = el('div', { class: 'bc-x', style: 'display:flex;gap:2px;align-items:center;justify-content:center' });
+    cellAccions.append(el('button', { class: 'btn-print sm', title: 'Imprimir aquesta partida', textContent: '🖨️', onclick: (ev) => { ev.stopPropagation(); imprimeixPartida(idx); } }));
+    if (editing) cellAccions.append(el('button', { class: 'x', textContent: '×', onclick: () => {
+      if (confirm('Eliminar aquesta partida?')) { s.budget.splice(idx, 1); s.budget.forEach((q,i)=>q.pos=i); save(s); render(); }
+    } }));
+    row.append(cellAccions);
 
     if (editing) {
       row.addEventListener('dragover', (ev) => { ev.preventDefault(); row.classList.add('drop-target'); });
@@ -3070,7 +3468,7 @@ if (possibleDobleComptatge) concepteCell.append(el('span', { class: 'budget-badg
           liniaMes.append(el('span', { style: 'font-variant-numeric:tabular-nums;min-width:80px;text-align:right', textContent: eur(total) }));
           if (cobrat) liniaMes.append(el('span', { style: 'font-variant-numeric:tabular-nums;min-width:100px;text-align:right;color:var(--ok);font-weight:600', textContent: '🟢 Cobrat' }));
           else liniaMes.append(el('span', { style: 'font-variant-numeric:tabular-nums;min-width:100px;text-align:right;color:var(--warn);font-weight:600', textContent: '🟡 ' + eur(pendent) + ' pendent' }));
-          liniaMes.append(el('span', { style: 'min-width:110px' }));
+          liniaMes.append(el('button', { class: 'btn-print sm', title: 'Imprimir aquest mes', textContent: '🖨️', onclick: (ev) => { ev.stopPropagation(); imprimeixMes('jornades', idx, mk); } }));
           sublinia.append(liniaMes);
         });
         list.append(el('div', { style: 'background:rgba(122,90,166,.03);border-bottom:1px solid var(--bd)' }, sublinia));
@@ -3119,11 +3517,12 @@ if (possibleDobleComptatge) concepteCell.append(el('span', { class: 'budget-badg
           header.append(el('span', { class: 'jorn-mes-count', textContent: '(' + nJ + ' jornada' + (nJ === 1 ? '' : 'es') + ')' }));
           header.append(el('span', { class: 'jorn-mes-total', textContent: eur(tM) }));
           header.append(el('span', { class: 'jorn-mes-cobrat', textContent: '(' + eur(cM) + ' cobrats)' }));
+          header.append(el('button', { class: 'btn-print sm', title: 'Imprimir aquest mes', textContent: '🖨️', onclick: (ev) => { ev.stopPropagation(); imprimeixMes('jornades', idx, mk); } }));
           header.addEventListener('click', () => { openMes[idx] = openMes[idx] || {}; openMes[idx][mk] = !obert; render(); });
           jbox.append(header);
           if (obert) {
             const taula = el('div', { class: 'jorn-taula' });
-            taula.append(el('div', { class: 'jorn-row jorn-head' }, [el('div', { textContent: 'Data' }), el('div', { textContent: 'Tipus' }), el('div', { textContent: 'Persones' }), el('div', { textContent: 'Concepte' }), el('div', { class: 'jorn-num', textContent: 'Preu unit.' }), el('div', { class: 'jorn-num', textContent: 'Pers.' }), el('div', { class: 'jorn-num', textContent: 'Total' }), el('div', { textContent: 'Cobrat' }), el('div')]));
+            taula.append(el('div', { class: 'jorn-row jorn-head' }, [el('div', { textContent: 'Data' }), el('div', { textContent: 'Tipus' }), el('div', { textContent: 'Persones' }), el('div', { textContent: 'Concepte' }), el('div', { class: 'jorn-num', textContent: 'Preu unit.' }), el('div', { class: 'jorn-num', textContent: 'Pers.' }), el('div', { class: 'jorn-num', textContent: 'Dies' }), el('div', { class: 'jorn-num', textContent: 'Total' }), el('div', { textContent: 'Cobrat' }), el('div')]));
             arr.forEach(j => {
               const jrow = el('div', { class: 'jorn-row' + (j.cobrat ? ' done' : '') });
               const tipusJ = j.tipus_jornada || 'sencera';
@@ -3165,15 +3564,22 @@ if (possibleDobleComptatge) concepteCell.append(el('span', { class: 'budget-badg
               jrow.append(el('div', { class: 'jorn-num', textContent: preuUnit ? eur(preuUnit) : '—' }));
               const nPers = (j.persones_noms || []).length;
               jrow.append(el('div', { class: 'jorn-num', textContent: String(nPers) }));
-              const totalJornada = preuUnit * nPers;
+              const inpDies = el('input', { type: 'number', value: j.dies || 1, min: 1, step: '1', style: 'width:44px;text-align:right;padding:3px' });
+              inpDies.disabled = !editing;
+              inpDies.addEventListener('input', () => { j.dies = Math.max(1, Number(inpDies.value) || 1); save(s); render(); });
+              jrow.append(el('div', { class: 'jorn-num' }, inpDies));
+              const diesJ = Number(j.dies) || 1;
+              const totalJornada = preuUnit * nPers * diesJ;
               jrow.append(el('div', { class: 'jorn-num', style: 'font-weight:700;' + (j.cobrat ? '' : 'color:var(--mut);opacity:.65'), textContent: totalJornada > 0 ? eur(totalJornada) : '—' }));
               const cbC = el('input', { type: 'checkbox', checked: !!j.cobrat }); cbC.disabled = !editing;
               cbC.addEventListener('change', () => { j.cobrat = cbC.checked; save(s); render(); });
               if (j.cobrat && !editing) jrow.append(el('div', { style: 'text-align:center;font-size:16px', title: 'Cobrat', textContent: '✅' }));
               else jrow.append(el('div', { style: 'text-align:center' }, cbC));
               jrow.append(el('div', { style: 'text-align:center' }, editing ? el('button', { class: 'x', textContent: '×', onclick: () => { if (!confirm('Esborrar aquesta jornada?')) return; p.jornades = p.jornades.filter(x => x !== j); save(s); render(); } }) : ''));
+              const diesBadge = Number(j.dies) || 1;
+              const diesTxt = diesBadge > 1 ? ' × ' + diesBadge + ' dies' : '';
               const badgeRow = el('div', { style: 'grid-column:1/-1;padding:2px 0 4px 6px;font-size:11px;' + (j.cobrat ? 'color:var(--ok)' : 'color:var(--warn)') });
-              badgeRow.textContent = ETIQ_JORNADA[tipusJ] + ' · ' + (j.cobrat ? '🟢 Cobrat' : '🟡 Pendent de cobrar');
+              badgeRow.textContent = ETIQ_JORNADA[tipusJ] + diesTxt + ' · ' + (j.cobrat ? '🟢 Cobrat' : '🟡 Pendent de cobrar');
               taula.append(jrow); taula.append(badgeRow);
             });
             const tMes = totalMes(arr), cMes = cobratMes(arr), pMes = pendentMes(arr);
@@ -3183,7 +3589,7 @@ if (possibleDobleComptatge) concepteCell.append(el('span', { class: 'budget-badg
             if (editing) taula.append(el('div', { class: 'row', style: 'margin-top:6px' }, el('button', { class: 'btn s', textContent: '+ Afegir jornada', onclick: () => {
               const dataDefault = (mk && mk !== 'sense-data') ? (mk + '-' + String(new Date().getDate()).padStart(2, '0')) : avuiISO();
               p.jornades = p.jornades || [];
-              p.jornades.push({ id: 'j' + Date.now().toString(36), data: dataDefault, tipus_jornada: 'sencera', persones_noms: [], concepte: '', cobrat: false });
+              p.jornades.push({ id: 'j' + Date.now().toString(36), data: dataDefault, tipus_jornada: 'sencera', persones_noms: [], concepte: '', cobrat: false, dies: 1 });
               openMes[idx] = openMes[idx] || {}; openMes[idx][mk] = true; save(s); render();
             } })));
             jbox.append(taula);
@@ -3194,10 +3600,10 @@ if (possibleDobleComptatge) concepteCell.append(el('span', { class: 'budget-badg
           const valor = prompt('Mes (YYYY-MM):', ara.getFullYear() + '-' + String(ara.getMonth() + 1).padStart(2, '0'));
           if (!valor || !/^\d{4}-\d{2}$/.test(valor)) return;
           p.jornades = p.jornades || [];
-          p.jornades.push({ id: 'j' + Date.now().toString(36), data: valor + '-01', tipus_jornada: 'sencera', persones_noms: [], concepte: '', cobrat: false });
+          p.jornades.push({ id: 'j' + Date.now().toString(36), data: valor + '-01', tipus_jornada: 'sencera', persones_noms: [], concepte: '', cobrat: false, dies: 1 });
           openMes[idx] = openMes[idx] || {}; openMes[idx][valor] = true; save(s); render();
         } })));
-        jbox.append(el('div', { class: 'badge', style: 'margin-top:6px', textContent: 'Les jornades cobrades sumen al Real. Les pendents es mostren però no sumen.' }));
+        jbox.append(el('div', { class: 'badge', style: 'margin-top:6px', textContent: 'Les jornades cobrades sumen al Real. El camp "Dies" multiplica el total: preu × persones × dies.' }));
         list.append(jbox);
       }
     }
@@ -3270,6 +3676,7 @@ function renderBlocDietes(s, p, idx) {
     header.append(el('span', { class: 'diet-mes-total', textContent: eur(tM) }));
     if (pM === 0) header.append(el('span', { style: 'color:var(--ok);font-weight:600;font-size:12px', textContent: '🟢 Cobrat' }));
     else header.append(el('span', { style: 'color:var(--warn);font-weight:600;font-size:12px', textContent: '🟡 ' + eur(pM) + ' pendent' }));
+    header.append(el('button', { class: 'btn-print sm', title: 'Imprimir aquest mes', textContent: '🖨️', onclick: (ev) => { ev.stopPropagation(); imprimeixMes('dietes', idx, mk); } }));
     if (pM > 0) {
       header.append(el('button', { class: 'btn s', textContent: '✅ Cobrar totes', onclick: () => {
         if (!confirm('Marcar com a cobrades ' + arr.filter(d => d.estat !== 'cobrat').length + ' dietes pendents de ' + nomMesDieta(mk) + '?')) return;
@@ -3409,6 +3816,9 @@ function renderBlocDietes(s, p, idx) {
   return dbox;
 }
 
+/* ============================================================
+   INICIALITZACIÓ
+   ============================================================ */
 async function start(user) {
   me = user.email;
   $('#login').hidden = true; $('#ui').hidden = false;
